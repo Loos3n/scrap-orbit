@@ -1,3 +1,6 @@
+// Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
+// Content-Security-Policy hosts (embedded pages, some app stores' web views).
+import 'pixi.js/unsafe-eval';
 import './style.css';
 import { GENERATORS, UPGRADES } from './core/config';
 import * as eco from './core/economy';
