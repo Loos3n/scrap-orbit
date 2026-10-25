@@ -10,24 +10,34 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;600&display=swap" />
   </head>
   <body>
+    <div id="scene" aria-label="Your station. Tap to salvage scrap."></div>
     <div id="app">
       <header id="hud">
-        <div class="hud-main">
-          <div class="label">Scrap</div>
-          <div id="scrap" class="scrap">0</div>
-          <div id="rate" class="rate">0 / sec</div>
+        <div class="readout">
+          <span class="scrap-icon" data-icon="scrap"></span>
+          <div class="readout-text">
+            <div id="scrap" class="scrap">0</div>
+            <div class="rate"><span id="rate">0</span> scrap / sec</div>
+          </div>
         </div>
-        <button id="boost" class="boost" type="button">
-          <span class="boost-title">Overdrive</span>
-          <span id="boost-sub" class="boost-sub">2x for 30s</span>
-        </button>
+        <div class="hud-actions">
+          <button id="sound" class="round-btn" type="button" aria-label="Sound on" data-icon="soundOn"></button>
+          <button id="boost" class="boost" type="button">
+            <span class="boost-icon" data-icon="bolt"></span>
+            <span class="boost-text">
+              <span class="boost-title">Overdrive</span>
+              <span id="boost-sub" class="boost-sub">2x for 30s</span>
+            </span>
+          </button>
+        </div>
       </header>
-      <main id="scene" aria-label="Your station. Tap to salvage scrap."></main>
+      <div id="stage"></div>
       <section id="panel">
+        <div class="grabber" aria-hidden="true"></div>
         <nav class="tabs" role="tablist">
-          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button">Build</button>
-          <button class="tab" role="tab" data-tab="upgrades" aria-selected="false" type="button">Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button">Station</button>
+          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build</button>
+          <button class="tab" role="tab" data-tab="upgrades" aria-selected="false" type="button"><span data-icon="upgrades"></span>Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station</button>
         </nav>
         <div id="tab-build" class="tab-body">
           <div class="buy-modes" role="radiogroup" aria-label="Buy amount">
@@ -37,6 +47,7 @@
             <button type="button" data-mode="max" aria-checked="false" role="radio">Max</button>
           </div>
           <ul id="gen-list" class="list"></ul>
+          <p id="gen-hint" class="hint">Build more to discover new machines.</p>
         </div>
         <div id="tab-upgrades" class="tab-body" hidden>
           <ul id="upgrade-list" class="list"></ul>
@@ -44,8 +55,9 @@
         <div id="tab-station" class="tab-body" hidden>
           <dl id="stats" class="stats"></dl>
           <div class="settings">
-            <label class="toggle"><input id="opt-sci" type="checkbox" /> Scientific notation</label>
-            <label class="toggle"><input id="opt-haptics" type="checkbox" /> Vibration on tap</label>
+            <label class="toggle"><input id="opt-sound" type="checkbox" /><span>Sound effects</span></label>
+            <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration on tap</span></label>
+            <label class="toggle"><input id="opt-sci" type="checkbox" /><span>Scientific notation</span></label>
             <button id="reset" class="reset" type="button">Reset progress</button>
             <div id="reset-confirm" class="reset-confirm" hidden>
               <span>Erase this station and start over?</span>
@@ -58,7 +70,8 @@
     </div>
     <div id="modal" class="modal" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="label">While you were away</div>
+        <div class="modal-art" data-icon="scrap"></div>
+        <div class="eyebrow">While you were away</div>
         <h2 id="modal-title">Your crew kept salvaging</h2>
         <div id="modal-amount" class="modal-amount">+0</div>
         <p id="modal-time" class="modal-time"></p>

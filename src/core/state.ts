@@ -14,7 +14,7 @@ export interface GameState {
   boostReadyAt: number;
   /** Epoch ms of the last save, used for offline earnings. */
   lastSeen: number;
-  settings: { scientific: boolean; haptics: boolean };
+  settings: { scientific: boolean; haptics: boolean; sound: boolean };
 }
 
 interface SaveData {
@@ -42,7 +42,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { scientific: false, haptics: true },
+    settings: { scientific: false, haptics: true, sound: true },
   };
 }
 

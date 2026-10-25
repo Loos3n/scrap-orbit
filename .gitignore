@@ -5,3 +5,4 @@ dist-single/
 .env
 .env.*
 .DS_Store
+shots/
