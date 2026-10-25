@@ -1,6 +1,8 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { checkAchievements, type AchievementDef } from './core/achievements';
+import { ACHIEVEMENT_CRYSTALS, type CrewId, type EventKind } from './core/content';
 import * as eco from './core/economy';
+import * as meta from './core/meta';
 import type { Decimal } from './core/num';
 import { deserialize, newState, serialize, type GameState } from './core/state';
 
@@ -10,6 +12,8 @@ const AUTOSAVE_MS = 30_000;
 const AWAY_THRESHOLD_SEC = 5;
 const ACHIEVEMENT_CHECK_MS = 1_000;
 const AUTOBUY_MS = 2_000;
+/** Crystals for each relocation. */
+const RELOCATE_CRYSTALS = 5;
 
 export type GameEvent =
   | { type: 'tap'; value: Decimal }
@@ -20,7 +24,16 @@ export type GameEvent =
   | { type: 'offline'; seconds: number; earned: Decimal }
   | { type: 'bonus'; value: Decimal }
   | { type: 'achievement'; def: AchievementDef }
-  | { type: 'relocate'; cores: number }
+  | { type: 'relocate'; cores: number; crystals: number }
+  | { type: 'crew'; id: CrewId; level: number }
+  | { type: 'research'; id: string; phase: 'start' | 'done' }
+  | { type: 'decor'; id: string }
+  | { type: 'mission'; crystals: number }
+  | { type: 'missionReady' }
+  | { type: 'event'; kind: EventKind; phase: 'start' | 'end' }
+  | { type: 'meteor'; value: Decimal }
+  | { type: 'convoy'; crystals: number }
+  | { type: 'tutorial'; step: number }
   | { type: 'reset' };
 
 function storageGet(): string | null {
@@ -48,6 +61,7 @@ export class Game {
   private lastSave = Date.now();
   private lastCheck = 0;
   private lastAutoBuy = Date.now();
+  private readyMissions = 0;
 
   constructor() {
     const now = Date.now();
@@ -65,6 +79,8 @@ export class Game {
   /** Call once after listeners are attached, to credit time away since the last save. */
   start(): void {
     this.collectOffline(Date.now());
+    meta.refreshMissions(this.state, Date.now());
+    this.readyMissions = meta.claimableMissions(this.state);
   }
 
   /** Advances the game to `now`. Called every animation frame. */
@@ -76,6 +92,8 @@ export class Game {
     } else {
       eco.tick(this.state, dt, now);
       this.state.lastSeen = now;
+      this.state.stats.playSec += dt;
+      this.state.stats.runSec += dt;
     }
     if (now - this.lastAutoBuy > AUTOBUY_MS) {
       this.lastAutoBuy = now;
@@ -83,9 +101,78 @@ export class Game {
     }
     if (now - this.lastCheck > ACHIEVEMENT_CHECK_MS) {
       this.lastCheck = now;
-      for (const def of checkAchievements(this.state)) this.emit({ type: 'achievement', def });
+      this.slowUpdate(now);
     }
     if (now - this.lastSave > AUTOSAVE_MS) this.save();
+  }
+
+  /** Once a second: achievements, missions, research timers, events, records. */
+  private slowUpdate(now: number): void {
+    const s = this.state;
+    for (const def of checkAchievements(s)) {
+      meta.addCrystals(s, ACHIEVEMENT_CRYSTALS);
+      this.emit({ type: 'achievement', def });
+    }
+    meta.refreshMissions(s, now);
+    const ready = meta.claimableMissions(s);
+    if (ready > this.readyMissions) this.emit({ type: 'missionReady' });
+    this.readyMissions = ready;
+    const done = meta.finishResearch(s, now);
+    if (done) this.emit({ type: 'research', id: done, phase: 'done' });
+    const ev = meta.updateEvents(s, now);
+    if (ev.started) this.emit({ type: 'event', kind: ev.started, phase: 'start' });
+    if (ev.ended) this.emit({ type: 'event', kind: ev.ended, phase: 'end' });
+    const inc = eco.baseIncome(s);
+    if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
+  }
+
+  /** Moves the tutorial on when the player has done what the current step asks. */
+  advanceTutorial(step: number): void {
+    if (this.state.tutorial !== step) return;
+    this.state.tutorial = step + 1;
+    this.emit({ type: 'tutorial', step: this.state.tutorial });
+  }
+
+  endTutorial(): void {
+    this.state.tutorial = -1;
+    this.emit({ type: 'tutorial', step: -1 });
+  }
+
+  trainCrew(id: CrewId): void {
+    if (meta.trainCrew(this.state, id)) this.emit({ type: 'crew', id, level: this.state.crew[id] });
+  }
+
+  startResearch(id: string): void {
+    if (meta.startResearch(this.state, id, Date.now())) this.emit({ type: 'research', id, phase: 'start' });
+  }
+
+  rushResearch(): void {
+    const id = meta.rushResearch(this.state, Date.now());
+    if (id) this.emit({ type: 'research', id, phase: 'done' });
+  }
+
+  useDecor(id: string): void {
+    if (meta.useDecor(this.state, id)) this.emit({ type: 'decor', id });
+  }
+
+  claimMission(index: number): void {
+    const crystals = meta.claimMission(this.state, index);
+    if (crystals > 0) {
+      this.readyMissions = meta.claimableMissions(this.state);
+      this.emit({ type: 'mission', crystals });
+    }
+  }
+
+  smashMeteor(): Decimal {
+    const value = meta.smashMeteor(this.state, Date.now());
+    this.emit({ type: 'meteor', value });
+    return value;
+  }
+
+  boardConvoy(): number {
+    const crystals = meta.boardConvoy(this.state);
+    this.emit({ type: 'convoy', crystals });
+    return crystals;
   }
 
   /** Auto-Builder perk: buys the cheapest machine on offer, if it's affordable. */
@@ -151,8 +238,9 @@ export class Game {
   relocate(): number {
     const cores = eco.relocate(this.state, Date.now());
     if (cores > 0) {
+      meta.addCrystals(this.state, RELOCATE_CRYSTALS);
       this.save();
-      this.emit({ type: 'relocate', cores });
+      this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS });
     }
     return cores;
   }

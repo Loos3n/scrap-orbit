@@ -4,6 +4,8 @@ import 'pixi.js/unsafe-eval';
 import './style.css';
 import { Sfx } from './audio';
 import { GENERATORS, UPGRADES } from './core/config';
+import { CREW, EVENTS, PAINTS, RESEARCH, THEMES } from './core/content';
+import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { format } from './core/num';
 import { Game } from './game';
@@ -15,7 +17,10 @@ async function boot(): Promise<void> {
   const game = new Game();
   const sfx = new Sfx();
   const ui = new UI(game);
-  ui.onSoundChange = (on) => (sfx.enabled = on);
+  ui.onSoundChange = (sound, music) => {
+    sfx.enabled = sound;
+    sfx.setMusic(music);
+  };
   ui.onRelocate = () => game.relocate();
   ui.syncSettings();
   const scene = new StationScene();
@@ -30,10 +35,19 @@ async function boot(): Promise<void> {
   syncFocus();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
-  const syncPerks = () => scene.setCrateRate(eco.hasPerk(game.state, 'magnet') ? 2 : 1);
+  const syncPerks = () => scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate'));
   syncPerks();
+  const syncDecor = () => {
+    const s = game.state;
+    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (PAINTS.find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint);
+    document.documentElement.style.setProperty('--theme-core', '#' + (THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0]).core.toString(16).padStart(6, '0'));
+  };
+  syncDecor();
+  ui.onTab = (tab) => {
+    if (tab === 'upgrades') game.advanceTutorial(2);
+  };
 
-  const fmt = (v: Parameters<typeof format>[0]) => format(v, game.state.settings.scientific);
+  const fmt = (v: Parameters<typeof format>[0]) => format(v, game.state.settings.numbers);
   const buzz = (ms: number) => {
     if (game.state.settings.haptics && 'vibrate' in navigator) {
       try {
@@ -53,6 +67,8 @@ async function boot(): Promise<void> {
         scene.setOwned(game.state.owned);
         ui.flashRow(e.gen);
         sfx.buy();
+        buzz(5);
+        if (e.gen === 'drone') game.advanceTutorial(1);
         break;
       case 'milestone': {
         const g = GENERATORS.find((x) => x.id === e.gen)!;
@@ -70,6 +86,7 @@ async function boot(): Promise<void> {
         break;
       }
       case 'boost':
+        game.advanceTutorial(3);
         ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), `<b>Overdrive!</b> 2x everything for ${eco.boostDurationSec(game.state)} seconds`);
         sfx.boost();
         buzz(40);
@@ -82,7 +99,7 @@ async function boot(): Promise<void> {
         sfx.crate();
         break;
       case 'achievement':
-        ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>${e.def.name}</b> +1% income forever`);
+        ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>${e.def.name}</b> +1% income and 3 crystals`);
         sfx.achievement();
         break;
       case 'relocate':
@@ -90,13 +107,65 @@ async function boot(): Promise<void> {
         // Swap the station over at the brightest moment of the flash.
         setTimeout(() => scene.setOwned(game.state.owned), 1500);
         syncPerks();
-        ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores`);
+        ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores, +${e.crystals} crystals`);
         sfx.warp();
         buzz(60);
         break;
       case 'reset':
         scene.setOwned(game.state.owned);
         syncPerks();
+        syncDecor();
+        break;
+      case 'crew': {
+        const c = CREW.find((x) => x.id === e.id)!;
+        ui.toast(ICONS.crew.replace('currentColor', '#4fe3c1'), e.level === 1 ? `<b>${c.name}</b> joined the crew!` : `<b>${c.name}</b> reached level ${e.level}`);
+        scene.celebrate(GENERATORS.find((g) => g.id === c.gen)!.color);
+        sfx.upgrade();
+        buzz(20);
+        break;
+      }
+      case 'research': {
+        const r = RESEARCH.find((x) => x.id === e.id)!;
+        if (e.phase === 'done') {
+          ui.toast(ICONS.lab.replace('currentColor', '#5ce1ff'), `<b>${r.name}</b> research complete`);
+          scene.celebrate(0x5ce1ff);
+          sfx.research();
+          buzz(25);
+          syncPerks();
+        } else {
+          sfx.buy();
+        }
+        break;
+      }
+      case 'decor':
+        syncDecor();
+        sfx.upgrade();
+        break;
+      case 'mission':
+        ui.toast(ICONS.crystal, `<b>Mission complete!</b> +${e.crystals} crystals`);
+        sfx.coins();
+        buzz(20);
+        break;
+      case 'missionReady':
+        ui.toast(ICONS.missions.replace('currentColor', '#4fe3c1'), '<b>Mission ready</b> to claim on the mission board');
+        break;
+      case 'event':
+        scene.setEvent(e.phase === 'start' ? e.kind : null);
+        if (e.phase === 'start') {
+          ui.toast(e.kind === 'meteors' ? ICONS.meteor : e.kind === 'flare' ? ICONS.flare : ICONS.crystal, `<b>${EVENTS[e.kind].name}!</b> ${EVENTS[e.kind].desc}`);
+          sfx.event();
+          buzz(30);
+        }
+        break;
+      case 'meteor':
+        sfx.meteor();
+        break;
+      case 'convoy':
+        ui.toast(ICONS.crystal, `<b>Convoy boarded!</b> +${e.crystals} crystals`);
+        sfx.crate();
+        break;
+      case 'tutorial':
+        if (e.step === 1) ui.showTab('build');
         break;
     }
   });
@@ -105,13 +174,27 @@ async function boot(): Promise<void> {
     const rect = sceneEl.getBoundingClientRect();
     const x = ev.clientX - rect.left;
     const y = ev.clientY - rect.top;
-    if (scene.hitCrate(x, y)) {
+    const hit = scene.hitSpecial(x, y);
+    if (hit === 'crate') {
       const v = game.collectBonus();
       scene.floatText(0, -60, `+${fmt(v)}`, true);
       buzz(25);
       return;
     }
+    if (hit === 'meteor') {
+      const v = game.smashMeteor();
+      scene.floatText(scene.lastHit.x, scene.lastHit.y, `+${fmt(v)}`);
+      buzz(15);
+      return;
+    }
+    if (hit === 'convoy') {
+      const n = game.boardConvoy();
+      scene.floatText(scene.lastHit.x, scene.lastHit.y, `+${n} crystals`, true);
+      buzz(25);
+      return;
+    }
     const value = game.tap();
+    if (game.state.tutorial === 0 && game.state.taps >= 8) game.advanceTutorial(0);
     scene.tapAt(x, y, `+${fmt(value)}`);
     ui.bumpScrap();
     sfx.tap();
@@ -119,6 +202,7 @@ async function boot(): Promise<void> {
   });
 
   game.start();
+  scene.setEvent(meta.eventActive(game.state, Date.now()));
 
   let lastUi = 0;
   let lastFrame = performance.now();

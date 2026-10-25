@@ -96,6 +96,18 @@ const RAW_ICONS = {
     <circle cx="24" cy="24" r="6" fill="#fff"/>`),
   trophy: svg(`<path d="M14 6h20v10a10 10 0 0 1-20 0z" fill="currentColor"/><path d="M14 9H7a7 7 0 0 0 7 9M34 9h7a7 7 0 0 1-7 9" fill="none" stroke="currentColor" stroke-width="3"/><rect x="21" y="25" width="6" height="8" fill="currentColor"/><rect x="14" y="33" width="20" height="6" rx="2" fill="currentColor"/>`),
   warp: svg(`<circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="9" fill="none" stroke="currentColor" stroke-width="3" opacity=".6"/><circle cx="24" cy="24" r="3" fill="currentColor"/>`),
+  crystal: svg(`
+    <defs><linearGradient id="icr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6fbff"/><stop offset=".5" stop-color="#5cd6ff"/><stop offset="1" stop-color="#2a5fd0"/></linearGradient></defs>
+    <path d="M24 4 L38 17 L24 44 L10 17 Z" fill="url(#icr)" stroke="#0b1a40" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M10 17 H38 M24 4 L18 17 L24 44 L30 17 Z" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linejoin="round"/>`),
+  missions: svg(`<rect x="10" y="7" width="28" height="36" rx="4" fill="currentColor" opacity=".9"/><rect x="17" y="3" width="14" height="8" rx="2" fill="currentColor"/><path d="M16 20l3 3 6-6M16 32l3 3 6-6" fill="none" stroke="#141838" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><rect x="28" y="19" width="6" height="3" rx="1.5" fill="#141838"/><rect x="28" y="31" width="6" height="3" rx="1.5" fill="#141838"/>`),
+  crew: svg(`<circle cx="18" cy="16" r="7" fill="currentColor"/><path d="M5 40c0-9 6-14 13-14s13 5 13 14z" fill="currentColor"/><circle cx="33" cy="18" r="5.5" fill="currentColor" opacity=".6"/><path d="M27 29c2-1 4-2 6-2 6 0 10 4 10 11h-11" fill="currentColor" opacity=".6"/>`),
+  lab: svg(`<path d="M19 5h10M21 5v13L9 39a3 3 0 0 0 3 4h24a3 3 0 0 0 3-4L27 18V5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M14 31h20l4 8H10z" fill="currentColor"/><circle cx="21" cy="25" r="2" fill="currentColor"/><circle cx="27" cy="21" r="1.5" fill="currentColor"/>`),
+  meteor: svg(`<path d="M6 6 L26 22" stroke="#ffb547" stroke-width="5" stroke-linecap="round" opacity=".5"/><path d="M12 4 L28 18" stroke="#ff6b3d" stroke-width="3" stroke-linecap="round" opacity=".6"/><circle cx="31" cy="30" r="11" fill="#8a7a6a"/><circle cx="28" cy="27" r="3" fill="#6a5a4a"/><circle cx="35" cy="34" r="2" fill="#6a5a4a"/>`),
+  flare: svg(`<circle cx="24" cy="24" r="10" fill="#ffd166"/><g stroke="#ff8a4c" stroke-width="3.5" stroke-linecap="round"><path d="M24 3v6M24 39v6M3 24h6M39 24h6M9 9l4 4M35 35l4 4M9 39l4-4M35 13l4-4"/></g>`),
+  check: svg(`<path d="M10 25l9 9 19-20" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  clock: svg(`<circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" stroke-width="4"/><path d="M24 13v12l8 5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`),
+  palette: svg(`<path d="M24 5C13 5 5 13 5 23c0 9 7 15 14 15 3 0 3-3 2-5s0-5 3-5h6c7 0 13-4 13-11C43 10 34 5 24 5z" fill="currentColor"/><circle cx="15" cy="20" r="3" fill="#ff6b9a"/><circle cx="22" cy="13" r="3" fill="#ffd166"/><circle cx="31" cy="14" r="3" fill="#4fe3c1"/><circle cx="35" cy="22" r="3" fill="#7aa7ff"/>`),
   lock: svg(`<rect x="11" y="21" width="26" height="20" rx="4" fill="currentColor"/><path d="M16 21v-5a8 8 0 0 1 16 0v5" fill="none" stroke="currentColor" stroke-width="4"/>`),
 };
 

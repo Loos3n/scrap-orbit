@@ -1,9 +1,11 @@
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
-import { D, Decimal, format, formatDuration } from '../core/num';
+import { CREW, RESEARCH } from '../core/content';
+import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
+import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -68,10 +70,17 @@ export class UI {
   private achButtons = new Map<string, HTMLButtonElement>();
   private shown: Decimal = D(0);
   private lastScrapText = '';
-  private fmt = (v: Parameters<typeof format>[0]) => format(v, this.game.state.settings.scientific);
+  private fmt = (v: Parameters<typeof format>[0]) => format(v, this.game.state.settings.numbers);
+  private crew: CrewPanel;
+  private lab: LabPanel;
+  private decor: DecorPanel;
+  readonly missions: MissionsPanel;
+  private coach: Coach;
 
-  /** Called when the sound setting changes, so main can mute the synth. */
-  onSoundChange: ((on: boolean) => void) | null = null;
+  /** Called when the sound or music setting changes, so main can update the synth. */
+  onSoundChange: ((sound: boolean, music: boolean) => void) | null = null;
+  /** Called when the player opens a tab, for the tutorial. */
+  onTab: ((tab: string) => void) | null = null;
   /** Called after the player confirms a relocation. */
   onRelocate: (() => void) | null = null;
 
@@ -84,6 +93,12 @@ export class UI {
     this.bindSettings();
     this.bindRelocate();
     this.buildAchievements();
+    this.bindSegments();
+    this.crew = new CrewPanel(game);
+    this.lab = new LabPanel(game);
+    this.decor = new DecorPanel(game);
+    this.missions = new MissionsPanel(game, this.fmt);
+    this.coach = new Coach(game);
     $('boost').addEventListener('click', () => game.boost());
   }
 
@@ -137,6 +152,7 @@ export class UI {
           t.setAttribute('aria-selected', String(on));
           $(`tab-${t.dataset.tab}`).hidden = !on;
         });
+        this.onTab?.(tab.dataset.tab!);
         this.render();
       }),
     );
@@ -149,6 +165,24 @@ export class UI {
         const m = b.dataset.mode!;
         this.game.buyMode = m === 'max' ? 'max' : (Number(m) as 1 | 10 | 100);
         buttons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        this.render();
+      }),
+    );
+  }
+
+  /** Opens a panel tab from code (the tutorial uses it). */
+  showTab(name: string): void {
+    document.querySelector<HTMLButtonElement>(`.tab[data-tab="${name}"]`)?.click();
+  }
+
+  private bindSegments(): void {
+    const segs = document.querySelectorAll<HTMLButtonElement>('.segments button');
+    segs.forEach((b) =>
+      b.addEventListener('click', () => {
+        segs.forEach((x) => {
+          x.setAttribute('aria-selected', String(x === b));
+          $(`seg-${x.dataset.seg}`).hidden = x !== b;
+        });
         this.render();
       }),
     );
@@ -190,34 +224,43 @@ export class UI {
 
   private bindSettings(): void {
     const settings = () => this.game.state.settings;
-    const sci = $<HTMLInputElement>('opt-sci');
     const hap = $<HTMLInputElement>('opt-haptics');
     const snd = $<HTMLInputElement>('opt-sound');
+    const mus = $<HTMLInputElement>('opt-music');
     const auto = $<HTMLInputElement>('opt-auto');
-    const soundBtn = $('sound');
+    const nums = document.querySelectorAll<HTMLButtonElement>('#opt-numbers button');
     const sync = () => {
       auto.checked = settings().autoBuy;
-      sci.checked = settings().scientific;
       hap.checked = settings().haptics;
       snd.checked = settings().sound;
-      soundBtn.innerHTML = settings().sound ? ICONS.soundOn : ICONS.soundOff;
-      soundBtn.setAttribute('aria-label', settings().sound ? 'Mute sound' : 'Turn sound on');
-      this.onSoundChange?.(settings().sound);
+      mus.checked = settings().music;
+      nums.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.num === settings().numbers)));
+      this.onSoundChange?.(settings().sound, settings().music);
     };
     this.syncSettings = sync;
     sync();
-    sci.addEventListener('change', () => {
-      settings().scientific = sci.checked;
-      this.upgradeKey = '';
-    });
+    nums.forEach((b) =>
+      b.addEventListener('click', () => {
+        settings().numbers = b.dataset.num as NumberStyle;
+        this.upgradeKey = '';
+        sync();
+        this.render();
+      }),
+    );
     hap.addEventListener('change', () => (settings().haptics = hap.checked));
     auto.addEventListener('change', () => (settings().autoBuy = auto.checked));
-    const setSound = (on: boolean) => {
-      settings().sound = on;
+    snd.addEventListener('change', () => {
+      settings().sound = snd.checked;
       sync();
-    };
-    snd.addEventListener('change', () => setSound(snd.checked));
-    soundBtn.addEventListener('click', () => setSound(!settings().sound));
+    });
+    mus.addEventListener('change', () => {
+      settings().music = mus.checked;
+      sync();
+    });
+    $('replay-tutorial').addEventListener('click', () => {
+      this.game.state.tutorial = 0;
+      this.showTab('build');
+    });
     const confirm = $('reset-confirm');
     $('reset').addEventListener('click', () => (confirm.hidden = false));
     $('reset-no').addEventListener('click', () => (confirm.hidden = true));
@@ -265,7 +308,18 @@ export class UI {
     if (!$('tab-build').hidden) this.renderGenerators();
     this.renderUpgrades();
     this.renderCores();
-    if (!$('tab-station').hidden) this.renderStats(now);
+    setText($('crystals'), s.crystals.toLocaleString('en-US'));
+    $('crew-dot').hidden = !this.crew.anyAffordable();
+    $('lab-dot').hidden = !this.lab.idle();
+    if (!$('tab-crew').hidden) this.crew.render();
+    if (!$('tab-lab').hidden) this.lab.render();
+    if (!$('tab-station').hidden) {
+      if (!$('seg-decor').hidden) this.decor.render();
+      this.renderStats(now);
+    }
+    this.missions.render();
+    renderEventBanner(this.game);
+    this.coach.render();
   }
 
   private renderCores(): void {
@@ -279,7 +333,7 @@ export class UI {
     if ($('tab-cores').hidden) return;
 
     setText($('core-count'), s.cores.toLocaleString('en-US'));
-    setText($('core-bonus'), `+${Math.round(s.cores * PRESTIGE.perCore * 100).toLocaleString('en-US')}% income`);
+    setText($('core-bonus'), `+${Math.round(s.cores * eco.perCoreBonus(s) * 100).toLocaleString('en-US')}% income`);
     setText($('core-claim'), claim.toLocaleString('en-US'));
     const next = eco.nextCoreAt(s);
     const prevTotal = Math.max(eco.coresForAllTime(s.allTime), s.cores);
@@ -378,7 +432,7 @@ export class UI {
     if ($('tab-upgrades').hidden) return;
 
     // Rebuild only when the set of cards changes; otherwise just toggle buttons.
-    const key = available.map((u) => u.id).join() + '|' + (teaser?.id ?? '') + '|' + s.settings.scientific;
+    const key = available.map((u) => u.id).join() + '|' + (teaser?.id ?? '') + '|' + s.settings.numbers;
     const list = $('upgrade-list');
     if (key !== this.upgradeKey) {
       this.upgradeKey = key;
@@ -420,17 +474,37 @@ export class UI {
 
   private renderStats(now: number): void {
     const s = this.game.state;
-    const rows: [string, string][] = [
-      ['Scrap per tap', this.fmt(eco.tapValue(s, now))],
-      ['Total scrap salvaged', this.fmt(s.lifetime)],
-      ['Taps', s.taps.toLocaleString('en-US')],
-      ['Machines built', Object.values(s.owned).reduce((a, b) => a + b, 0).toLocaleString('en-US')],
-      ['Upgrades installed', `${s.upgrades.size} of ${UPGRADES.length}`],
-      ['Scrap salvaged, all time', this.fmt(s.allTime)],
-      ['Crates grabbed', s.stats.crates.toLocaleString('en-US')],
-      ['Relocations', s.stats.relocations.toLocaleString('en-US')],
+    const n = (v: number) => v.toLocaleString('en-US');
+    const sections: [string, [string, string][]][] = [
+      ['This run', [
+        ['Time this run', formatDuration(s.stats.runSec)],
+        ['Scrap salvaged', this.fmt(s.lifetime)],
+        ['Scrap per second', this.fmt(eco.baseIncome(s))],
+        ['Scrap per tap', this.fmt(eco.tapValue(s, now))],
+        ['Machines owned', n(Object.values(s.owned).reduce((a, b) => a + b, 0))],
+        ['Upgrades installed', `${s.upgrades.size} of ${UPGRADES.length}`],
+      ]],
+      ['All time', [
+        ['Time played', formatDuration(s.stats.playSec)],
+        ['Scrap salvaged', this.fmt(s.allTime)],
+        ['Best scrap per second', this.fmt(D(s.stats.bestIncome))],
+        ['Taps', n(s.taps)],
+        ['Machines built', n(s.stats.machines)],
+        ['Crates grabbed', n(s.stats.crates)],
+        ['Meteors smashed', n(s.stats.meteors)],
+        ['Events seen', n(s.stats.events)],
+        ['Overdrives fired', n(s.stats.boosts)],
+        ['Relocations', n(s.stats.relocations)],
+      ]],
+      ['Collection', [
+        ['Crystals earned', n(s.stats.crystalsEarned)],
+        ['Crew recruited', `${CREW.filter((c) => s.crew[c.id] > 0).length} of ${CREW.length}`],
+        ['Research finished', `${s.research.done.size} of ${RESEARCH.length}`],
+        ['Achievements', `${s.achievements.size} of ${ACHIEVEMENTS.length}`],
+        ['Star Cores', n(s.cores)],
+      ]],
     ];
-    const html = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+    const html = sections.map(([title, rows]) => `<dt class="stats-head">${title}</dt><dd class="stats-head"></dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')).join('');
     const stats = $('stats');
     if (stats.innerHTML !== html) stats.innerHTML = html;
 

@@ -92,21 +92,26 @@ export const flare = () =>
   }, 2);
 
 /** Deep-space backdrop: gradient, nebula clouds and a dusting of faint stars. */
-export function backdrop(w: number, h: number): Texture {
+export function backdrop(
+  w: number,
+  h: number,
+  sky: [string, string, string] = ['#0a0b22', '#12123a', '#0b0d26'],
+  nebula: [string, string, string, string, string] = ['#6b3fc2', '#c23f8f', '#1f7fa8', '#3f4fc2', '#2a8f9c'],
+): Texture {
   return paint(w, h, (ctx) => {
     ctx.fillStyle = linear(ctx, 0, 0, 0, h, [
-      [0, '#0a0b22'],
-      [0.55, '#12123a'],
-      [1, '#0b0d26'],
+      [0, sky[0]],
+      [0.55, sky[1]],
+      [1, sky[2]],
     ]);
     ctx.fillRect(0, 0, w, h);
     const r = rng(7);
     const clouds: [number, number, number, string, number][] = [
-      [0.12, 0.18, 0.75, '#6b3fc2', 0.22],
-      [0.3, 0.05, 0.45, '#c23f8f', 0.12],
-      [0.85, 0.42, 0.6, '#1f7fa8', 0.2],
-      [0.7, 0.9, 0.7, '#3f4fc2', 0.18],
-      [0.05, 0.75, 0.5, '#2a8f9c', 0.1],
+      [0.12, 0.18, 0.75, nebula[0], 0.22],
+      [0.3, 0.05, 0.45, nebula[1], 0.12],
+      [0.85, 0.42, 0.6, nebula[2], 0.2],
+      [0.7, 0.9, 0.7, nebula[3], 0.18],
+      [0.05, 0.75, 0.5, nebula[4], 0.1],
     ];
     ctx.globalCompositeOperation = 'lighter';
     for (const [cx, cy, cr, color, a] of clouds) {
@@ -1009,4 +1014,30 @@ export const dysonPanel = () =>
       ctx.lineTo(x, 11 - Math.sin((x / 30) * Math.PI) * 5);
       ctx.stroke();
     }
+  }, 4);
+
+/** A glowing meteor head: molten rock with a hot rim. The tail is a stretched streak. */
+export const meteor = () =>
+  paint(30, 30, (ctx) => {
+    const c = 15;
+    ctx.fillStyle = radial(ctx, c, c, 15, [
+      [0, 'rgba(255,200,120,0.9)'],
+      [0.55, 'rgba(255,120,60,0.35)'],
+      [1, 'rgba(255,90,40,0)'],
+    ]);
+    ctx.fillRect(0, 0, 30, 30);
+    const r = rng(77);
+    ctx.beginPath();
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * TAU;
+      const rr = 7 * (0.75 + r() * 0.25);
+      ctx.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = radial(ctx, c - 2, c - 2, 10, [
+      [0, '#fff1c8'],
+      [0.4, '#ff9a4c'],
+      [1, '#7a2a1a'],
+    ]);
+    ctx.fill();
   }, 4);

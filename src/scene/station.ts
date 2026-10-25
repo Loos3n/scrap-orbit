@@ -1,5 +1,6 @@
 import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
+import type { EventKind, ThemeDef } from '../core/content';
 import * as art from './art';
 
 /** Size of the world in scene units; the scene scales this to fit the viewport. */
@@ -40,7 +41,8 @@ interface Orbiter { s: Sprite; radius: number; angle: number; speed: number; wob
 interface Spark { s: Sprite; vx: number; vy: number; life: number; max: number }
 interface Puff { s: Sprite; life: number; max: number; grow: number }
 interface Ring { x: number; y: number; r: number; life: number; color: number; width: number }
-interface Drift { s: Sprite; vx: number; vy: number; vr: number; crate: boolean; glow?: Sprite }
+type DriftKind = 'debris' | 'crate' | 'meteor' | 'convoy';
+interface Drift { s: Sprite; vx: number; vy: number; vr: number; kind: DriftKind; glow?: Sprite; tail?: Sprite }
 interface Chunk { s: Sprite; x0: number; y0: number; t: number; dur: number; color: number }
 interface Floater { text: Text; vy: number; life: number; max: number }
 interface Turret { s: Sprite; angle: number; aim: number; cool: number; beam: number; tx: number; ty: number }
@@ -79,7 +81,7 @@ export class StationScene {
     wing: Texture; claw: Texture; drone: Texture; hauler: Texture; smelter: Texture; fab: Texture;
     dock: Texture; crate: Texture; debris: Texture[]; planet: Texture; antenna: Texture; moon: Texture;
     galaxy: Texture; rocks: Texture[]; turret: Texture; vortex: Texture; gate: Texture; portal: Texture;
-    sun: Texture; panel: Texture;
+    sun: Texture; panel: Texture; meteor: Texture;
   };
 
   private bg = new Sprite();
@@ -157,6 +159,13 @@ export class StationScene {
   private zoom = 1;
   private zoomTarget = 1;
   private crateRate = 1;
+  private event: EventKind | null = null;
+  private nextMeteor = 0;
+  private flareGlow = new Sprite();
+  private flare = 0;
+  private theme: ThemeDef | null = null;
+  private coreColor: number = COLORS.scrap;
+  private hullSprites: Sprite[] = [];
   private jump = 0;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   private resizeTimer = 0;
@@ -201,6 +210,7 @@ export class StationScene {
       portal: art.portal(),
       sun: art.sun(),
       panel: art.dysonPanel(),
+      meteor: art.meteor(),
     };
 
     this.buildHub();
@@ -219,9 +229,14 @@ export class StationScene {
     // Foreground rocks are drawn soft, as if close to the camera and out of focus.
     this.fgLayer.filters = [new BlurFilter({ strength: 2, quality: 2 })];
     this.flash.alpha = 0;
+    this.flareGlow.texture = this.tex.glow;
+    this.flareGlow.anchor.set(0.5);
+    this.flareGlow.blendMode = 'add';
+    this.flareGlow.tint = 0xffb070;
+    this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.world, 10], [this.fgLayer, 20], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.flareGlow, 6], [this.world, 10], [this.fgLayer, 20], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -256,9 +271,10 @@ export class StationScene {
     halo.blendMode = 'add';
     this.antenna = this.sprite(t.antenna, this.hub, 0, 54);
     this.antenna.anchor.set(0.5, 0);
-    this.sprite(t.hull, this.hub);
+    this.hullSprites.push(this.sprite(t.hull, this.hub));
     this.hub.addChild(this.podLayer);
     this.habitat = this.sprite(t.habitat, this.hub);
+    this.hullSprites.push(this.habitat);
     this.habitat.scale.set(0.82);
     // Blinking beacon lights around the rim.
     for (let i = 0; i < 6; i++) {
@@ -290,7 +306,9 @@ export class StationScene {
     this.world.scale.set(this.scale);
 
     this.bg.texture?.destroy(true);
-    this.bg.texture = art.backdrop(Math.ceil(w), Math.ceil(h));
+    this.bg.texture = art.backdrop(Math.ceil(w), Math.ceil(h), this.theme?.sky, this.theme?.nebula);
+    this.flareGlow.position.set(w * 0.08, top + fh * 0.05);
+    this.flareGlow.scale.set(Math.max(w, h) / 40);
 
     // The gas giant rises from behind the panel, off to one side.
     const ps = Math.min(w, fh, 520) * 0.62;
@@ -482,6 +500,24 @@ export class StationScene {
     this.crateRate = mult;
   }
 
+  /** Colours the sky, core and beacons, and paints the hull. */
+  setTheme(theme: ThemeDef, paint: number): void {
+    const changedSky = this.theme?.id !== theme.id;
+    this.theme = theme;
+    this.coreColor = theme.core;
+    this.lights.forEach((l, i) => (l.tint = theme.beacons[i % 2]));
+    for (const h of this.hullSprites) h.tint = paint;
+    if (changedSky && this.tex) this.layout();
+  }
+
+  /** Timed events change what drifts past (meteors, a convoy) and the light (solar flare). */
+  setEvent(kind: EventKind | null): void {
+    if (kind === this.event) return;
+    this.event = kind;
+    this.nextMeteor = 0.3;
+    if (kind === 'convoy') this.spawnDrift('convoy');
+  }
+
   /** The big jump when the station relocates: a warp, a flash, and a fresh start. */
   warpJump(): void {
     this.jump = 2.4;
@@ -503,23 +539,29 @@ export class StationScene {
     return { x: (sx - this.world.x) / this.scale, y: (sy - this.world.y) / this.scale };
   }
 
-  /** Returns true if the point hit the bonus crate (and consumes it). */
-  hitCrate(sx: number, sy: number): boolean {
+  /** Checks for a tap on a crate, meteor or convoy ship, and consumes it. */
+  hitSpecial(sx: number, sy: number): 'crate' | 'meteor' | 'convoy' | null {
     const p = this.toWorld(sx, sy);
-    const crate = this.drifts.find((d) => d.crate && Math.hypot(d.s.x - p.x, d.s.y - p.y) < 34);
-    if (!crate) return false;
-    this.removeDrift(crate);
-    this.burst(crate.s.x, crate.s.y, COLORS.dock, 34, 1.7);
-    this.puff(crate.s.x, crate.s.y, COLORS.dock, 3, 0.6);
-    this.rings.push({ x: crate.s.x, y: crate.s.y, r: 10, life: 1, color: COLORS.dock, width: 3 });
-    this.shake = Math.max(this.shake, 6);
-    return true;
+    const reach: Record<DriftKind, number> = { debris: 0, crate: 34, meteor: 32, convoy: 46 };
+    const hit = this.drifts.find((d) => d.kind !== 'debris' && Math.hypot(d.s.x - p.x, d.s.y - p.y) < reach[d.kind]);
+    if (!hit) return null;
+    this.removeDrift(hit);
+    this.lastHit = { x: hit.s.x, y: hit.s.y };
+    const color = hit.kind === 'meteor' ? 0xff9a4c : hit.kind === 'convoy' ? 0x5cd6ff : COLORS.dock;
+    this.burst(hit.s.x, hit.s.y, color, hit.kind === 'meteor' ? 22 : 34, 1.7);
+    this.puff(hit.s.x, hit.s.y, color, 3, 0.6);
+    this.rings.push({ x: hit.s.x, y: hit.s.y, r: 10, life: 1, color, width: 3 });
+    this.shake = Math.max(this.shake, hit.kind === 'meteor' ? 4 : 6);
+    return hit.kind as 'crate' | 'meteor' | 'convoy';
   }
+
+  /** Where a hit happened, in world units, for floating text. */
+  lastHit = { x: 0, y: 0 };
 
   /** Effects for a tap at screen point (sx, sy) worth `label`. */
   tapAt(sx: number, sy: number, label: string): void {
     const p = this.toWorld(sx, sy);
-    const color = this.boosting ? COLORS.boost : COLORS.scrap;
+    const color = this.boosting ? COLORS.boost : this.flare > 0.5 ? 0xfff0c0 : this.coreColor;
     this.squash = 1;
     this.clawSnap = 1;
     this.puff(0, 0, color, 1.6, 0.25);
@@ -577,7 +619,7 @@ export class StationScene {
       text.anchor.set(0.5);
     }
     text.text = label;
-    text.style.fill = big ? COLORS.dock : this.boosting ? COLORS.boost : COLORS.scrap;
+    text.style.fill = big ? COLORS.dock : this.boosting ? COLORS.boost : this.coreColor;
     text.style.fontSize = big ? 34 : 24;
     text.position.set(x + rand(-24, 24), y + rand(-10, 10));
     text.alpha = 1;
@@ -617,6 +659,8 @@ export class StationScene {
       this.scale = this.baseScale / this.zoom;
       this.world.scale.set(this.scale);
     }
+    this.flare += ((this.event === 'flare' ? 1 : 0) - this.flare) * Math.min(1, dt * 2);
+    this.flareGlow.alpha = this.flare * (0.55 + 0.15 * Math.sin(this.time * 3));
     this.updateStars(dt);
     this.updateScenery(dt);
     this.updateDrifts(dt);
@@ -675,55 +719,94 @@ export class StationScene {
     }
   }
 
+  private spawnDrift(kind: DriftKind): void {
+    const half = WORLD * 0.8;
+    const fromLeft = Math.random() < 0.5;
+    const tex = kind === 'crate' ? this.tex.crate : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
+    const s = new Sprite(tex);
+    s.anchor.set(0.5);
+    let vx = (fromLeft ? 1 : -1) * rand(12, 28);
+    let vy = rand(-6, 6);
+    s.position.set(fromLeft ? -half : half, rand(-WORLD * 0.42, WORLD * 0.42));
+    s.scale.set(rand(0.5, 1.1));
+    if (kind === 'debris') s.alpha = rand(0.55, 0.9);
+    if (kind === 'crate') {
+      s.scale.set(1.1);
+      vx = (fromLeft ? 1 : -1) * rand(26, 34);
+    }
+    if (kind === 'meteor') {
+      // Meteors rain in from the top, angled across the station.
+      s.position.set(rand(-half, half * 0.6), -WORLD * 0.75);
+      const a = rand(0.95, 1.35);
+      const v = rand(70, 105);
+      vx = Math.cos(a) * v * (fromLeft ? 1 : -1);
+      vy = Math.sin(a) * v;
+      s.scale.set(rand(1.1, 1.5));
+    }
+    if (kind === 'convoy') {
+      s.scale.set(fromLeft ? 2.8 : -2.8, 2.8);
+      s.tint = 0xd8f6ff;
+      vx = (fromLeft ? 1 : -1) * 24;
+      vy = 0;
+      s.y = rand(-WORLD * 0.3, -WORLD * 0.15);
+    }
+    let glow: Sprite | undefined;
+    let tail: Sprite | undefined;
+    if (kind !== 'debris') {
+      glow = new Sprite(this.tex.glow);
+      glow.anchor.set(0.5);
+      glow.blendMode = 'add';
+      glow.tint = kind === 'meteor' ? 0xff7a3d : kind === 'convoy' ? 0x5cd6ff : COLORS.dock;
+      this.debrisLayer.addChild(glow);
+    }
+    if (kind === 'meteor') {
+      tail = new Sprite(this.tex.streak);
+      tail.anchor.set(1, 0.5);
+      tail.blendMode = 'add';
+      tail.tint = 0xffa060;
+      tail.rotation = Math.atan2(vy, vx);
+      tail.scale.set(3.2, 1.6);
+      this.debrisLayer.addChild(tail);
+    }
+    this.debrisLayer.addChild(s);
+    this.drifts.push({ s, glow, tail, vx, vy, vr: kind === 'convoy' ? 0 : rand(-0.8, 0.8) * (kind === 'meteor' ? 3 : 1), kind });
+  }
+
   private updateDrifts(dt: number): void {
     const half = WORLD * 0.8;
     this.nextDebris -= dt;
     this.nextCrate -= dt;
-    const spawn = (crate: boolean) => {
-      const fromLeft = Math.random() < 0.5;
-      const tex = crate ? this.tex.crate : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
-      const s = new Sprite(tex);
-      s.anchor.set(0.5);
-      s.position.set(fromLeft ? -half : half, rand(-WORLD * 0.42, WORLD * 0.42));
-      s.scale.set(crate ? 1.1 : rand(0.5, 1.1));
-      if (!crate) s.alpha = rand(0.55, 0.9);
-      let glow: Sprite | undefined;
-      if (crate) {
-        glow = new Sprite(this.tex.glow);
-        glow.anchor.set(0.5);
-        glow.blendMode = 'add';
-        glow.tint = COLORS.dock;
-        this.debrisLayer.addChild(glow);
-      }
-      this.debrisLayer.addChild(s);
-      this.drifts.push({
-        s,
-        glow,
-        vx: (fromLeft ? 1 : -1) * (crate ? rand(26, 34) : rand(12, 28)),
-        vy: rand(-6, 6),
-        vr: rand(-0.8, 0.8),
-        crate,
-      });
-    };
     if (this.nextDebris <= 0) {
-      spawn(false);
+      this.spawnDrift('debris');
       this.nextDebris = rand(1.8, 4.5);
     }
     if (this.nextCrate <= 0) {
-      spawn(true);
+      this.spawnDrift('crate');
       this.nextCrate = rand(60, 110) / this.crateRate;
     }
+    if (this.event === 'meteors') {
+      this.nextMeteor -= dt;
+      if (this.nextMeteor <= 0) {
+        this.spawnDrift('meteor');
+        this.nextMeteor = rand(0.45, 0.9);
+      }
+    }
+    if (this.event === 'convoy' && !this.drifts.some((d) => d.kind === 'convoy')) this.spawnDrift('convoy');
     for (const d of [...this.drifts]) {
       d.s.x += d.vx * dt;
       d.s.y += d.vy * dt;
       d.s.rotation += d.vr * dt;
+      if (d.kind === 'convoy') d.s.y += Math.sin(this.time * 1.5) * dt * 6;
       if (d.glow) {
         d.glow.position.copyFrom(d.s.position);
         const p = 0.5 + 0.5 * Math.sin(this.time * 5);
-        d.glow.scale.set(1.3 + p * 0.4);
+        const base = d.kind === 'convoy' ? 2.4 : d.kind === 'meteor' ? 0.9 : 1.3;
+        d.glow.scale.set(base + p * 0.4);
         d.glow.alpha = 0.55 + p * 0.3;
       }
-      if (Math.abs(d.s.x) > half + 1) this.removeDrift(d);
+      d.tail?.position.copyFrom(d.s.position);
+      const gone = Math.abs(d.s.x) > half + 1 || d.s.y > WORLD * 0.8;
+      if (gone) this.removeDrift(d);
     }
   }
 
@@ -731,6 +814,7 @@ export class StationScene {
     this.drifts.splice(this.drifts.indexOf(d), 1);
     d.s.destroy();
     d.glow?.destroy();
+    d.tail?.destroy();
   }
 
   private updateMachines(dt: number): void {
@@ -808,7 +892,7 @@ export class StationScene {
     this.moonAngle += dt * 0.07;
     const pr = this.planet.width * 0.5;
     const ma = this.moonAngle;
-    this.moon.position.set(this.planet.x + Math.cos(ma) * pr * 0.9, this.planet.y - pr * 0.62 + Math.sin(ma) * pr * 0.3);
+    this.moon.position.set(this.planet.x + pr * 0.15 + Math.cos(ma) * pr * 0.5, this.planet.y - pr * 0.72 + Math.sin(ma) * pr * 0.16);
     // Pass in front of the planet on the near side of the orbit, behind it on the far side.
     const z = Math.sin(ma) > 0 ? 5 : 3;
     if (this.moon.zIndex !== z) this.moon.zIndex = z;
@@ -854,7 +938,7 @@ export class StationScene {
         let best = 240;
         for (const d of this.drifts) {
           const dist = Math.hypot(d.s.x - x, d.s.y - y);
-          if (!d.crate && dist < best) {
+          if (d.kind === 'debris' && dist < best) {
             best = dist;
             target = d;
           }
@@ -1000,7 +1084,7 @@ export class StationScene {
     this.habitat.rotation = t * 0.35;
     this.antenna.rotation = Math.sin(t * 0.7) * 0.06;
 
-    const color = this.boosting ? COLORS.boost : COLORS.scrap;
+    const color = this.boosting ? COLORS.boost : this.flare > 0.5 ? 0xfff4d8 : this.coreColor;
     const beat = 0.5 + 0.5 * Math.sin(t * (this.boosting ? 10 : 2.4));
     this.core.tint = color;
     this.coreGlow.tint = color;

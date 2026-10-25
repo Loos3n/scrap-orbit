@@ -17,6 +17,12 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition
 - 6 core perks unlocked by how many cores you hold, including an Auto-Builder
 - 27 achievements, each worth +1% income
+- Crew: 10 collectible crew members with their own portraits, each one multiplying a machine's output, levelled up with crystals
+- Missions: three daily goals and a weekly challenge that pay out crystals
+- Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
+- Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
+- Decorations: six sky themes and five hull paints
+- Ambient generative music, a short first-run tutorial, three number formats and a full stats screen
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
 - Synthesized sound effects (taps climb a musical scale), with a mute button
 - Salvage crates that drift past now and then; tap one for a bonus

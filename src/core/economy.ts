@@ -13,6 +13,7 @@ import {
   type GeneratorId,
   type UpgradeDef,
 } from './config';
+import { CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
 
@@ -20,28 +21,37 @@ export type BuyMode = 1 | 10 | 100 | 'max';
 
 export const genById = (id: GeneratorId): GeneratorDef => GENERATORS.find((g) => g.id === id)!;
 
-/** Cost of buying `count` more of a generator when `owned` are already owned. */
-export function costFor(gen: GeneratorDef, owned: number, count: number): Decimal {
+/**
+ * Cost of buying `count` more of a generator when `owned` are already owned.
+ * `discount` scales every price (research makes machines cheaper).
+ */
+export function costFor(gen: GeneratorDef, owned: number, count: number, discount = 1): Decimal {
   if (count <= 0) return D(0);
-  return Decimal.sumGeometricSeries(count, gen.baseCost, gen.growth, owned);
+  return Decimal.sumGeometricSeries(count, gen.baseCost * discount, gen.growth, owned);
 }
 
 /** How many of a generator `scrap` can buy right now. */
-export function maxAffordable(gen: GeneratorDef, owned: number, scrap: Decimal): number {
-  let n = Decimal.affordGeometricSeries(scrap, gen.baseCost, gen.growth, owned).toNumber();
+export function maxAffordable(gen: GeneratorDef, owned: number, scrap: Decimal, discount = 1): number {
+  let n = Decimal.affordGeometricSeries(scrap, gen.baseCost * discount, gen.growth, owned).toNumber();
   if (!Number.isFinite(n) || n < 0) n = 0;
   n = Math.floor(n);
   // The library works in logs; nudge for floating-point edge cases.
-  while (n > 0 && costFor(gen, owned, n).gt(scrap)) n--;
-  while (costFor(gen, owned, n + 1).lte(scrap)) n++;
+  while (n > 0 && costFor(gen, owned, n, discount).gt(scrap)) n--;
+  while (costFor(gen, owned, n + 1, discount).lte(scrap)) n++;
   return n;
+}
+
+/** Price multiplier for machines from research. */
+export function costDiscount(state: GameState): number {
+  return researchProduct(state, 'costMult');
 }
 
 /** Units and price for a buy button in the given mode. Max with nothing affordable shows 1. */
 export function purchaseQuote(state: GameState, gen: GeneratorDef, mode: BuyMode): { count: number; cost: Decimal } {
   const owned = state.owned[gen.id];
-  const count = mode === 'max' ? Math.max(1, maxAffordable(gen, owned, state.scrap)) : mode;
-  return { count, cost: costFor(gen, owned, count) };
+  const discount = costDiscount(state);
+  const count = mode === 'max' ? Math.max(1, maxAffordable(gen, owned, state.scrap, discount)) : mode;
+  return { count, cost: costFor(gen, owned, count, discount) };
 }
 
 export function milestonesReached(owned: number): number {
@@ -62,21 +72,62 @@ function upgradeDefs(state: GameState): UpgradeDef[] {
   return UPGRADES.filter((u) => state.upgrades.has(u.id));
 }
 
+function researchEffects(state: GameState): ResearchEffect[] {
+  return RESEARCH.filter((r) => state.research.done.has(r.id)).map((r) => r.effect);
+}
+
+type MultKind = 'tapMult' | 'allMult' | 'costMult' | 'crateRate' | 'offlineMult' | 'eventRate' | 'flareMult' | 'crewMult' | 'missionMult';
+
+/** Product of every finished research multiplier of one kind (1 if none). */
+export function researchProduct(state: GameState, kind: MultKind): number {
+  let m = 1;
+  for (const e of researchEffects(state)) if (e.kind === kind) m *= (e as { mult: number }).mult;
+  return m;
+}
+
+function researchSum(state: GameState, kind: 'offlineSec' | 'boostSec' | 'corePerCore' | 'tapIncomeShare'): number {
+  let sum = 0;
+  for (const e of researchEffects(state)) {
+    if (e.kind === 'offlineSec' && kind === e.kind) sum += e.sec;
+    if (e.kind === 'boostSec' && kind === e.kind) sum += e.sec;
+    if (e.kind === 'corePerCore' && kind === e.kind) sum += e.add;
+    if (e.kind === 'tapIncomeShare' && kind === e.kind) sum += e.share;
+  }
+  return sum;
+}
+
+/** Output multiplier a machine gets from its crew member. */
+export function crewMult(state: GameState, gen: GeneratorId): number {
+  const def = CREW.find((c) => c.gen === gen);
+  const level = def ? state.crew[def.id] : 0;
+  return 1 + level * CREW_PER_LEVEL * researchProduct(state, 'crewMult');
+}
+
+export function flareActive(state: GameState, now: number): boolean {
+  return state.event?.kind === 'flare' && now < state.event.endsAt;
+}
+
 export function hasPerk(state: GameState, id: PerkId): boolean {
   return state.cores >= CORE_PERKS.find((p) => p.id === id)!.at;
 }
 
 /** Permanent multiplier from Star Cores and achievements; applies to machines and taps. */
 export function globalMult(state: GameState): number {
-  return (1 + state.cores * PRESTIGE.perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS);
+  const perCore = PRESTIGE.perCore + researchSum(state, 'corePerCore');
+  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult');
+}
+
+/** Income bonus per Star Core, as a fraction. */
+export function perCoreBonus(state: GameState): number {
+  return PRESTIGE.perCore + researchSum(state, 'corePerCore');
 }
 
 export function boostDurationSec(state: GameState): number {
-  return hasPerk(state, 'longboost') ? 60 : BOOST.durationSec;
+  return (hasPerk(state, 'longboost') ? 60 : BOOST.durationSec) + researchSum(state, 'boostSec');
 }
 
 export function offlineCapSec(state: GameState): number {
-  return hasPerk(state, 'longshift') ? OFFLINE_CAP_SEC * 2 : OFFLINE_CAP_SEC;
+  return (hasPerk(state, 'longshift') ? OFFLINE_CAP_SEC * 2 : OFFLINE_CAP_SEC) + researchSum(state, 'offlineSec');
 }
 
 export function boostActive(state: GameState, now: number): boolean {
@@ -87,7 +138,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state);
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;
@@ -108,8 +159,9 @@ export function income(state: GameState, now: number): Decimal {
 }
 
 export function tapValue(state: GameState, now: number): Decimal {
-  let mult = 1;
-  let share = 0;
+  let mult = researchProduct(state, 'tapMult');
+  let share = researchSum(state, 'tapIncomeShare');
+  if (flareActive(state, now)) mult *= FLARE_TAP_MULT * researchProduct(state, 'flareMult');
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'tapMult') mult *= e.mult;
@@ -142,12 +194,14 @@ export function tap(state: GameState, now: number): Decimal {
 export function buyGenerator(state: GameState, id: GeneratorId, mode: BuyMode): number {
   const gen = genById(id);
   const owned = state.owned[id];
-  const count = mode === 'max' ? maxAffordable(gen, owned, state.scrap) : mode;
+  const discount = costDiscount(state);
+  const count = mode === 'max' ? maxAffordable(gen, owned, state.scrap, discount) : mode;
   if (count <= 0) return 0;
-  const cost = costFor(gen, owned, count);
+  const cost = costFor(gen, owned, count, discount);
   if (cost.gt(state.scrap)) return 0;
   state.scrap = state.scrap.sub(cost);
   state.owned[id] = owned + count;
+  state.stats.machines += count;
   return count;
 }
 
@@ -161,6 +215,7 @@ export function buyUpgrade(state: GameState, id: string): boolean {
   if (state.scrap.lt(u.cost)) return false;
   state.scrap = state.scrap.sub(u.cost);
   state.upgrades.add(id);
+  state.stats.upgradesBought++;
   return true;
 }
 
@@ -180,7 +235,7 @@ export function activateBoost(state: GameState, now: number): boolean {
 export function applyOffline(state: GameState, now: number): { seconds: number; earned: Decimal } {
   const away = Math.max(0, (now - state.lastSeen) / 1000);
   const seconds = Math.min(away, offlineCapSec(state));
-  const earned = baseIncome(state).mul(seconds);
+  const earned = baseIncome(state).mul(seconds).mul(researchProduct(state, 'offlineMult'));
   earn(state, earned);
   state.lastSeen = now;
   return { seconds, earned };
@@ -221,6 +276,7 @@ export function relocate(state: GameState, now: number): number {
   state.boostUntil = 0;
   state.boostReadyAt = 0;
   state.lastSeen = now;
+  state.stats.runSec = 0;
   if (hasPerk(state, 'headstart')) state.owned.drone = 10;
   if (hasPerk(state, 'seedfund')) state.scrap = D(1e6);
   return gained;
@@ -234,7 +290,7 @@ export function cheapestMachine(state: GameState): { id: GeneratorId; cost: Deci
     // Only machines the player can see: everything owned plus the next new one.
     if (!revealed) break;
     if (state.owned[g.id] === 0) revealed = false;
-    const cost = costFor(g, state.owned[g.id], 1);
+    const cost = costFor(g, state.owned[g.id], 1, costDiscount(state));
     if (!best || cost.lt(best.cost)) best = { id: g.id, cost };
   }
   return best;

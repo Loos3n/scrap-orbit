@@ -89,7 +89,7 @@ export const BOOST = {
 };
 
 export const OFFLINE_CAP_SEC = 2 * 60 * 60;
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /**
  * Prestige: relocating the station resets the run for Star Cores. Total cores earned is

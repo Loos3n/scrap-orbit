@@ -16,19 +16,29 @@ function letterSuffix(index: number): string {
   return String.fromCharCode(a + first) + String.fromCharCode(a + second);
 }
 
+export type NumberStyle = 'letters' | 'scientific' | 'engineering';
+
 /**
  * Formats a number for display: 999, 1.23K, 45.6M, ... then aa, ab, ...
+ * Scientific gives 1.23e6; engineering keeps exponents to multiples of 3 (12.3e6).
  * Values under 100 keep one decimal when they have a fraction.
  */
-export function format(value: Decimal | number, scientific = false): string {
+export function format(value: Decimal | number, style: NumberStyle | boolean = 'letters'): string {
+  if (typeof style === 'boolean') style = style ? 'scientific' : 'letters';
   const v = value instanceof Decimal ? value : D(value);
-  if (v.lt(0)) return '-' + format(v.neg(), scientific);
+  if (v.lt(0)) return '-' + format(v.neg(), style);
   if (v.lt(1000)) {
     const n = v.toNumber();
     if (n < 100 && n % 1 !== 0) return (Math.floor(n * 10) / 10).toFixed(1).replace(/\.0$/, '');
     return Math.floor(n).toString();
   }
-  if (scientific) return `${v.m.toFixed(2)}e${v.e}`;
+  if (style === 'scientific') return `${(Math.floor(v.m * 100 + 1e-9) / 100).toFixed(2)}e${v.e}`;
+  if (style === 'engineering') {
+    const e3 = Math.floor(v.e / 3) * 3;
+    const m = v.m * Math.pow(10, v.e - e3);
+    const d = m >= 100 ? 0 : m >= 10 ? 1 : 2;
+    return `${(Math.floor(m * 10 ** d + 1e-9) / 10 ** d).toFixed(d)}e${e3}`;
+  }
   const group = Math.floor(v.e / 3);
   const mantissa = v.m * Math.pow(10, v.e - group * 3);
   const suffix = group < SHORT.length ? SHORT[group] : letterSuffix(group - SHORT.length);
@@ -42,7 +52,7 @@ export function formatDuration(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${s % 60}s`;
+  if (m < 60) return s % 60 ? `${m}m ${s % 60}s` : `${m}m`;
   const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
+  return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
 }
