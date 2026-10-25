@@ -6,19 +6,22 @@ A cozy space-salvage idle clicker for phones and the web. Tap your station's cla
 
 This is the **prototype**: the core loop with placeholder-quality art, built to find out whether the game is fun before the real art goes in.
 
-## What's in the prototype
+## What's in the game so far
 
-- Hand-painted space scene: nebula, ringed gas giant, shaded station with lit windows and beacons
+- Hand-painted space scene: nebula, spiral galaxy, ringed gas giant with an orbiting moon, comets, and soft out-of-focus rocks drifting past the camera
 - Tap the station to earn scrap: the claw yanks in debris, with glowing sparks, a shockwave and floating numbers
-- 5 generator tiers, each visibly added to the station as you buy them
+- 10 machine tiers, each visibly added to the scene: drones, haulers, smelters, fabricators, a dock ring, mining lasers that shoot passing rocks, gravity wells, a nanite swarm, a warp gate and a Dyson swarm around a distant star. The camera pulls back as the station grows
 - Buy x1, x10, x100 or Max
-- Milestones at 10, 25, 50, 100, ... owned that double a generator's output
-- 14 upgrades: tap power, per-tier multipliers, and taps that scale with income
+- Milestones at 10, 25, 50, 100, ... owned that double a machine's output
+- 24 upgrades: tap power, per-tier multipliers, global multipliers, and taps that scale with income
+- Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition
+- 6 core perks unlocked by how many cores you hold, including an Auto-Builder
+- 27 achievements, each worth +1% income
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
 - Synthesized sound effects (taps climb a musical scale), with a mute button
 - Salvage crates that drift past now and then; tap one for a bonus
 - Autosave every 30 seconds and when the app is hidden
-- Offline earnings for up to 2 hours, shown when you come back
+- Offline earnings for up to 2 hours (4 with a perk), shown when you come back
 
 ## Running it
 
@@ -46,8 +49,8 @@ Tuning numbers (costs, outputs, upgrades, boost) are all in `src/core/config.ts`
 ## Roadmap
 
 1. **Prototype** (this): is the loop fun for 15 minutes?
-2. **Vertical slice**: 10 to 12 tiers, the first prestige layer, final art style, sound
-3. **Content and polish**: second prestige layer, achievements, challenges, cloud save
+2. **Vertical slice** (in progress): 10 tiers, the first prestige layer, achievements, final art style, sound
+3. **Content and polish**: second prestige layer, challenges, cloud save
 4. **Soft launch** on iOS and Android via Capacitor
 5. **Global launch**
 

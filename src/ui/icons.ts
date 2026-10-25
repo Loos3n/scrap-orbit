@@ -4,7 +4,7 @@ import type { GeneratorId } from '../core/config';
 const svg = (body: string, view = 48) =>
   `<svg viewBox="0 0 ${view} ${view}" aria-hidden="true" focusable="false">${body}</svg>`;
 
-export const GEN_ICONS: Record<GeneratorId, string> = {
+const RAW_GEN_ICONS: Record<GeneratorId, string> = {
   drone: svg(`
     <defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9fff3"/><stop offset="1" stop-color="#1fa587"/></linearGradient></defs>
     <path d="M24 8 L38 34 L24 28 L10 34 Z" fill="url(#gd)" stroke="#0b2b2a" stroke-width="1.5" stroke-linejoin="round"/>
@@ -35,9 +35,43 @@ export const GEN_ICONS: Record<GeneratorId, string> = {
     <path d="M12 22 L16 30 M18 17 L21 27 M26 15 L26 26 M33 18 L30 27 M37 23 L33 30" stroke="#ffd166" stroke-width="1.6" opacity=".9"/>
     <rect x="19" y="34" width="10" height="8" rx="2" fill="url(#gk)" stroke="#6a4808" stroke-width="1.2"/>
     <circle cx="24" cy="38" r="1.5" fill="#ff6b9a"/>`),
+  laser: svg(`
+    <defs><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd0d4"/><stop offset="1" stop-color="#8a1e2a"/></linearGradient></defs>
+    <path d="M27 21 L45 7" stroke="#ff5d6c" stroke-width="4" stroke-linecap="round" opacity=".55"/>
+    <path d="M27 21 L45 7" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+    <rect x="9" y="30" width="22" height="12" rx="3" fill="#2b3170" stroke="#151845" stroke-width="1.5"/>
+    <circle cx="20" cy="29" r="9" fill="url(#gl)" stroke="#4a0e16" stroke-width="1.5"/>
+    <path d="M22 26 L32 18" stroke="url(#gl)" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="33" cy="17.5" r="2.4" fill="#fff"/>`),
+  gravity: svg(`
+    <defs><radialGradient id="gg"><stop offset="0" stop-color="#05061a"/><stop offset=".45" stop-color="#0d2a4a"/><stop offset=".75" stop-color="#5ce1ff"/><stop offset="1" stop-color="#5ce1ff" stop-opacity="0"/></radialGradient></defs>
+    <circle cx="24" cy="24" r="20" fill="url(#gg)"/>
+    <path d="M24 8 C36 8 40 20 32 26 M24 40 C12 40 8 28 16 22 M8 24 C8 13 19 9 25 16 M40 24 C40 35 29 39 23 32" fill="none" stroke="#c8f6ff" stroke-width="2" stroke-linecap="round" opacity=".85"/>
+    <circle cx="24" cy="24" r="5" fill="#000"/>`),
+  nanite: svg(`
+    <g fill="#9dff6b">
+      <circle cx="24" cy="24" r="4"/><circle cx="14" cy="18" r="2.6"/><circle cx="33" cy="16" r="2.2"/><circle cx="35" cy="30" r="3"/>
+      <circle cx="16" cy="33" r="2.4"/><circle cx="25" cy="37" r="1.8"/><circle cx="9" cy="25" r="1.6"/><circle cx="40" cy="22" r="1.5"/>
+      <circle cx="24" cy="10" r="1.8"/><circle cx="30" cy="42" r="1.3"/>
+    </g>
+    <g stroke="#9dff6b" stroke-width="1" opacity=".5"><path d="M24 24 L14 18 M24 24 L33 16 M24 24 L35 30 M24 24 L16 33 M24 24 L25 37"/></g>
+    <circle cx="23" cy="23" r="1.4" fill="#fff"/>`),
+  gate: svg(`
+    <defs><radialGradient id="gw"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#c2b6ff"/><stop offset="1" stop-color="#3a2a9a"/></radialGradient>
+    <linearGradient id="gwr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6e0ff"/><stop offset="1" stop-color="#4a3aa8"/></linearGradient></defs>
+    <circle cx="24" cy="24" r="15" fill="url(#gw)"/>
+    <circle cx="24" cy="24" r="17" fill="none" stroke="url(#gwr)" stroke-width="5"/>
+    <g fill="#8f7bff" stroke="#241a6a" stroke-width="1"><rect x="21" y="3" width="6" height="6" rx="1"/><rect x="21" y="39" width="6" height="6" rx="1"/><rect x="3" y="21" width="6" height="6" rx="1"/><rect x="39" y="21" width="6" height="6" rx="1"/></g>`),
+  dyson: svg(`
+    <defs><radialGradient id="gy"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#ffe9a8"/><stop offset="1" stop-color="#ff8a4c"/></radialGradient></defs>
+    <circle cx="24" cy="24" r="9" fill="url(#gy)"/>
+    <g fill="#ffd166" stroke="#7a5208" stroke-width="1">
+      <path d="M24 5 l6 3 -2 5 -8 0 -2 -5z"/><path d="M41 18 l-1 7 -5 0 -2 -7 4 -3z"/><path d="M37 38 l-6 3 -3 -4 4 -6 5 1z"/>
+      <path d="M11 38 l6 3 3 -4 -4 -6 -5 1z"/><path d="M7 18 l1 7 5 0 2 -7 -4 -3z"/>
+    </g>`),
 };
 
-export const ICONS = {
+const RAW_ICONS = {
   scrap: svg(`
     <defs><linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1c4"/><stop offset=".5" stop-color="#ffb547"/><stop offset="1" stop-color="#c4701a"/></linearGradient></defs>
     <path d="M24 3 l4.2 6.3 7.4-1.7 1 7.5 7 2.9-3 6.9 4.6 6-6.4 4-0.3 7.6-7.4-1.1-4.7 5.9-4.6-6-7.4 1.3-0.4-7.6-6.5-3.9 4.5-6.1-3-6.8 7-3 0.9-7.5 7.4 1.6z" fill="url(#gb)" stroke="#7a4a08" stroke-width="1.5" stroke-linejoin="round"/>
@@ -55,5 +89,31 @@ export const ICONS = {
   star: svg(`
     <defs><radialGradient id="gst"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#ffd166"/><stop offset="1" stop-color="#ff6b9a"/></radialGradient></defs>
     <path d="M24 3 L29 18 L45 18 L32 28 L37 44 L24 34 L11 44 L16 28 L3 18 L19 18 Z" fill="url(#gst)" stroke="#7a3a50" stroke-width="1.5" stroke-linejoin="round"/>`),
+  core: svg(`
+    <defs><radialGradient id="ic" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#d9d0ff"/><stop offset="1" stop-color="#6a4cff"/></radialGradient></defs>
+    <circle cx="24" cy="24" r="20" fill="#8f7bff" opacity=".18"/>
+    <path d="M24 4 L28.5 19.5 L44 24 L28.5 28.5 L24 44 L19.5 28.5 L4 24 L19.5 19.5 Z" fill="url(#ic)"/>
+    <circle cx="24" cy="24" r="6" fill="#fff"/>`),
+  trophy: svg(`<path d="M14 6h20v10a10 10 0 0 1-20 0z" fill="currentColor"/><path d="M14 9H7a7 7 0 0 0 7 9M34 9h7a7 7 0 0 1-7 9" fill="none" stroke="currentColor" stroke-width="3"/><rect x="21" y="25" width="6" height="8" fill="currentColor"/><rect x="14" y="33" width="20" height="6" rx="2" fill="currentColor"/>`),
+  warp: svg(`<circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="9" fill="none" stroke="currentColor" stroke-width="3" opacity=".6"/><circle cx="24" cy="24" r="3" fill="currentColor"/>`),
   lock: svg(`<rect x="11" y="21" width="26" height="20" rx="4" fill="currentColor"/><path d="M16 21v-5a8 8 0 0 1 16 0v5" fill="none" stroke="currentColor" stroke-width="4"/>`),
 };
+
+/**
+ * Icons with gradients carry ids, and a page can show the same icon many times, some copies
+ * inside hidden tabs. A gradient defined in a hidden copy doesn't render, so every read hands
+ * out a copy with its own ids.
+ */
+let uid = 0;
+function uniqueIds(svgText: string): string {
+  if (!svgText.includes('id="')) return svgText;
+  const n = ++uid;
+  return svgText.replace(/id="([^"]+)"/g, `id="$1-${n}"`).replace(/url\(#([^)]+)\)/g, `url(#$1-${n})`);
+}
+
+function fresh<T extends Record<string, string>>(raw: T): T {
+  return new Proxy(raw, { get: (t, k) => (typeof k === 'string' && k in t ? uniqueIds(t[k as keyof T]) : undefined) });
+}
+
+export const GEN_ICONS = fresh(RAW_GEN_ICONS);
+export const ICONS = fresh(RAW_ICONS);

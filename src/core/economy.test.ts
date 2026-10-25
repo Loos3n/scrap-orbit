@@ -6,14 +6,20 @@ import {
   baseIncome,
   buyGenerator,
   buyUpgrade,
+  claimableCores,
+  coresForAllTime,
   costFor,
+  earn,
   genById,
   income,
   maxAffordable,
+  nextCoreAt,
   nextMilestone,
+  relocate,
   tap,
   tapValue,
 } from './economy';
+import { checkAchievements } from './achievements';
 import { D, format } from './num';
 import { deserialize, newState, serialize } from './state';
 
@@ -129,5 +135,68 @@ describe('format', () => {
     expect(format(D('1e33'))).toBe('1.00Dc');
     expect(format(D('1e36'))).toBe('1.00aa');
     expect(format(D('2.5e39'))).toBe('2.50ab');
+  });
+});
+
+describe('prestige', () => {
+  it('turns all-time earnings into cores by a cube root', () => {
+    expect(coresForAllTime(D(0))).toBe(0);
+    expect(coresForAllTime(D(1e6))).toBe(1);
+    expect(coresForAllTime(D(8e6))).toBe(2);
+    expect(coresForAllTime(D(1e9))).toBe(10);
+    expect(coresForAllTime(D('1e306'))).toBeCloseTo(1e100, -90);
+  });
+
+  it('relocating banks cores, resets the run and keeps permanent progress', () => {
+    const s = newState(NOW);
+    earn(s, D(1e9));
+    s.owned.hauler = 40;
+    s.upgrades.add('claw1');
+    s.achievements.add('taps100');
+    expect(claimableCores(s)).toBe(10);
+    expect(relocate(s, NOW)).toBe(10);
+    expect(s.cores).toBe(10);
+    expect(s.owned.hauler).toBe(0);
+    expect(s.owned.drone).toBe(10); // Head Start perk at 3 cores
+    expect(s.upgrades.size).toBe(0);
+    expect(s.achievements.has('taps100')).toBe(true);
+    expect(s.scrap.toNumber()).toBe(0);
+    expect(claimableCores(s)).toBe(0);
+    expect(relocate(s, NOW)).toBe(0);
+  });
+
+  it('cores and achievements multiply income and taps', () => {
+    const s = newState(NOW);
+    s.owned.drone = 2; // 1 scrap/s before bonuses
+    s.cores = 10; // +100%
+    s.achievements.add('a').add('b'); // +2%
+    expect(baseIncome(s).toNumber()).toBeCloseTo(2 * 1.02);
+    expect(tapValue(s, NOW).toNumber()).toBeCloseTo(2 * 1.02);
+  });
+
+  it('next core target sits just past the current total', () => {
+    const s = newState(NOW);
+    earn(s, D(9e6)); // worth 2 cores
+    expect(nextCoreAt(s).toNumber()).toBeCloseTo(27e6);
+  });
+});
+
+describe('achievements', () => {
+  it('unlock once and report only new ones', () => {
+    const s = newState(NOW);
+    s.owned.drone = 1;
+    expect(checkAchievements(s).map((a) => a.id)).toEqual(['first-machine']);
+    expect(checkAchievements(s)).toEqual([]);
+  });
+});
+
+describe('save migration', () => {
+  it('reads version 1 saves', () => {
+    const v1 = JSON.stringify({ v: 1, scrap: '500', lifetime: '9000', owned: { drone: 3 }, upgrades: [], taps: 7, boostUntil: 0, boostReadyAt: 0, lastSeen: NOW });
+    const s = deserialize(v1, NOW)!;
+    expect(s.allTime.toNumber()).toBe(9000);
+    expect(s.cores).toBe(0);
+    expect(s.owned.laser).toBe(0);
+    expect(s.settings.sound).toBe(true);
   });
 });

@@ -16,6 +16,7 @@ async function boot(): Promise<void> {
   const sfx = new Sfx();
   const ui = new UI(game);
   ui.onSoundChange = (on) => (sfx.enabled = on);
+  ui.onRelocate = () => game.relocate();
   ui.syncSettings();
   const scene = new StationScene();
   const sceneEl = document.getElementById('scene')!;
@@ -29,6 +30,8 @@ async function boot(): Promise<void> {
   syncFocus();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
+  const syncPerks = () => scene.setCrateRate(eco.hasPerk(game.state, 'magnet') ? 2 : 1);
+  syncPerks();
 
   const fmt = (v: Parameters<typeof format>[0]) => format(v, game.state.settings.scientific);
   const buzz = (ms: number) => {
@@ -67,7 +70,7 @@ async function boot(): Promise<void> {
         break;
       }
       case 'boost':
-        ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Overdrive!</b> 2x everything for 30 seconds');
+        ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), `<b>Overdrive!</b> 2x everything for ${eco.boostDurationSec(game.state)} seconds`);
         sfx.boost();
         buzz(40);
         break;
@@ -78,8 +81,22 @@ async function boot(): Promise<void> {
         ui.toast(ICONS.scrap, `<b>Salvage crate!</b> +${fmt(e.value)}`);
         sfx.crate();
         break;
+      case 'achievement':
+        ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>${e.def.name}</b> +1% income forever`);
+        sfx.achievement();
+        break;
+      case 'relocate':
+        scene.warpJump();
+        // Swap the station over at the brightest moment of the flash.
+        setTimeout(() => scene.setOwned(game.state.owned), 1500);
+        syncPerks();
+        ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores`);
+        sfx.warp();
+        buzz(60);
+        break;
       case 'reset':
         scene.setOwned(game.state.owned);
+        syncPerks();
         break;
     }
   });

@@ -4,12 +4,15 @@ import {
   baseIncome,
   buyGenerator,
   buyUpgrade,
+  claimableCores,
   costFor,
+  relocate,
   tap,
   tapValue,
   tick,
   upgradeVisible,
 } from './economy';
+import { checkAchievements } from './achievements';
 import { format, formatDuration } from './num';
 import { deserialize, newState, serialize, type GameState } from './state';
 
@@ -57,13 +60,14 @@ function nextPurchase(state: GameState): Option | null {
 }
 
 /** Simulates an active player for `seconds`, returning purchase times and first-buy times. */
-function simulate(seconds: number) {
-  const s = newState(0);
+function simulate(seconds: number, start?: GameState) {
+  const s = start ?? newState(0);
   const purchases: number[] = [];
   const firsts: Record<string, number> = {};
   for (let t = 1; t <= seconds; t++) {
     for (let i = 0; i < TAPS_PER_SEC; i++) tap(s, 0);
     tick(s, 1, 0);
+    if (t % 10 === 0) checkAchievements(s);
     for (let next = nextPurchase(s); next; next = nextPurchase(s)) {
       next.apply(s);
       purchases.push(t);
@@ -113,7 +117,36 @@ describe('pacing', () => {
     expect(maxGap(run.purchases, 60 * 60)).toBeLessThanOrEqual(300);
   });
 
-  it('reaches every generator within 90 minutes', () => {
-    for (const g of GENERATORS) expect(run.firsts[g.name]).toBeDefined();
+  it('reaches the Mining Laser within 45 minutes and the Gravity Well within 90', () => {
+    expect(run.firsts['Mining Laser']).toBeLessThanOrEqual(45 * 60);
+    expect(run.firsts['Gravity Well']).toBeLessThanOrEqual(90 * 60);
+  });
+});
+
+describe('prestige pacing', () => {
+  /** Hour-long runs, relocating after each, like a player who prestiges once a session. */
+  const runs: { cores: number; lifetime: string; reached: string; gainedAt60: number }[] = [];
+  const state = newState(0);
+  for (let i = 0; i < 5; i++) {
+    const r = simulate(60 * 60, state);
+    const reached = GENERATORS.filter((g) => r.state.owned[g.id] > 0).at(-1)!.name;
+    runs.push({ cores: state.cores, lifetime: format(state.lifetime), reached, gainedAt60: claimableCores(state) });
+    relocate(state, 0);
+  }
+
+  it('prints a prestige report', () => {
+    console.log(
+      ['Five 1-hour runs, relocating after each:', ...runs.map((r, i) => `  run ${i + 1}: started with ${r.cores} cores, earned ${r.lifetime}, reached ${r.reached}, +${r.gainedAt60} cores`)].join('\n'),
+    );
+  });
+
+  it('offers a worthwhile first relocation after an hour', () => {
+    expect(runs[0].gainedAt60).toBeGreaterThanOrEqual(5);
+  });
+
+  it('makes each run reach at least as far as the one before', () => {
+    const idx = (name: string) => GENERATORS.findIndex((g) => g.name === name);
+    for (let i = 1; i < runs.length; i++) expect(idx(runs[i].reached)).toBeGreaterThanOrEqual(idx(runs[i - 1].reached));
+    expect(idx(runs.at(-1)!.reached)).toBeGreaterThan(idx(runs[0].reached));
   });
 });

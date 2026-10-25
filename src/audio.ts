@@ -90,4 +90,17 @@ export class Sfx {
     if (!this.ready()) return;
     for (let i = 0; i < 6; i++) this.tone(1400 + Math.random() * 600, i * 0.07, 0.1, 'sine', 0.15);
   }
+
+  achievement(): void {
+    if (!this.ready()) return;
+    [880, 1109, 1319].forEach((f, i) => this.tone(f, i * 0.09, 0.35, 'sine', 0.2));
+  }
+
+  /** Relocation: a long rising whoosh into a bright chord. */
+  warp(): void {
+    if (!this.ready()) return;
+    this.tone(90, 0, 1.6, 'sawtooth', 0.1, 1400);
+    this.tone(180, 0.1, 1.5, 'triangle', 0.14, 2600);
+    [523, 784, 1047, 1568].forEach((f, i) => this.tone(f, 1.5 + i * 0.05, 0.9, 'triangle', 0.16));
+  }
 }

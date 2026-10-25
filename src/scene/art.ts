@@ -687,3 +687,326 @@ export const crate = () =>
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.fillRect(5, 5, 6, 2);
   }, 4);
+
+// ---------- Extra detail ----------
+
+/** Comms mast with a dish, hanging below the hull. Anchored at its top. */
+export const antenna = () =>
+  paint(40, 40, (ctx) => {
+    ctx.fillStyle = linear(ctx, 17, 0, 23, 0, [
+      [0, '#c5cbff'],
+      [1, '#3a4090'],
+    ]);
+    ctx.fillRect(18, 0, 4, 20);
+    ctx.strokeStyle = 'rgba(200,206,255,0.7)';
+    ctx.lineWidth = 0.7;
+    for (let y = 2; y < 20; y += 4) {
+      ctx.beginPath();
+      ctx.moveTo(18, y);
+      ctx.lineTo(22, y + 4);
+      ctx.stroke();
+    }
+    // Dish, facing down-left.
+    ctx.save();
+    ctx.translate(20, 26);
+    ctx.rotate(0.5);
+    ctx.fillStyle = linear(ctx, -12, -4, 12, 6, [
+      [0, '#f2f4ff'],
+      [0.6, '#9aa2e8'],
+      [1, '#3a4090'],
+    ]);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12, 5, 0, 0, Math.PI);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#2b3170';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.strokeStyle = '#c5cbff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 9);
+    ctx.stroke();
+    ctx.fillStyle = '#ff6b9a';
+    ctx.beginPath();
+    ctx.arc(0, 9.5, 1.4, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }, 5);
+
+/** A cratered grey moon, lit from the upper left. */
+export const moon = () =>
+  paint(40, 40, (ctx) => {
+    const c = 20;
+    ctx.fillStyle = radial(ctx, c - 6, c - 7, 26, [
+      [0, '#e6e2f0'],
+      [0.6, '#9a95b0'],
+      [1, '#4a4660'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(c, c, 18, 0, TAU);
+    ctx.fill();
+    const r = rng(21);
+    for (let i = 0; i < 9; i++) {
+      const x = c + (r() - 0.5) * 24;
+      const y = c + (r() - 0.5) * 24;
+      if (Math.hypot(x - c, y - c) > 15) continue;
+      const cr = 1 + r() * 3;
+      ctx.fillStyle = 'rgba(60,55,80,0.45)';
+      ctx.beginPath();
+      ctx.arc(x, y, cr, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y, cr, Math.PI * 1.1, Math.PI * 1.7);
+      ctx.stroke();
+    }
+    ctx.fillStyle = radial(ctx, c - 8, c - 8, 34, [
+      [0.45, 'rgba(10,8,30,0)'],
+      [1, 'rgba(10,8,30,0.85)'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(c, c, 18, 0, TAU);
+    ctx.fill();
+  }, 3);
+
+/** A distant spiral galaxy. */
+export const galaxy = () =>
+  paint(120, 120, (ctx) => {
+    const c = 60;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = radial(ctx, c, c, 22, [
+      [0, 'rgba(255,240,220,0.9)'],
+      [0.4, 'rgba(255,200,170,0.35)'],
+      [1, 'rgba(255,200,170,0)'],
+    ]);
+    ctx.fillRect(0, 0, 120, 120);
+    const r = rng(5);
+    for (let arm = 0; arm < 2; arm++) {
+      for (let i = 0; i < 260; i++) {
+        const t = i / 260;
+        const a = arm * Math.PI + t * Math.PI * 3.2;
+        const d = 4 + t * 52;
+        const x = c + Math.cos(a) * d + (r() - 0.5) * 8 * t;
+        const y = c + Math.sin(a) * d * 0.55 + (r() - 0.5) * 6 * t;
+        const s = 0.5 + r() * 2.2 * (1 - t);
+        ctx.fillStyle = r() < 0.2 ? `rgba(255,150,200,${0.35 * (1 - t)})` : `rgba(170,190,255,${0.4 * (1 - t) + 0.05})`;
+        ctx.beginPath();
+        ctx.arc(x, y, s, 0, TAU);
+        ctx.fill();
+      }
+    }
+  }, 2);
+
+/** A big rock for the foreground, drawn soft-edged so it reads as out of focus. */
+export const bigRock = (seed: number) =>
+  paint(80, 80, (ctx) => {
+    const r = rng(seed);
+    const c = 40;
+    ctx.beginPath();
+    const sides = 11;
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * TAU;
+      const rr = 30 * (0.7 + r() * 0.3);
+      ctx.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.shadowColor = 'rgba(20,16,40,0.9)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = radial(ctx, c - 10, c - 12, 50, [
+      [0, '#5c5878'],
+      [0.6, '#2e2b45'],
+      [1, '#16142a'],
+    ]);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = 'rgba(10,8,24,0.4)';
+      ctx.beginPath();
+      ctx.arc(c + (r() - 0.5) * 30, c + (r() - 0.5) * 30, 2 + r() * 5, 0, TAU);
+      ctx.fill();
+    }
+    // Rim light from the station's side.
+    ctx.strokeStyle = 'rgba(255,190,140,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(c, c, 26, Math.PI * 1.1, Math.PI * 1.6);
+    ctx.stroke();
+  }, 2);
+
+/** A small laser turret on a strut, barrel pointing up (rotate to aim). */
+export const laserTurret = () =>
+  paint(28, 34, (ctx) => {
+    // Base plate.
+    ctx.fillStyle = linear(ctx, 4, 24, 24, 34, [
+      [0, '#6a6f9c'],
+      [1, '#262a4e'],
+    ]);
+    ctx.beginPath();
+    ctx.roundRect(3, 24, 22, 8, 3);
+    ctx.fill();
+    // Turret dome.
+    ctx.fillStyle = radial(ctx, 11, 18, 12, [
+      [0, '#f1f3ff'],
+      [0.5, '#9aa0d0'],
+      [1, '#3a3f70'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(14, 22, 9, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Barrel.
+    ctx.fillStyle = linear(ctx, 11, 0, 17, 0, [
+      [0, '#2e3260'],
+      [0.5, '#c8ccf0'],
+      [1, '#2e3260'],
+    ]);
+    ctx.fillRect(11.5, 3, 5, 15);
+    ctx.fillStyle = '#ff5d6c';
+    ctx.fillRect(11.5, 2, 5, 2.5);
+    ctx.fillStyle = radial(ctx, 14, 3, 5, [
+      [0, 'rgba(255,200,200,1)'],
+      [1, 'rgba(255,93,108,0)'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(14, 3, 5, 0, TAU);
+    ctx.fill();
+  }, 4);
+
+/** A swirling gravity vortex: a dark eye with bright spiral arms. Spin it. */
+export const vortex = () =>
+  paint(90, 90, (ctx) => {
+    const c = 45;
+    ctx.fillStyle = radial(ctx, c, c, 44, [
+      [0, 'rgba(92,225,255,0.35)'],
+      [0.5, 'rgba(60,120,255,0.12)'],
+      [1, 'rgba(60,120,255,0)'],
+    ]);
+    ctx.fillRect(0, 0, 90, 90);
+    ctx.lineCap = 'round';
+    for (let arm = 0; arm < 4; arm++) {
+      for (let i = 0; i < 40; i++) {
+        const t = i / 40;
+        const a = (arm / 4) * TAU + t * Math.PI * 2.2;
+        const d = 6 + t * 36;
+        ctx.strokeStyle = `rgba(${170 + 85 * (1 - t)},${230},255,${0.65 * (1 - t)})`;
+        ctx.lineWidth = 2.6 * (1 - t) + 0.4;
+        ctx.beginPath();
+        ctx.arc(c, c, d, a, a + 0.12);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = radial(ctx, c, c, 9, [
+      [0, '#000008'],
+      [0.75, '#05061a'],
+      [1, 'rgba(160,240,255,0.9)'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(c, c, 9, 0, TAU);
+    ctx.fill();
+  }, 3);
+
+/** A warp gate: a heavy segmented ring with lights. The portal is a separate sprite. */
+export const warpGate = () =>
+  paint(120, 120, (ctx) => {
+    const c = 60;
+    ctx.lineWidth = 11;
+    ctx.strokeStyle = linear(ctx, 0, 0, 120, 120, [
+      [0, '#b9b2ff'],
+      [0.5, '#4b3f9a'],
+      [1, '#1e1846'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(c, c, 48, 0, TAU);
+    ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.arc(c, c, 53, Math.PI * 1.05, Math.PI * 1.7);
+    ctx.stroke();
+    // Clamps around the ring.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU;
+      ctx.save();
+      ctx.translate(c + Math.cos(a) * 48, c + Math.sin(a) * 48);
+      ctx.rotate(a);
+      ctx.fillStyle = linear(ctx, -7, 0, 7, 0, [
+        [0, '#2a2460'],
+        [0.5, '#9d94ff'],
+        [1, '#2a2460'],
+      ]);
+      ctx.beginPath();
+      ctx.roundRect(-7, -5, 14, 10, 2);
+      ctx.fill();
+      ctx.fillStyle = i % 2 ? '#ffe9a8' : '#8f7bff';
+      ctx.beginPath();
+      ctx.arc(4, 0, 1.6, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  }, 3);
+
+/** The shimmering inside of a warp gate. Spin and pulse it with additive blending. */
+export const portal = () =>
+  paint(96, 96, (ctx) => {
+    const c = 48;
+    ctx.fillStyle = radial(ctx, c, c, 44, [
+      [0, 'rgba(255,255,255,0.95)'],
+      [0.25, 'rgba(190,170,255,0.7)'],
+      [0.7, 'rgba(110,80,255,0.35)'],
+      [1, 'rgba(80,60,200,0)'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(c, c, 44, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU;
+      ctx.strokeStyle = 'rgba(220,210,255,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(c, c, 14 + i * 4.5, a, a + 1.6);
+      ctx.stroke();
+    }
+  }, 2);
+
+/** A distant white-gold star for the Dyson collectors to wrap. */
+export const sun = () =>
+  paint(80, 80, (ctx) => {
+    const c = 40;
+    ctx.fillStyle = radial(ctx, c, c, 40, [
+      [0, 'rgba(255,255,240,1)'],
+      [0.18, 'rgba(255,240,190,1)'],
+      [0.3, 'rgba(255,200,110,0.6)'],
+      [0.6, 'rgba(255,150,80,0.15)'],
+      [1, 'rgba(255,150,80,0)'],
+    ]);
+    ctx.fillRect(0, 0, 80, 80);
+  }, 3);
+
+/** One curved collector panel of a Dyson swarm, centred on its arc. */
+export const dysonPanel = () =>
+  paint(30, 12, (ctx) => {
+    ctx.fillStyle = linear(ctx, 0, 0, 30, 0, [
+      [0, '#3b3220'],
+      [0.5, '#ffe9a8'],
+      [1, '#3b3220'],
+    ]);
+    ctx.beginPath();
+    ctx.moveTo(1, 9);
+    ctx.quadraticCurveTo(15, 1, 29, 9);
+    ctx.lineTo(27, 11);
+    ctx.quadraticCurveTo(15, 4, 3, 11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 0.5;
+    for (let x = 6; x < 26; x += 5) {
+      ctx.beginPath();
+      ctx.moveTo(x, 9 - Math.sin((x / 30) * Math.PI) * 5);
+      ctx.lineTo(x, 11 - Math.sin((x / 30) * Math.PI) * 5);
+      ctx.stroke();
+    }
+  }, 4);

@@ -1,16 +1,20 @@
 import {
+  ACHIEVEMENT_BONUS,
   BOOST,
+  CORE_PERKS,
   GENERATORS,
   MILESTONE_MULT,
   MILESTONES,
   OFFLINE_CAP_SEC,
+  PRESTIGE,
   UPGRADES,
+  type PerkId,
   type GeneratorDef,
   type GeneratorId,
   type UpgradeDef,
 } from './config';
 import { D, Decimal } from './num';
-import type { GameState } from './state';
+import { emptyOwned, type GameState } from './state';
 
 export type BuyMode = 1 | 10 | 100 | 'max';
 
@@ -58,6 +62,23 @@ function upgradeDefs(state: GameState): UpgradeDef[] {
   return UPGRADES.filter((u) => state.upgrades.has(u.id));
 }
 
+export function hasPerk(state: GameState, id: PerkId): boolean {
+  return state.cores >= CORE_PERKS.find((p) => p.id === id)!.at;
+}
+
+/** Permanent multiplier from Star Cores and achievements; applies to machines and taps. */
+export function globalMult(state: GameState): number {
+  return (1 + state.cores * PRESTIGE.perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS);
+}
+
+export function boostDurationSec(state: GameState): number {
+  return hasPerk(state, 'longboost') ? 60 : BOOST.durationSec;
+}
+
+export function offlineCapSec(state: GameState): number {
+  return hasPerk(state, 'longshift') ? OFFLINE_CAP_SEC * 2 : OFFLINE_CAP_SEC;
+}
+
 export function boostActive(state: GameState, now: number): boolean {
   return now < state.boostUntil;
 }
@@ -66,7 +87,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned));
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;
@@ -95,13 +116,14 @@ export function tapValue(state: GameState, now: number): Decimal {
       if (e.kind === 'tapIncomeShare') share += e.share;
     }
   }
-  const value = D(mult).add(baseIncome(state).mul(share));
+  const value = D(mult * globalMult(state)).add(baseIncome(state).mul(share));
   return boostActive(state, now) ? value.mul(BOOST.mult) : value;
 }
 
 export function earn(state: GameState, amount: Decimal): void {
   state.scrap = state.scrap.add(amount);
   state.lifetime = state.lifetime.add(amount);
+  state.allTime = state.allTime.add(amount);
 }
 
 /** Advances the game by `dt` seconds of production. */
@@ -144,8 +166,10 @@ export function buyUpgrade(state: GameState, id: string): boolean {
 
 export function activateBoost(state: GameState, now: number): boolean {
   if (now < state.boostReadyAt) return false;
-  state.boostUntil = now + BOOST.durationSec * 1000;
-  state.boostReadyAt = now + (BOOST.durationSec + BOOST.cooldownSec) * 1000;
+  const duration = boostDurationSec(state);
+  state.boostUntil = now + duration * 1000;
+  state.boostReadyAt = now + (duration + BOOST.cooldownSec) * 1000;
+  state.stats.boosts++;
   return true;
 }
 
@@ -155,9 +179,63 @@ export function activateBoost(state: GameState, now: number): boolean {
  */
 export function applyOffline(state: GameState, now: number): { seconds: number; earned: Decimal } {
   const away = Math.max(0, (now - state.lastSeen) / 1000);
-  const seconds = Math.min(away, OFFLINE_CAP_SEC);
+  const seconds = Math.min(away, offlineCapSec(state));
   const earned = baseIncome(state).mul(seconds);
   earn(state, earned);
   state.lastSeen = now;
   return { seconds, earned };
+}
+
+/** Total Star Cores that all-time earnings are worth. */
+export function coresForAllTime(allTime: Decimal): number {
+  if (allTime.lte(0)) return 0;
+  // Work in logs so this stays exact far past the range of a normal number.
+  const log = (allTime.log10() - Math.log10(PRESTIGE.divisor)) * PRESTIGE.exponent;
+  return log < 0 ? 0 : Math.floor(Math.pow(10, log) + 1e-9);
+}
+
+/** Cores the player would gain by relocating now. */
+export function claimableCores(state: GameState): number {
+  return Math.max(0, coresForAllTime(state.allTime) - state.cores);
+}
+
+/** All-time scrap needed before the next core becomes claimable. */
+export function nextCoreAt(state: GameState): Decimal {
+  const target = Math.max(coresForAllTime(state.allTime), state.cores) + 1;
+  return D(target).pow(1 / PRESTIGE.exponent).mul(PRESTIGE.divisor);
+}
+
+/**
+ * Relocates the station: banks the claimable cores and starts a fresh run.
+ * Keeps cores, achievements, all-time totals, stats and settings.
+ */
+export function relocate(state: GameState, now: number): number {
+  const gained = claimableCores(state);
+  if (gained <= 0) return 0;
+  state.cores += gained;
+  state.stats.relocations++;
+  state.scrap = D(0);
+  state.lifetime = D(0);
+  state.owned = emptyOwned();
+  state.upgrades = new Set();
+  state.boostUntil = 0;
+  state.boostReadyAt = 0;
+  state.lastSeen = now;
+  if (hasPerk(state, 'headstart')) state.owned.drone = 10;
+  if (hasPerk(state, 'seedfund')) state.scrap = D(1e6);
+  return gained;
+}
+
+/** The cheapest single machine purchase, for the Auto-Builder perk. */
+export function cheapestMachine(state: GameState): { id: GeneratorId; cost: Decimal } | null {
+  let best: { id: GeneratorId; cost: Decimal } | null = null;
+  let revealed = true;
+  for (const g of GENERATORS) {
+    // Only machines the player can see: everything owned plus the next new one.
+    if (!revealed) break;
+    if (state.owned[g.id] === 0) revealed = false;
+    const cost = costFor(g, state.owned[g.id], 1);
+    if (!best || cost.lt(best.cost)) best = { id: g.id, cost };
+  }
+  return best;
 }

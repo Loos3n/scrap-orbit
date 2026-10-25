@@ -1,4 +1,5 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
+import { checkAchievements, type AchievementDef } from './core/achievements';
 import * as eco from './core/economy';
 import type { Decimal } from './core/num';
 import { deserialize, newState, serialize, type GameState } from './core/state';
@@ -7,6 +8,8 @@ const SAVE_KEY = 'scrap-orbit-save';
 const AUTOSAVE_MS = 30_000;
 /** Gaps longer than this between frames count as time away (tab hidden, phone locked). */
 const AWAY_THRESHOLD_SEC = 5;
+const ACHIEVEMENT_CHECK_MS = 1_000;
+const AUTOBUY_MS = 2_000;
 
 export type GameEvent =
   | { type: 'tap'; value: Decimal }
@@ -16,6 +19,8 @@ export type GameEvent =
   | { type: 'boost' }
   | { type: 'offline'; seconds: number; earned: Decimal }
   | { type: 'bonus'; value: Decimal }
+  | { type: 'achievement'; def: AchievementDef }
+  | { type: 'relocate'; cores: number }
   | { type: 'reset' };
 
 function storageGet(): string | null {
@@ -41,6 +46,8 @@ export class Game {
   private listeners: ((e: GameEvent) => void)[] = [];
   private lastFrame = Date.now();
   private lastSave = Date.now();
+  private lastCheck = 0;
+  private lastAutoBuy = Date.now();
 
   constructor() {
     const now = Date.now();
@@ -70,7 +77,25 @@ export class Game {
       eco.tick(this.state, dt, now);
       this.state.lastSeen = now;
     }
+    if (now - this.lastAutoBuy > AUTOBUY_MS) {
+      this.lastAutoBuy = now;
+      if (eco.hasPerk(this.state, 'autobuy') && this.state.settings.autoBuy) this.autoBuy();
+    }
+    if (now - this.lastCheck > ACHIEVEMENT_CHECK_MS) {
+      this.lastCheck = now;
+      for (const def of checkAchievements(this.state)) this.emit({ type: 'achievement', def });
+    }
     if (now - this.lastSave > AUTOSAVE_MS) this.save();
+  }
+
+  /** Auto-Builder perk: buys the cheapest machine on offer, if it's affordable. */
+  private autoBuy(): void {
+    const pick = eco.cheapestMachine(this.state);
+    if (!pick || pick.cost.gt(this.state.scrap)) return;
+    const mode = this.buyMode;
+    this.buyMode = 1;
+    this.buy(pick.id);
+    this.buyMode = mode;
   }
 
   private collectOffline(now: number): void {
@@ -92,6 +117,7 @@ export class Game {
     const b = eco.tapValue(this.state, now).mul(25);
     const value = a.gt(b) ? a : b;
     eco.earn(this.state, value);
+    this.state.stats.crates++;
     this.emit({ type: 'bonus', value });
     return value;
   }
@@ -119,6 +145,16 @@ export class Game {
     this.state.lastSeen = Date.now();
     storageSet(serialize(this.state));
     this.lastSave = Date.now();
+  }
+
+  /** Prestige: trades this run for Star Cores. Returns the cores gained. */
+  relocate(): number {
+    const cores = eco.relocate(this.state, Date.now());
+    if (cores > 0) {
+      this.save();
+      this.emit({ type: 'relocate', cores });
+    }
+    return cores;
   }
 
   reset(): void {

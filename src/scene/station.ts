@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
 import * as art from './art';
 
@@ -15,6 +15,11 @@ const COLORS = {
   smelter: 0xff8a4c,
   fabricator: 0xc58cff,
   dock: 0xffd166,
+  laser: 0xff5d6c,
+  gravity: 0x5ce1ff,
+  nanite: 0x9dff6b,
+  gate: 0x8f7bff,
+  dyson: 0xffe9a8,
   boost: 0xff6b9a,
   white: 0xffffff,
 };
@@ -22,14 +27,28 @@ const COLORS = {
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const easeInCubic = (t: number) => t * t * t;
 
+/** Where the big late-game machines sit, in world units. */
+const GATE_POS = { x: -250, y: -205 };
+const SUN_POS = { x: 236, y: -200 };
+const WELL_RADIUS = 238;
+const TURRET_RADIUS = 186;
+/** How far the camera pulls back once each tier is built, so everything fits. */
+const ZOOM_FOR: Partial<Record<GeneratorId, number>> = { laser: 1.16, gravity: 1.4, nanite: 1.42, gate: 1.5, dyson: 1.6 };
+
 interface Star { s: Sprite; depth: number; phase: number; base: number }
-interface Orbiter { s: Sprite; radius: number; angle: number; speed: number; wobble: number; cargo?: Sprite }
+interface Orbiter { s: Sprite; radius: number; angle: number; speed: number; wobble: number; cargo?: Sprite; engine?: Sprite }
 interface Spark { s: Sprite; vx: number; vy: number; life: number; max: number }
 interface Puff { s: Sprite; life: number; max: number; grow: number }
 interface Ring { x: number; y: number; r: number; life: number; color: number; width: number }
 interface Drift { s: Sprite; vx: number; vy: number; vr: number; crate: boolean; glow?: Sprite }
 interface Chunk { s: Sprite; x0: number; y0: number; t: number; dur: number; color: number }
 interface Floater { text: Text; vy: number; life: number; max: number }
+interface Turret { s: Sprite; angle: number; aim: number; cool: number; beam: number; tx: number; ty: number }
+interface Well { s: Sprite; x: number; y: number; spin: number }
+interface Mote { s: Sprite; a: number; d: number; v: number; well: number }
+interface Nanite { s: Sprite; p: number; lane: number; size: number }
+interface GateShip { s: Sprite; engine: Sprite; t: number; x0: number; y0: number; x1: number; y1: number }
+interface Rock { s: Sprite; vx: number; vr: number }
 
 /** Simple pool so effects don't allocate sprites every tap. */
 class Pool {
@@ -58,13 +77,23 @@ export class StationScene {
   private tex!: {
     glow: Texture; streak: Texture; flare: Texture; hull: Texture; habitat: Texture; core: Texture;
     wing: Texture; claw: Texture; drone: Texture; hauler: Texture; smelter: Texture; fab: Texture;
-    dock: Texture; crate: Texture; debris: Texture[]; planet: Texture;
+    dock: Texture; crate: Texture; debris: Texture[]; planet: Texture; antenna: Texture; moon: Texture;
+    galaxy: Texture; rocks: Texture[]; turret: Texture; vortex: Texture; gate: Texture; portal: Texture;
+    sun: Texture; panel: Texture;
   };
 
   private bg = new Sprite();
   private starLayer = new Container();
   private planet = new Sprite();
+  private galaxy = new Sprite();
+  private moon = new Sprite();
+  private moonAngle = rand(0, TAU);
+  private fgLayer = new Container();
+  private rocks: Rock[] = [];
+  private nextRock = rand(4, 10);
+  private flash = new Sprite(Texture.WHITE);
   private world = new Container();
+  private farLayer = new Container();
   private debrisLayer = new Container();
   private lines = new Graphics();
   private dockLayer = new Container();
@@ -76,9 +105,11 @@ export class StationScene {
   private claw!: Sprite;
   private podLayer = new Container();
   private lights: Sprite[] = [];
+  private antenna!: Sprite;
   private droneLayer = new Container();
   private fxLayer = new Container();
   private ringG = new Graphics();
+  private beamG = new Graphics();
   private textLayer = new Container();
 
   private sparkPool!: Pool;
@@ -92,6 +123,15 @@ export class StationScene {
   private fabs: Sprite[] = [];
   private docks: Sprite[] = [];
   private dockedShips: Sprite[] = [];
+  private turrets: Turret[] = [];
+  private wells: Well[] = [];
+  private motes: Mote[] = [];
+  private nanites: Nanite[] = [];
+  private gate: { ring: Sprite; portal: Sprite; glow: Sprite } | null = null;
+  private gateShips: GateShip[] = [];
+  private nextGateShip = 2;
+  private sun: { core: Sprite; glow: Sprite; panels: Sprite[] } | null = null;
+  private dysonCount = 0;
   private sparks: Spark[] = [];
   private puffs: Puff[] = [];
   private rings: Ring[] = [];
@@ -113,6 +153,11 @@ export class StationScene {
   private nextWeld = 0;
   private nextEmber = 0;
   private scale = 1;
+  private baseScale = 1;
+  private zoom = 1;
+  private zoomTarget = 1;
+  private crateRate = 1;
+  private jump = 0;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   private resizeTimer = 0;
   /** The open band of screen between the HUD and the panel, where the station sits. */
@@ -146,6 +191,16 @@ export class StationScene {
       crate: art.crate(),
       debris: [1, 2, 3, 4, 5, 6].map((n) => art.debris(n * 97)),
       planet: art.planet(260),
+      antenna: art.antenna(),
+      moon: art.moon(),
+      galaxy: art.galaxy(),
+      rocks: [11, 23, 37].map((n) => art.bigRock(n)),
+      turret: art.laserTurret(),
+      vortex: art.vortex(),
+      gate: art.warpGate(),
+      portal: art.portal(),
+      sun: art.sun(),
+      panel: art.dysonPanel(),
     };
 
     this.buildHub();
@@ -155,8 +210,22 @@ export class StationScene {
 
     this.planet.texture = this.tex.planet;
     this.planet.anchor.set(0.5);
-    this.world.addChild(this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.fxLayer, this.ringG, this.textLayer);
-    this.app.stage.addChild(this.bg, this.starLayer, this.planet, this.world);
+    this.galaxy.texture = this.tex.galaxy;
+    this.galaxy.anchor.set(0.5);
+    this.galaxy.blendMode = 'add';
+    this.galaxy.alpha = 0.55;
+    this.moon.texture = this.tex.moon;
+    this.moon.anchor.set(0.5);
+    // Foreground rocks are drawn soft, as if close to the camera and out of focus.
+    this.fgLayer.filters = [new BlurFilter({ strength: 2, quality: 2 })];
+    this.flash.alpha = 0;
+    this.world.addChild(this.farLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
+    this.app.stage.sortableChildren = true;
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.world, 10], [this.fgLayer, 20], [this.flash, 30]];
+    for (const [c, i] of z) {
+      c.zIndex = i;
+      this.app.stage.addChild(c);
+    }
 
     this.layout();
     this.app.renderer.on('resize', () => {
@@ -185,6 +254,8 @@ export class StationScene {
     halo.tint = 0x5b6bff;
     halo.alpha = 0.25;
     halo.blendMode = 'add';
+    this.antenna = this.sprite(t.antenna, this.hub, 0, 54);
+    this.antenna.anchor.set(0.5, 0);
     this.sprite(t.hull, this.hub);
     this.hub.addChild(this.podLayer);
     this.habitat = this.sprite(t.habitat, this.hub);
@@ -213,7 +284,8 @@ export class StationScene {
     const top = this.focus.bottom > this.focus.top ? this.focus.top : 0;
     const bottom = this.focus.bottom > this.focus.top ? this.focus.bottom : h;
     const fh = bottom - top;
-    this.scale = Math.min(w, fh * 1.08) / WORLD;
+    this.baseScale = Math.min(w, fh * 1.08) / WORLD;
+    this.scale = this.baseScale / this.zoom;
     this.world.position.set(w / 2, top + fh / 2);
     this.world.scale.set(this.scale);
 
@@ -225,6 +297,11 @@ export class StationScene {
     this.planet.width = ps * 1.7;
     this.planet.height = ps * 1.7;
     this.planet.position.set(w / 2 + Math.min(w, 540) * 0.52, bottom - ps * 0.02);
+    this.moon.scale.set(ps / 220);
+    this.galaxy.position.set(w * 0.16, top + fh * 0.86);
+    this.galaxy.scale.set(Math.min(w, 600) / 300);
+    this.flash.width = w;
+    this.flash.height = h;
 
     for (const st of this.stars) st.s.destroy();
     this.stars = [];
@@ -258,14 +335,18 @@ export class StationScene {
     while (this.haulers.length < haulerCount) {
       const cargo = this.sprite(t.debris[this.haulers.length % t.debris.length], this.machineLayer);
       cargo.scale.set(0.55);
+      const engine = this.sprite(t.glow, this.machineLayer);
+      engine.blendMode = 'add';
+      engine.tint = 0x7aa7ff;
       const s = this.sprite(t.hauler, this.machineLayer);
       s.scale.set(0.85);
-      this.haulers.push({ s, cargo, radius: rand(124, 136), angle: rand(0, TAU), speed: rand(0.14, 0.22), wobble: rand(0, TAU) });
+      this.haulers.push({ s, cargo, engine, radius: rand(124, 136), angle: rand(0, TAU), speed: rand(0.14, 0.22), wobble: rand(0, TAU) });
     }
     while (this.haulers.length > haulerCount) {
       const h = this.haulers.pop()!;
       h.s.destroy();
       h.cargo?.destroy();
+      h.engine?.destroy();
     }
 
     const podCount = Math.min(8, Math.ceil(Math.sqrt(owned.smelter) * 1.6));
@@ -297,6 +378,115 @@ export class StationScene {
     }
     while (this.docks.length > dockCount) this.docks.pop()!.destroy();
     while (this.dockedShips.length > Math.ceil(dockCount / 2)) this.dockedShips.pop()!.destroy();
+
+    // Mining lasers sit just outside the dock ring.
+    const turretCount = owned.laser > 0 ? Math.min(8, Math.ceil(Math.sqrt(owned.laser) * 1.4)) : 0;
+    while (this.turrets.length < turretCount) {
+      const s = this.sprite(t.turret, this.machineLayer);
+      s.scale.set(0.9);
+      this.turrets.push({ s, angle: 0, aim: 0, cool: rand(0.5, 2), beam: 0, tx: 0, ty: 0 });
+    }
+    while (this.turrets.length > turretCount) this.turrets.pop()!.s.destroy();
+    this.turrets.forEach((tu, i) => {
+      tu.angle = (i / turretCount) * TAU - Math.PI / 2 + 0.3;
+      tu.aim = tu.angle;
+      tu.s.position.set(Math.cos(tu.angle) * TURRET_RADIUS, Math.sin(tu.angle) * TURRET_RADIUS);
+    });
+
+    // Gravity wells, out on the diagonals, pulling in streams of dust.
+    const wellCount = owned.gravity > 0 ? Math.min(4, Math.ceil(Math.sqrt(owned.gravity) * 0.8)) : 0;
+    while (this.wells.length < wellCount) {
+      const i = this.wells.length;
+      const a = [Math.PI * 0.82, Math.PI * 0.18, Math.PI * 1.12, Math.PI * 1.88][i];
+      const s = this.sprite(t.vortex, this.farLayer, Math.cos(a) * WELL_RADIUS, Math.sin(a) * WELL_RADIUS * 0.8);
+      s.blendMode = 'add';
+      this.wells.push({ s, x: s.x, y: s.y, spin: i % 2 ? 1 : -1 });
+    }
+    while (this.wells.length > wellCount) this.wells.pop()!.s.destroy();
+    const moteCount = this.wells.length * 14;
+    while (this.motes.length < moteCount) {
+      const s = this.sprite(t.glow, this.farLayer);
+      s.blendMode = 'add';
+      s.tint = Math.random() < 0.3 ? 0xffffff : COLORS.gravity;
+      this.motes.push({ s, a: rand(0, TAU), d: rand(4, 46), v: rand(0.6, 1.2), well: this.motes.length % Math.max(1, this.wells.length) });
+    }
+    while (this.motes.length > moteCount) this.motes.pop()!.s.destroy();
+
+    // A ribbon of nanites flowing around the whole station.
+    const naniteCount = owned.nanite > 0 ? Math.min(110, Math.ceil(Math.sqrt(owned.nanite) * 14)) : 0;
+    while (this.nanites.length < naniteCount) {
+      const s = this.sprite(t.glow, this.droneLayer);
+      s.blendMode = 'add';
+      s.tint = Math.random() < 0.25 ? 0xeaffd8 : COLORS.nanite;
+      this.nanites.push({ s, p: Math.random(), lane: rand(-1, 1), size: rand(0.1, 0.2) });
+    }
+    while (this.nanites.length > naniteCount) this.nanites.pop()!.s.destroy();
+
+    // One warp gate, which grows a little as you build more.
+    if (owned.gate > 0 && !this.gate) {
+      const glow = this.sprite(t.glow, this.farLayer, GATE_POS.x, GATE_POS.y);
+      glow.blendMode = 'add';
+      glow.tint = COLORS.gate;
+      const portal = this.sprite(t.portal, this.farLayer, GATE_POS.x, GATE_POS.y);
+      portal.blendMode = 'add';
+      const ring = this.sprite(t.gate, this.farLayer, GATE_POS.x, GATE_POS.y);
+      this.gate = { ring, portal, glow };
+    } else if (owned.gate === 0 && this.gate) {
+      this.gate.ring.destroy();
+      this.gate.portal.destroy();
+      this.gate.glow.destroy();
+      this.gate = null;
+      for (const sh of this.gateShips) {
+        sh.s.destroy();
+        sh.engine.destroy();
+      }
+      this.gateShips = [];
+    }
+    if (this.gate) {
+      const k = 0.85 + Math.min(0.35, Math.sqrt(owned.gate) * 0.05);
+      this.gate.ring.scale.set(k);
+      this.gate.portal.scale.set(k * 0.9);
+      this.gate.glow.scale.set(k * 3.2);
+    }
+
+    // A distant star, wrapped in more collector panels the more you build.
+    if (owned.dyson > 0 && !this.sun) {
+      const glow = this.sprite(t.glow, this.farLayer, SUN_POS.x, SUN_POS.y);
+      glow.blendMode = 'add';
+      glow.tint = 0xffc070;
+      glow.scale.set(4);
+      const core = this.sprite(t.sun, this.farLayer, SUN_POS.x, SUN_POS.y);
+      core.blendMode = 'add';
+      this.sun = { core, glow, panels: [] };
+    } else if (owned.dyson === 0 && this.sun) {
+      this.sun.core.destroy();
+      this.sun.glow.destroy();
+      this.sun.panels.forEach((p) => p.destroy());
+      this.sun = null;
+    }
+    if (this.sun) {
+      const panels = Math.min(18, Math.ceil(Math.sqrt(owned.dyson) * 3));
+      while (this.sun.panels.length < panels) this.sun.panels.push(this.sprite(t.panel, this.farLayer));
+      while (this.sun.panels.length > panels) this.sun.panels.pop()!.destroy();
+    }
+    this.dysonCount = owned.dyson;
+
+    let zoom = 1;
+    for (const [id, z] of Object.entries(ZOOM_FOR) as [GeneratorId, number][]) if (owned[id] > 0) zoom = Math.max(zoom, z);
+    this.zoomTarget = zoom;
+  }
+
+  /** Crate Magnet perk: crates show up `mult` times as often. */
+  setCrateRate(mult: number): void {
+    if (mult > this.crateRate) this.nextCrate /= mult / this.crateRate;
+    this.crateRate = mult;
+  }
+
+  /** The big jump when the station relocates: a warp, a flash, and a fresh start. */
+  warpJump(): void {
+    this.jump = 2.4;
+    this.shake = Math.max(this.shake, 9);
+    this.celebrate(COLORS.gate);
   }
 
   setFocus(top: number, bottom: number): void {
@@ -415,11 +605,23 @@ export class StationScene {
 
   private frame(dt: number): void {
     this.time += dt;
-    this.warp += ((this.boosting ? 1 : 0) - this.warp) * Math.min(1, dt * 3);
-    const speed = 1 + this.warp * 1.4;
+    this.jump = Math.max(0, this.jump - dt);
+    const warpTarget = this.jump > 0.6 ? 2.6 : this.boosting ? 1 : 0;
+    this.warp += (warpTarget - this.warp) * Math.min(1, dt * 3);
+    // The flash peaks partway through the jump, as the station lands somewhere new.
+    const jt = 2.4 - this.jump;
+    this.flash.alpha = this.jump > 0 ? Math.max(0, 1 - Math.abs(jt - 1.6) * 2.2) * 0.85 : 0;
+    const speed = 1 + Math.min(1, this.warp) * 1.4;
+    if (Math.abs(this.zoom - this.zoomTarget) > 0.0005) {
+      this.zoom += (this.zoomTarget - this.zoom) * Math.min(1, dt * 1.5);
+      this.scale = this.baseScale / this.zoom;
+      this.world.scale.set(this.scale);
+    }
     this.updateStars(dt);
+    this.updateScenery(dt);
     this.updateDrifts(dt);
     this.updateMachines(dt * speed);
+    this.updateFar(dt * speed);
     this.updateHub(dt);
     this.updateFx(dt);
     if (!this.reducedMotion && this.shake > 0.05) {
@@ -509,7 +711,7 @@ export class StationScene {
     }
     if (this.nextCrate <= 0) {
       spawn(true);
-      this.nextCrate = rand(60, 110);
+      this.nextCrate = rand(60, 110) / this.crateRate;
     }
     for (const d of [...this.drifts]) {
       d.s.x += d.vx * dt;
@@ -559,6 +761,9 @@ export class StationScene {
       const cx = Math.cos(ba) * o.radius;
       const cy = Math.sin(ba) * o.radius;
       o.cargo!.position.set(cx, cy);
+      const ea = o.angle - 0.06;
+      o.engine!.position.set(Math.cos(ea) * o.radius, Math.sin(ea) * o.radius);
+      o.engine!.scale.set(0.35 + 0.08 * Math.sin(t * 20 + o.wobble) + this.warp * 0.2);
       o.cargo!.rotation += dt * 0.6;
       g.moveTo(x - Math.cos(o.s.rotation) * 10, y - Math.sin(o.s.rotation) * 10).lineTo(cx, cy).stroke({ width: 0.8, color: 0xb8ccff, alpha: 0.6 });
       this.trail(g, o.radius, o.angle - 0.07, -1, 0.25, 0x7aa7ff, 2.2);
@@ -595,6 +800,183 @@ export class StationScene {
     }
   }
 
+  /** Background life: the galaxy turns, the moon orbits, big rocks drift past the camera. */
+  private updateScenery(dt: number): void {
+    const { width: w } = this.app.screen;
+    this.galaxy.rotation += dt * 0.012;
+
+    this.moonAngle += dt * 0.07;
+    const pr = this.planet.width * 0.5;
+    const ma = this.moonAngle;
+    this.moon.position.set(this.planet.x + Math.cos(ma) * pr * 0.9, this.planet.y - pr * 0.62 + Math.sin(ma) * pr * 0.3);
+    // Pass in front of the planet on the near side of the orbit, behind it on the far side.
+    const z = Math.sin(ma) > 0 ? 5 : 3;
+    if (this.moon.zIndex !== z) this.moon.zIndex = z;
+
+    if (this.reducedMotion) return;
+    this.nextRock -= dt;
+    if (this.nextRock <= 0 && this.rocks.length < 2) {
+      const fromLeft = Math.random() < 0.5;
+      const s = new Sprite(this.tex.rocks[Math.floor(Math.random() * this.tex.rocks.length)]);
+      s.anchor.set(0.5);
+      const size = Math.min(w, 500) * rand(0.2, 0.3);
+      s.scale.set(size / 80);
+      s.tint = 0xc8c0e0;
+      s.alpha = 0.9;
+      s.position.set(fromLeft ? -size : w + size, rand(this.focus.top, this.focus.bottom || this.app.screen.height));
+      this.fgLayer.addChild(s);
+      this.rocks.push({ s, vx: (fromLeft ? 1 : -1) * rand(10, 18), vr: rand(-0.08, 0.08) });
+      this.nextRock = rand(25, 50);
+    }
+    for (const r of [...this.rocks]) {
+      r.s.x += r.vx * dt * (1 + this.warp * 6);
+      r.s.rotation += r.vr * dt;
+      if (r.s.x < -r.s.width || r.s.x > w + r.s.width) {
+        this.rocks.splice(this.rocks.indexOf(r), 1);
+        r.s.destroy();
+      }
+    }
+  }
+
+  /** The late-game machines: lasers, gravity wells, nanites, the warp gate and the Dyson swarm. */
+  private updateFar(dt: number): void {
+    const g = this.beamG.clear();
+    const t = this.time;
+
+    for (const tu of this.turrets) {
+      tu.cool -= dt;
+      tu.beam = Math.max(0, tu.beam - dt);
+      const x = tu.s.x;
+      const y = tu.s.y;
+      if (tu.cool <= 0) {
+        // Shoot the nearest passing rock if there is one, otherwise sweep the dark.
+        let target: Drift | null = null;
+        let best = 240;
+        for (const d of this.drifts) {
+          const dist = Math.hypot(d.s.x - x, d.s.y - y);
+          if (!d.crate && dist < best) {
+            best = dist;
+            target = d;
+          }
+        }
+        if (target) {
+          tu.tx = target.s.x;
+          tu.ty = target.s.y;
+          this.removeDrift(target);
+          this.burst(tu.tx, tu.ty, COLORS.laser, 14, 0.9);
+          this.puff(tu.tx, tu.ty, 0xffb0a0, 1.6, 0.35);
+        } else {
+          const a = tu.angle + rand(-0.7, 0.7);
+          const d = rand(70, 130);
+          tu.tx = x + Math.cos(a) * d;
+          tu.ty = y + Math.sin(a) * d;
+          this.burst(tu.tx, tu.ty, COLORS.laser, 4, 0.4);
+        }
+        tu.aim = Math.atan2(tu.ty - y, tu.tx - x);
+        tu.beam = 0.2;
+        tu.cool = rand(1.4, 3.4) / Math.sqrt(this.turrets.length);
+      } else if (tu.beam === 0) {
+        tu.aim += (tu.angle - tu.aim) * Math.min(1, dt * 0.8);
+      }
+      tu.s.rotation = tu.aim + Math.PI / 2;
+      if (tu.beam > 0) {
+        const k = tu.beam / 0.2;
+        const bx = x + Math.cos(tu.aim) * 12;
+        const by = y + Math.sin(tu.aim) * 12;
+        g.moveTo(bx, by).lineTo(tu.tx, tu.ty).stroke({ width: 5 * k, color: COLORS.laser, alpha: 0.35 * k });
+        g.moveTo(bx, by).lineTo(tu.tx, tu.ty).stroke({ width: 1.6 * k, color: 0xfff0f0, alpha: k });
+      }
+    }
+
+    for (const w of this.wells) {
+      w.s.rotation += w.spin * dt * 1.1;
+      w.s.scale.set(0.95 + 0.06 * Math.sin(t * 1.3 + w.x));
+    }
+    for (const m of this.motes) {
+      const w = this.wells[m.well % this.wells.length];
+      if (!w) continue;
+      m.d -= dt * m.v * (10 + (46 - m.d) * 0.9);
+      m.a += w.spin * dt * (1.5 + 40 / (m.d + 6));
+      if (m.d < 3) {
+        m.d = 46;
+        m.a = rand(0, TAU);
+      }
+      m.s.position.set(w.x + Math.cos(m.a) * m.d, w.y + Math.sin(m.a) * m.d * 0.85);
+      m.s.scale.set(0.04 + (m.d / 46) * 0.07);
+      m.s.alpha = Math.min(1, (46 - m.d) / 8) * Math.min(1, m.d / 6);
+    }
+
+    for (const n of this.nanites) {
+      n.p = (n.p + dt * 0.03) % 1;
+      const u = n.p * TAU;
+      const r = 198 + 20 * Math.sin(u * 3 + t * 0.5) + n.lane * 12 * Math.sin(t * 1.9 + n.p * 50);
+      n.s.position.set(Math.cos(u) * r, Math.sin(u) * r * 0.8);
+      n.s.scale.set(n.size * (0.8 + 0.35 * Math.sin(t * 6 + n.p * 90)));
+      n.s.alpha = 0.55 + 0.45 * Math.sin(t * 3 + n.lane * 9);
+    }
+
+    if (this.gate) {
+      const gt = this.gate;
+      gt.portal.rotation -= dt * 0.9;
+      gt.ring.rotation += dt * 0.05;
+      gt.glow.alpha = 0.35 + 0.15 * Math.sin(t * 2);
+      this.nextGateShip -= dt;
+      if (this.nextGateShip <= 0 && this.gateShips.length < 4) {
+        const s = this.sprite(this.tex.hauler, this.farLayer, GATE_POS.x, GATE_POS.y);
+        s.tint = 0xdcd2ff;
+        const engine = this.sprite(this.tex.glow, this.farLayer);
+        engine.blendMode = 'add';
+        engine.tint = COLORS.gate;
+        const a = Math.atan2(GATE_POS.y, GATE_POS.x) + rand(-0.6, 0.6);
+        this.gateShips.push({ s, engine, t: 0, x0: GATE_POS.x, y0: GATE_POS.y, x1: Math.cos(a) * 128, y1: Math.sin(a) * 128 });
+        this.puff(GATE_POS.x, GATE_POS.y, COLORS.gate, 2.2, 0.4);
+        this.nextGateShip = rand(3, 7) / Math.sqrt(Math.sqrt(this.gateShips.length + 1));
+      }
+    }
+    for (const sh of [...this.gateShips]) {
+      sh.t += dt / 2.8;
+      const k = 1 - Math.pow(1 - Math.min(1, sh.t), 2);
+      const x = sh.x0 + (sh.x1 - sh.x0) * k;
+      const y = sh.y0 + (sh.y1 - sh.y0) * k;
+      const dir = Math.atan2(sh.y1 - sh.y0, sh.x1 - sh.x0);
+      sh.s.position.set(x, y);
+      sh.s.rotation = dir;
+      sh.s.scale.set(0.3 + Math.min(1, sh.t * 4) * 0.45);
+      const alpha = Math.min(1, sh.t * 8) * Math.min(1, (1 - sh.t) * 4);
+      sh.s.alpha = alpha;
+      sh.engine.position.set(x - Math.cos(dir) * 10, y - Math.sin(dir) * 10);
+      sh.engine.scale.set(0.45 + 0.1 * Math.sin(t * 25));
+      sh.engine.alpha = alpha;
+      if (sh.t >= 1) {
+        this.gateShips.splice(this.gateShips.indexOf(sh), 1);
+        sh.s.destroy();
+        sh.engine.destroy();
+      }
+    }
+
+    if (this.sun) {
+      const sn = this.sun;
+      sn.glow.alpha = 0.5 + 0.12 * Math.sin(t * 1.4);
+      sn.core.scale.set(1 + 0.04 * Math.sin(t * 2.3));
+      const n = sn.panels.length;
+      sn.panels.forEach((p, i) => {
+        const a = (i / n) * TAU + t * 0.25;
+        p.position.set(SUN_POS.x + Math.cos(a) * 30, SUN_POS.y + Math.sin(a) * 11);
+        p.rotation = Math.cos(a) * 0.5;
+        p.scale.set(0.7 + 0.3 * Math.abs(Math.sin(a)), 0.8);
+        p.alpha = Math.sin(a) > 0 ? 1 : 0.45;
+      });
+      // Power beamed home to the station core.
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+      g.moveTo(SUN_POS.x, SUN_POS.y).lineTo(0, 0).stroke({ width: 3, color: COLORS.dyson, alpha: 0.06 + pulse * 0.05 });
+      const packets = Math.min(5, 1 + Math.floor(Math.sqrt(this.dysonCount)));
+      for (let k = 0; k < packets; k++) {
+        const f = (t * 0.3 + k / packets) % 1;
+        g.circle(SUN_POS.x * (1 - f), SUN_POS.y * (1 - f), 2.4).fill({ color: COLORS.dyson, alpha: Math.sin(f * Math.PI) * 0.9 });
+      }
+    }
+  }
+
   /** Draws a fading arc behind something orbiting at radius r. */
   private trail(g: Graphics, r: number, angle: number, dir: number, length: number, color: number, width: number): void {
     const steps = 5;
@@ -616,6 +998,7 @@ export class StationScene {
     this.hub.scale.set(1 - sq * 0.06 + wobble, 1 - sq * 0.06 - wobble);
     this.hub.y = Math.sin(t * 0.8) * 2;
     this.habitat.rotation = t * 0.35;
+    this.antenna.rotation = Math.sin(t * 0.7) * 0.06;
 
     const color = this.boosting ? COLORS.boost : COLORS.scrap;
     const beat = 0.5 + 0.5 * Math.sin(t * (this.boosting ? 10 : 2.4));

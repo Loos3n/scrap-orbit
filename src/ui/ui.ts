@@ -1,4 +1,5 @@
-import { BOOST, GENERATORS, OFFLINE_CAP_SEC, UPGRADES, type GeneratorId, type UpgradeDef } from '../core/config';
+import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
+import { ACHIEVEMENT_BONUS, BOOST, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { D, Decimal, format, formatDuration } from '../core/num';
 import type { Game } from '../game';
@@ -25,6 +26,24 @@ function upgradeArt(u: UpgradeDef): { icon: string; color: string } {
   return { icon: ICONS.claw, color: '#9aa6ff' };
 }
 
+const PERK_ICONS: Record<PerkId, string> = {
+  headstart: GEN_ICONS.drone,
+  longshift: ICONS.station,
+  longboost: ICONS.bolt.replace('currentColor', '#ff6b9a'),
+  autobuy: GEN_ICONS.fabricator,
+  magnet: ICONS.scrap,
+  seedfund: ICONS.star,
+};
+
+function achievementIcon(a: AchievementDef): string {
+  if (a.id.startsWith('own50-')) return GEN_ICONS[a.id.slice(6) as GeneratorId];
+  if (a.id.startsWith('taps')) return ICONS.claw;
+  if (a.id.startsWith('earn') || a.id.startsWith('rate') || a.id.startsWith('crate')) return ICONS.scrap;
+  if (a.id.startsWith('boost')) return ICONS.bolt.replace('currentColor', '#ff6b9a');
+  if (a.id.startsWith('relocate')) return ICONS.core;
+  return ICONS.star;
+}
+
 const setText = (el: HTMLElement, text: string) => {
   if (el.textContent !== text) el.textContent = text;
 };
@@ -44,12 +63,17 @@ interface GenRow {
 export class UI {
   private rows = new Map<GeneratorId, GenRow>();
   private upgradeKey = '';
+  private perkKey = '';
+  private achKey = '';
+  private achButtons = new Map<string, HTMLButtonElement>();
   private shown: Decimal = D(0);
   private lastScrapText = '';
   private fmt = (v: Parameters<typeof format>[0]) => format(v, this.game.state.settings.scientific);
 
   /** Called when the sound setting changes, so main can mute the synth. */
   onSoundChange: ((on: boolean) => void) | null = null;
+  /** Called after the player confirms a relocation. */
+  onRelocate: (() => void) | null = null;
 
   constructor(private game: Game) {
     fillIcons();
@@ -58,6 +82,8 @@ export class UI {
     this.bindTabs();
     this.bindBuyModes();
     this.bindSettings();
+    this.bindRelocate();
+    this.buildAchievements();
     $('boost').addEventListener('click', () => game.boost());
   }
 
@@ -128,13 +154,49 @@ export class UI {
     );
   }
 
+  private bindRelocate(): void {
+    const confirm = $('relocate-confirm');
+    $('relocate').addEventListener('click', () => (confirm.hidden = false));
+    $('relocate-no').addEventListener('click', () => (confirm.hidden = true));
+    $('relocate-yes').addEventListener('click', () => {
+      confirm.hidden = true;
+      this.onRelocate?.();
+      this.shown = this.game.state.scrap;
+      this.upgradeKey = '';
+      this.render();
+    });
+  }
+
+  private buildAchievements(): void {
+    const grid = $('ach-grid');
+    const caption = $('ach-caption');
+    for (const a of ACHIEVEMENTS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ach';
+      b.innerHTML = achievementIcon(a);
+      b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', () => {
+        this.achButtons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        const got = this.game.state.achievements.has(a.id);
+        caption.innerHTML = `<b></b> ${got ? '(earned)' : ''}<br>`;
+        caption.querySelector('b')!.textContent = a.name;
+        caption.append(a.desc);
+      });
+      grid.appendChild(b);
+      this.achButtons.set(a.id, b);
+    }
+  }
+
   private bindSettings(): void {
     const settings = () => this.game.state.settings;
     const sci = $<HTMLInputElement>('opt-sci');
     const hap = $<HTMLInputElement>('opt-haptics');
     const snd = $<HTMLInputElement>('opt-sound');
+    const auto = $<HTMLInputElement>('opt-auto');
     const soundBtn = $('sound');
     const sync = () => {
+      auto.checked = settings().autoBuy;
       sci.checked = settings().scientific;
       hap.checked = settings().haptics;
       snd.checked = settings().sound;
@@ -149,6 +211,7 @@ export class UI {
       this.upgradeKey = '';
     });
     hap.addEventListener('change', () => (settings().haptics = hap.checked));
+    auto.addEventListener('change', () => (settings().autoBuy = auto.checked));
     const setSound = (on: boolean) => {
       settings().sound = on;
       sync();
@@ -201,7 +264,50 @@ export class UI {
     this.renderBoost(now);
     if (!$('tab-build').hidden) this.renderGenerators();
     this.renderUpgrades();
+    this.renderCores();
     if (!$('tab-station').hidden) this.renderStats(now);
+  }
+
+  private renderCores(): void {
+    const s = this.game.state;
+    const claim = eco.claimableCores(s);
+    const chip = $('cores-chip');
+    chip.hidden = s.cores === 0;
+    setText($('cores-n'), s.cores.toLocaleString('en-US'));
+    // Nudge the player once a relocation would at least double their cores.
+    $('cores-dot').hidden = !(claim > 0 && claim >= Math.max(1, s.cores));
+    if ($('tab-cores').hidden) return;
+
+    setText($('core-count'), s.cores.toLocaleString('en-US'));
+    setText($('core-bonus'), `+${Math.round(s.cores * PRESTIGE.perCore * 100).toLocaleString('en-US')}% income`);
+    setText($('core-claim'), claim.toLocaleString('en-US'));
+    const next = eco.nextCoreAt(s);
+    const prevTotal = Math.max(eco.coresForAllTime(s.allTime), s.cores);
+    const prev = prevTotal > 0 ? D(prevTotal).pow(1 / PRESTIGE.exponent).mul(PRESTIGE.divisor) : D(0);
+    const span = next.sub(prev);
+    const pct = span.gt(0) ? Math.max(0, Math.min(1, s.allTime.sub(prev).div(span).toNumber())) : 0;
+    $('core-bar').style.width = `${(pct * 100).toFixed(1)}%`;
+    const nextHtml = `Next core at <b>${this.fmt(next)}</b> scrap salvaged (all time: ${this.fmt(s.allTime)})`;
+    if ($('core-next').innerHTML !== nextHtml) $('core-next').innerHTML = nextHtml;
+    $<HTMLButtonElement>('relocate').disabled = claim === 0;
+    if (claim === 0) $('relocate-confirm').hidden = true;
+
+    const key = CORE_PERKS.map((p) => eco.hasPerk(s, p.id)).join();
+    if (key !== this.perkKey) {
+      this.perkKey = key;
+      const list = $('perk-list');
+      list.replaceChildren();
+      for (const p of CORE_PERKS) {
+        const on = eco.hasPerk(s, p.id);
+        const li = document.createElement('li');
+        li.className = `perk${on ? ' on' : ''}`;
+        li.innerHTML = `<div class="perk-icon">${PERK_ICONS[p.id]}</div><div><div class="perk-name"></div><div class="perk-desc"></div></div><div class="perk-at"></div>`;
+        li.querySelector('.perk-name')!.textContent = p.name;
+        li.querySelector('.perk-desc')!.textContent = p.desc;
+        li.querySelector('.perk-at')!.textContent = on ? 'Active' : `${p.at} cores`;
+        list.appendChild(li);
+      }
+    }
   }
 
   private renderBoost(now: number): void {
@@ -212,7 +318,7 @@ export class UI {
     let p = 0;
     if (eco.boostActive(s, now)) {
       state = 'active';
-      p = (s.boostUntil - now) / (BOOST.durationSec * 1000);
+      p = (s.boostUntil - now) / (eco.boostDurationSec(s) * 1000);
       setText(sub, `${Math.ceil((s.boostUntil - now) / 1000)}s left`);
     } else if (now < s.boostReadyAt) {
       state = 'cooldown';
@@ -220,7 +326,7 @@ export class UI {
       setText(sub, `Ready in ${formatDuration((s.boostReadyAt - now) / 1000)}`);
     } else {
       state = 'ready';
-      setText(sub, `${BOOST.mult}x for ${BOOST.durationSec}s`);
+      setText(sub, `${BOOST.mult}x for ${eco.boostDurationSec(s)}s`);
     }
     if (btn.dataset.state !== state) btn.dataset.state = state;
     btn.style.setProperty('--p', p.toFixed(3));
@@ -320,17 +426,30 @@ export class UI {
       ['Taps', s.taps.toLocaleString('en-US')],
       ['Machines built', Object.values(s.owned).reduce((a, b) => a + b, 0).toLocaleString('en-US')],
       ['Upgrades installed', `${s.upgrades.size} of ${UPGRADES.length}`],
+      ['Scrap salvaged, all time', this.fmt(s.allTime)],
+      ['Crates grabbed', s.stats.crates.toLocaleString('en-US')],
+      ['Relocations', s.stats.relocations.toLocaleString('en-US')],
     ];
     const html = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
     const stats = $('stats');
     if (stats.innerHTML !== html) stats.innerHTML = html;
+
+    const key = [...s.achievements].join();
+    if (key !== this.achKey) {
+      this.achKey = key;
+      for (const [id, b] of this.achButtons) b.classList.toggle('on', s.achievements.has(id));
+      const n = s.achievements.size;
+      setText($('ach-sum'), `${n} of ${ACHIEVEMENTS.length} · +${Math.round(n * ACHIEVEMENT_BONUS * 100)}% income`);
+    }
+    $('opt-auto-row').hidden = !eco.hasPerk(s, 'autobuy');
   }
 
   showOffline(seconds: number, earned: Decimal, onCollect: () => void): void {
     const modal = $('modal');
     const amount = $('modal-amount');
-    const capped = seconds >= OFFLINE_CAP_SEC - 1;
-    $('modal-time').textContent = `Gone for ${formatDuration(seconds)}.${capped ? ' Earnings are capped at 2 hours for now.' : ''}`;
+    const cap = eco.offlineCapSec(this.game.state);
+    const capped = seconds >= cap - 1;
+    $('modal-time').textContent = `Gone for ${formatDuration(seconds)}.${capped ? ` Earnings are capped at ${formatDuration(cap)} for now.` : ''}`;
     modal.hidden = false;
     // Count the amount up from zero.
     const start = performance.now();
