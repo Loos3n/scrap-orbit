@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b0d26" />
+    <title>Scrap Orbit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;600&display=swap" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="hud">
+        <div class="hud-main">
+          <div class="label">Scrap</div>
+          <div id="scrap" class="scrap">0</div>
+          <div id="rate" class="rate">0 / sec</div>
+        </div>
+        <button id="boost" class="boost" type="button">
+          <span class="boost-title">Overdrive</span>
+          <span id="boost-sub" class="boost-sub">2x for 30s</span>
+        </button>
+      </header>
+      <main id="scene" aria-label="Your station. Tap to salvage scrap."></main>
+      <section id="panel">
+        <nav class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button">Build</button>
+          <button class="tab" role="tab" data-tab="upgrades" aria-selected="false" type="button">Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button">Station</button>
+        </nav>
+        <div id="tab-build" class="tab-body">
+          <div class="buy-modes" role="radiogroup" aria-label="Buy amount">
+            <button type="button" data-mode="1" aria-checked="true" role="radio">x1</button>
+            <button type="button" data-mode="10" aria-checked="false" role="radio">x10</button>
+            <button type="button" data-mode="100" aria-checked="false" role="radio">x100</button>
+            <button type="button" data-mode="max" aria-checked="false" role="radio">Max</button>
+          </div>
+          <ul id="gen-list" class="list"></ul>
+        </div>
+        <div id="tab-upgrades" class="tab-body" hidden>
+          <ul id="upgrade-list" class="list"></ul>
+        </div>
+        <div id="tab-station" class="tab-body" hidden>
+          <dl id="stats" class="stats"></dl>
+          <div class="settings">
+            <label class="toggle"><input id="opt-sci" type="checkbox" /> Scientific notation</label>
+            <label class="toggle"><input id="opt-haptics" type="checkbox" /> Vibration on tap</label>
+            <button id="reset" class="reset" type="button">Reset progress</button>
+            <div id="reset-confirm" class="reset-confirm" hidden>
+              <span>Erase this station and start over?</span>
+              <button id="reset-yes" type="button" class="danger">Erase</button>
+              <button id="reset-no" type="button">Keep playing</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="label">While you were away</div>
+        <h2 id="modal-title">Your crew kept salvaging</h2>
+        <div id="modal-amount" class="modal-amount">+0</div>
+        <p id="modal-time" class="modal-time"></p>
+        <button id="modal-ok" class="primary" type="button">Collect</button>
+      </div>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
