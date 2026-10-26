@@ -14,6 +14,16 @@ import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, Streak
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
+/** Each tab's accent colour and the line under its title. */
+const TAB_LOOK: Record<string, { accent: string; sub: string }> = {
+  build: { accent: '#4fe3c1', sub: 'Machines that make scrap' },
+  upgrades: { accent: '#ffd166', sub: 'Make your machines stronger' },
+  crew: { accent: '#ff8a4c', sub: 'Specialists, trips and pets' },
+  lab: { accent: '#7aa7ff', sub: 'Research that never resets' },
+  cores: { accent: '#c58cff', sub: 'Jump sectors for Star Cores' },
+  station: { accent: '#ff7bb0', sub: 'Rooms, looks, records and settings' },
+};
+
 /** Fills every `data-icon="name"` placeholder in the static HTML. */
 function fillIcons(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => {
@@ -182,8 +192,17 @@ export class UI {
       const on = t.dataset.tab === name;
       t.setAttribute('aria-selected', String(on));
       $(`tab-${t.dataset.tab}`).hidden = !on;
-      if (on) $('panel-title').textContent = t.textContent;
+      if (on) {
+        $('panel-title').textContent = t.textContent;
+        const icon = t.querySelector<HTMLElement>('[data-icon]');
+        $('panel-icon').innerHTML = icon?.innerHTML ?? '';
+      }
     });
+    const look = TAB_LOOK[name];
+    if (look) {
+      $('app').style.setProperty('--accent', look.accent);
+      $('panel-sub').textContent = look.sub;
+    }
     if (this.panel.size === 'closed') this.panel.set(this.panel.lastOpen);
     this.coach.tabOpened(name);
     this.render();

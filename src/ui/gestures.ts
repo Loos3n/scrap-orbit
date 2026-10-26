@@ -44,7 +44,7 @@ export function makePanelSizer(app: HTMLElement, tabs: HTMLElement, hud: HTMLEle
     const min = tabs.offsetHeight + 2;
     if (s === 'closed') return min;
     const max = Math.max(min, app.clientHeight - hud.offsetHeight - 120);
-    return min + head.offsetHeight + (max - min - head.offsetHeight) * OPEN[s];
+    return min + head.offsetHeight + 10 + (max - min - head.offsetHeight - 10) * OPEN[s];
   };
   // Set the row sizes directly: some web views mishandle var() fallbacks inside grid templates.
   const apply = (animate: boolean) => {

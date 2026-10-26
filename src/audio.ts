@@ -2,7 +2,6 @@
  * Tiny synthesized sound effects (Web Audio, no files). Browsers only allow audio after the
  * player interacts, so the context is created on the first tap.
  */
-const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16];
 
 /** Ambient loop: four slow chords (A minor, F, C, G), as semitones above A2. */
 const CHORDS = [
@@ -41,7 +40,6 @@ export class Sfx {
   private musicTimer = 0;
   private nextChordAt = 0;
   private chord = 0;
-  private tapStep = 0;
   private lastTap = 0;
   private lastBuy = 0;
   private lastHit = 0;
@@ -188,16 +186,20 @@ export class Sfx {
     return this.enabled && !!this.ctx && this.ctx.state === 'running';
   }
 
-  /** A metallic clink with a soft thump; rapid taps climb a pentatonic scale, so mashing sounds musical. */
+  /**
+   * A soft, steady clink with a little thump. Same note every time, with only a hint of random
+   * detune so it never sounds robotic, and quieter when taps come fast so mashing stays easy on the ears.
+   */
   tap(): void {
     if (!this.ready()) return;
     const now = performance.now();
-    this.tapStep = now - this.lastTap < 350 ? (this.tapStep + 1) % PENTATONIC.length : 0;
+    const fast = now - this.lastTap < 200;
     this.lastTap = now;
-    const f = 659.25 * Math.pow(2, PENTATONIC[this.tapStep] / 12);
-    this.bell(f, 0, 0.22, 0.32, 2, 1.4, 0.12);
-    this.noise(0, 0.03, 0.15, { type: 'highpass', freq: 4000 });
-    this.voice({ freq: 170, slideTo: 70, dur: 0.07, vol: 0.26, type: 'sine' });
+    const f = 523.25 * (1 + (Math.random() - 0.5) * 0.03);
+    const vol = fast ? 0.6 : 1;
+    this.bell(f, 0, 0.14 * vol, 0.22, 2, 1.2, 0.06);
+    this.noise(0, 0.025, 0.08 * vol, { type: 'highpass', freq: 4000 });
+    this.voice({ freq: 150, slideTo: 70, dur: 0.06, vol: 0.2 * vol, type: 'sine' });
   }
 
   /** A two-note wooden mallet. */
