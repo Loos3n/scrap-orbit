@@ -57,10 +57,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
   padding-right: env(safe-area-inset-right, 0px);
   pointer-events: none;
 }
-#hud, #panel { pointer-events: auto; }
+#hud, .hud, #panel { pointer-events: auto; }
 
 /* ---------- HUD ---------- */
-#hud {
+#hud, .hud {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;

@@ -101,7 +101,7 @@ export class UI {
     this.missions = new MissionsPanel(game, this.fmt);
     this.coach = new Coach(game);
     $('boost').addEventListener('click', () => game.boost());
-    makePanelDraggable($('app'), $('panel'), $('grabber'), document.querySelector<HTMLElement>('.tabs')!, $('hud'));
+    makePanelDraggable($('app'), $('panel'), $('grabber'), document.querySelector<HTMLElement>('.tabs'), $('hud'));
   }
 
   private buildGenerators(): void {

@@ -12,7 +12,7 @@
   <body>
     <div id="scene" aria-label="Your station. Tap to salvage scrap."></div>
     <div id="app">
-      <header id="hud">
+      <div id="hud" class="hud">
         <div class="readout">
           <div class="scrap-badge">
             <span class="scrap-icon" data-icon="scrap"></span>
@@ -33,7 +33,7 @@
             </span>
           </button>
         </div>
-      </header>
+      </div>
       <div id="stage">
         <div id="event-banner" class="event-banner" hidden>
           <span id="event-icon" class="event-icon"></span>
@@ -43,7 +43,7 @@
         </div>
       </div>
       <section id="panel">
-        <div id="grabber" class="grabber-zone" role="separator" aria-label="Drag to resize the panel" aria-orientation="horizontal" tabindex="0"><div class="grabber"></div></div>
+        <div id="grabber" class="grabber-zone" role="button" aria-label="Resize the panel" tabindex="0"><div class="grabber"></div></div>
         <nav class="tabs" role="tablist">
           <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build</button>
           <button class="tab" role="tab" data-tab="upgrades" aria-selected="false" type="button"><span data-icon="upgrades"></span>Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>

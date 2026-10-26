@@ -30,7 +30,15 @@ function store(v: number): void {
  * Lets the player drag the panel by its handle or its tab bar. On release it snaps to
  * collapsed (tabs only), half, or tall, following the flick direction.
  */
-export function makePanelDraggable(app: HTMLElement, panel: HTMLElement, handle: HTMLElement, tabs: HTMLElement, hud: HTMLElement): void {
+export function makePanelDraggable(
+  app: HTMLElement | null,
+  panel: HTMLElement | null,
+  handle: HTMLElement | null,
+  tabs: HTMLElement | null,
+  hud: HTMLElement | null,
+): void {
+  // Some hosts rewrite parts of the page; never let a missing element stop the game.
+  if (!app || !panel || !handle || !tabs || !hud) return;
   // Collapsed still shows the handle and tab bar.
   const minH = () => handle.offsetHeight + tabs.offsetHeight + 8;
   const range = () => {
