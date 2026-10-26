@@ -9,14 +9,27 @@ const RES = 3;
 
 type Ctx = CanvasRenderingContext2D;
 
-export function paint(w: number, h: number, draw: (ctx: Ctx) => void, res = RES): Texture {
+function paintCanvas(w: number, h: number, draw: (ctx: Ctx) => void, res: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(w * res);
   canvas.height = Math.ceil(h * res);
   const ctx = canvas.getContext('2d')!;
   ctx.scale(res, res);
   draw(ctx);
-  return new Texture({ source: new CanvasSource({ resource: canvas, resolution: res, autoGenerateMipmaps: true }) });
+  return canvas;
+}
+
+export function paint(w: number, h: number, draw: (ctx: Ctx) => void, res = RES): Texture {
+  return new Texture({ source: new CanvasSource({ resource: paintCanvas(w, h, draw, res), resolution: res, autoGenerateMipmaps: true }) });
+}
+
+/** The same painting as a PNG data URL, for the menus. Empty if the canvas can't be read. */
+function paintUrl(w: number, h: number, draw: (ctx: Ctx) => void, res: number): string {
+  try {
+    return paintCanvas(w, h, draw, res).toDataURL();
+  } catch {
+    return '';
+  }
 }
 
 const TAU = Math.PI * 2;
@@ -1337,3 +1350,282 @@ export const meteor = () =>
     ]);
     ctx.fill();
   }, 4);
+
+// ---------- Boss wrecks ----------
+
+/**
+ * A huge derelict, pointing left: a long broken hull with scorch marks, exposed ribs where it
+ * snapped, emergency lights and the Hollow Fleet's circle on its flank. `seed` varies the shape.
+ */
+export const bossWreck = (seed: number) =>
+  paint(230, 120, (ctx) => {
+    const r = rng(seed * 31 + 7);
+    const top = 22 + r() * 8;
+    const bottom = 98 - r() * 8;
+    const breakX = 168 + r() * 20;
+    // Hull silhouette: a tapered nose on the left, a jagged break on the right.
+    const hullPath = () => {
+      ctx.beginPath();
+      ctx.moveTo(8, 60);
+      ctx.quadraticCurveTo(14, top + 6, 46, top);
+      ctx.lineTo(breakX - 10, top - 2);
+      let y = top - 2;
+      for (let i = 0; i < 9; i++) {
+        y += (bottom - top) / 9;
+        ctx.lineTo(breakX + (r() - 0.3) * 22, y);
+      }
+      ctx.lineTo(46, bottom);
+      ctx.quadraticCurveTo(14, bottom - 6, 8, 60);
+      ctx.closePath();
+    };
+    // Shadow.
+    ctx.save();
+    ctx.translate(4, 6);
+    hullPath();
+    ctx.fillStyle = 'rgba(0,0,12,0.45)';
+    ctx.fill();
+    ctx.restore();
+    hullPath();
+    ctx.fillStyle = linear(ctx, 0, top, 0, bottom, [
+      [0, '#8a8fb8'],
+      [0.35, '#4d5280'],
+      [1, '#1c1e3a'],
+    ]);
+    ctx.fill();
+    ctx.save();
+    hullPath();
+    ctx.clip();
+    // Hull plating.
+    ctx.strokeStyle = 'rgba(10,10,30,0.55)';
+    ctx.lineWidth = 0.8;
+    for (let x = 40; x < 240; x += 14 + r() * 8) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 120);
+      ctx.stroke();
+    }
+    for (const y of [top + 18, 60, bottom - 18]) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(230, y);
+      ctx.stroke();
+    }
+    // Scorch marks.
+    for (let i = 0; i < 9; i++) {
+      const x = 30 + r() * (breakX - 30);
+      const y = top + r() * (bottom - top);
+      const rad = 8 + r() * 18;
+      ctx.fillStyle = radial(ctx, x, y, rad, [
+        [0, 'rgba(8,6,12,0.75)'],
+        [1, 'rgba(8,6,12,0)'],
+      ]);
+      ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // Lit upper edge.
+    ctx.fillStyle = linear(ctx, 0, top, 0, top + 10, [
+      [0, 'rgba(220,226,255,0.45)'],
+      [1, 'rgba(220,226,255,0)'],
+    ]);
+    ctx.fillRect(0, top - 4, 230, 14);
+    ctx.restore();
+    // Exposed ribs and fire where it broke.
+    ctx.strokeStyle = '#6a6f9a';
+    ctx.lineWidth = 2.2;
+    for (let i = 0; i < 5; i++) {
+      const y = top + 8 + i * ((bottom - top - 16) / 4);
+      ctx.beginPath();
+      ctx.moveTo(breakX - 6, y);
+      ctx.lineTo(breakX + 14 + r() * 16, y + (r() - 0.5) * 10);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = radial(ctx, breakX, 60, 34, [
+      [0, 'rgba(255,170,80,0.7)'],
+      [0.5, 'rgba(255,90,40,0.25)'],
+      [1, 'rgba(255,90,40,0)'],
+    ]);
+    ctx.fillRect(breakX - 40, 20, 80, 80);
+    ctx.globalCompositeOperation = 'source-over';
+    // Bridge windows, mostly dark.
+    for (let i = 0; i < 7; i++) {
+      ctx.fillStyle = r() < 0.25 ? 'rgba(255,210,140,0.9)' : 'rgba(20,22,48,0.9)';
+      ctx.fillRect(28 + i * 5, top + 8, 3, 2.4);
+    }
+    // The Hollow Fleet mark: a hollow circle, scratched but clear.
+    ctx.strokeStyle = 'rgba(235,240,255,0.75)';
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    ctx.arc(96, 60, 13, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(20,20,40,0.6)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(84, 52);
+    ctx.lineTo(106, 70);
+    ctx.stroke();
+    // Emergency lights.
+    for (const [x, y] of [[50, top + 2], [140, bottom - 2], [120, top + 1]]) {
+      ctx.fillStyle = radial(ctx, x, y, 5, [
+        [0, 'rgba(255,90,110,1)'],
+        [1, 'rgba(255,90,110,0)'],
+      ]);
+      ctx.fillRect(x - 5, y - 5, 10, 10);
+    }
+  }, 2.5);
+
+/** Glowing cracks, faded in over a wreck as it takes damage. Drawn additively. */
+export const bossCracks = (seed: number) =>
+  paint(230, 120, (ctx) => {
+    const r = rng(seed * 13 + 3);
+    ctx.strokeStyle = 'rgba(255,170,90,0.9)';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      let x = 30 + r() * 150;
+      let y = 35 + r() * 50;
+      ctx.lineWidth = 1 + r() * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let k = 0; k < 5; k++) {
+        x += (r() - 0.5) * 22;
+        y += (r() - 0.5) * 14;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }, 2);
+
+// ---------- Pets ----------
+
+/** A pet, facing right, inside a glass space helmet (the blob needs none). */
+export const pet = (id: 'cat' | 'pup' | 'owl' | 'blob') => paint(40, 40, (ctx) => drawPet(ctx, id), 4);
+
+/** A pet portrait for the Pets tab. */
+export const petUrl = (id: 'cat' | 'pup' | 'owl' | 'blob') => paintUrl(40, 40, (ctx) => drawPet(ctx, id), 3);
+
+function drawPet(ctx: Ctx, id: 'cat' | 'pup' | 'owl' | 'blob'): void {
+  const c = 20;
+  const ink = '#141838';
+  const eyes = (x: number, y: number, gap: number, size: number) => {
+    for (const dx of [-gap / 2, gap / 2]) {
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.arc(x + dx, y, size, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x + dx + size * 0.35, y - size * 0.35, size * 0.38, 0, TAU);
+      ctx.fill();
+    }
+  };
+  const blush = (x: number, y: number, gap: number) => {
+    ctx.fillStyle = 'rgba(255,120,150,0.45)';
+    for (const dx of [-gap / 2, gap / 2]) {
+      ctx.beginPath();
+      ctx.ellipse(x + dx, y, 2, 1.2, 0, 0, TAU);
+      ctx.fill();
+    }
+  };
+  if (id === 'blob') {
+    ctx.fillStyle = radial(ctx, 16, 16, 20, [
+      [0, '#e6ffd0'],
+      [0.4, '#9dff6b'],
+      [1, '#3f9a2a'],
+    ]);
+    ctx.beginPath();
+    ctx.moveTo(6, 32);
+    ctx.bezierCurveTo(2, 18, 10, 6, 20, 6);
+    ctx.bezierCurveTo(30, 6, 38, 18, 34, 32);
+    ctx.quadraticCurveTo(27, 35, 20, 32);
+    ctx.quadraticCurveTo(13, 35, 6, 32);
+    ctx.fill();
+    eyes(21, 19, 9, 2.4);
+    blush(21, 24, 13);
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.beginPath();
+    ctx.ellipse(13, 12, 3.5, 2, -0.6, 0, TAU);
+    ctx.fill();
+    return;
+  }
+  const body = id === 'cat' ? ['#e6d0ff', '#a66ae8', '#5a2f9a'] : id === 'pup' ? ['#ffe6c0', '#ffb547', '#b86a1a'] : ['#d6f4ff', '#5cd6ff', '#2a6fa0'];
+  const fill = radial(ctx, c - 4, c - 5, 16, [
+    [0, body[0]],
+    [0.5, body[1]],
+    [1, body[2]],
+  ]);
+  // Ears or tufts behind the head.
+  ctx.fillStyle = body[2];
+  if (id === 'cat' || id === 'owl') {
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(c + s * 4, c - 8);
+      ctx.lineTo(c + s * 9, c - 15);
+      ctx.lineTo(c + s * 10, c - 5);
+      ctx.fill();
+    }
+  }
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.ellipse(c, c + 1, 10.5, 9.5, 0, 0, TAU);
+  ctx.fill();
+  if (id === 'pup') {
+    ctx.fillStyle = body[2];
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.ellipse(c + s * 10, c + 1, 3, 6, s * 0.3, 0, TAU);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#fff2dc';
+    ctx.beginPath();
+    ctx.ellipse(c + 1, c + 5, 5, 3.4, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = ink;
+    ctx.beginPath();
+    ctx.ellipse(c + 1, c + 3.6, 1.6, 1.1, 0, 0, TAU);
+    ctx.fill();
+  }
+  if (id === 'owl') {
+    ctx.fillStyle = '#eafaff';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(c + s * 4.2, c - 0.5, 4, 0, TAU);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffb547';
+    ctx.beginPath();
+    ctx.moveTo(c - 1.4, c + 3);
+    ctx.lineTo(c + 1.4, c + 3);
+    ctx.lineTo(c, c + 5.4);
+    ctx.fill();
+  }
+  eyes(c + 1, c - 0.5, id === 'owl' ? 8.4 : 7.5, id === 'owl' ? 2.2 : 1.9);
+  if (id !== 'owl') blush(c + 1, c + 3.5, 12);
+  if (id === 'cat') {
+    // Whiskers and a few stars in the fur.
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 0.5;
+    for (const s of [-1, 1]) {
+      for (const dy of [-0.8, 0.8]) {
+        ctx.beginPath();
+        ctx.moveTo(c + s * 6, c + 3 + dy);
+        ctx.lineTo(c + s * 11, c + 2.4 + dy * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = '#fff6c8';
+    for (const [x, y] of [[c - 6, c - 4], [c + 7, c - 3], [c - 3, c + 6]]) ctx.fillRect(x, y, 1, 1);
+  }
+  // The glass helmet.
+  ctx.fillStyle = 'rgba(160,220,255,0.12)';
+  ctx.strokeStyle = 'rgba(220,240,255,0.75)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(c, c, 16.5, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(c, c, 13.5, Math.PI * 1.1, Math.PI * 1.4);
+  ctx.stroke();
+}

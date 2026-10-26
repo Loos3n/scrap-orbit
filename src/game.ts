@@ -1,6 +1,6 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { checkAchievements, type AchievementDef } from './core/achievements';
-import { ACHIEVEMENT_CRYSTALS, TUTORIAL, type CrewId, type EventKind, type TutorialStep } from './core/content';
+import { ACHIEVEMENT_CRYSTALS, TUTORIAL, type CrewId, type EventKind, type PetId, type TutorialStep } from './core/content';
 import * as eco from './core/economy';
 import * as meta from './core/meta';
 import type { Decimal } from './core/num';
@@ -35,6 +35,14 @@ export type GameEvent =
   | { type: 'convoy'; crystals: number }
   | { type: 'tutorial'; step: TutorialStep | null }
   | { type: 'claw'; level: number }
+  | { type: 'streak' }
+  | { type: 'streakClaim'; reward: meta.ClaimedReward }
+  | { type: 'pet'; id: PetId | null; adopted: boolean }
+  | { type: 'petTap'; value: Decimal }
+  | { type: 'boss'; phase: 'arrive' | 'escape' }
+  | { type: 'bossDefeated'; scrap: Decimal; crystals: number }
+  | { type: 'bossHit'; value: Decimal }
+  | { type: 'story'; id: string }
   | { type: 'reset' };
 
 function storageGet(): string | null {
@@ -63,6 +71,8 @@ export class Game {
   private lastCheck = 0;
   private lastAutoBuy = Date.now();
   private readyMissions = 0;
+  private lastPounce = Date.now();
+  private streakShown = '';
 
   constructor() {
     const now = Date.now();
@@ -82,6 +92,7 @@ export class Game {
     this.collectOffline(Date.now());
     meta.refreshMissions(this.state, Date.now());
     this.readyMissions = meta.claimableMissions(this.state);
+    meta.updateStory(this.state);
   }
 
   /** Advances the game to `now`. Called every animation frame. */
@@ -95,6 +106,13 @@ export class Game {
       this.state.lastSeen = now;
       this.state.stats.playSec += dt;
       this.state.stats.runSec += dt;
+    }
+    this.updateBoss(now, Math.min(dt, 1));
+    if (meta.catDue(this.state, this.lastPounce, now)) {
+      this.lastPounce = now;
+      const value = eco.tap(this.state, now);
+      this.emit({ type: 'petTap', value });
+      this.hitBoss(value, now);
     }
     if (now - this.lastAutoBuy > AUTOBUY_MS) {
       this.lastAutoBuy = now;
@@ -125,6 +143,44 @@ export class Game {
     if (ev.ended) this.emit({ type: 'event', kind: ev.ended, phase: 'end' });
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
+    for (const id of meta.updateStory(s)) this.emit({ type: 'story', id });
+    // A new day's reward waits until the tutorial is over, then is offered once per day.
+    if (s.tutorial < 0 && meta.checkLogin(s, now) && this.streakShown !== s.login.day) {
+      this.streakShown = s.login.day;
+      this.emit({ type: 'streak' });
+    }
+  }
+
+  private updateBoss(now: number, dt: number): void {
+    if (dt <= 0) return;
+    const r = meta.updateBoss(this.state, now, dt);
+    if (r.arrived) this.emit({ type: 'boss', phase: 'arrive' });
+    if (r.escaped) this.emit({ type: 'boss', phase: 'escape' });
+    if (r.defeated) this.emit({ type: 'bossDefeated', ...r.defeated });
+  }
+
+  private hitBoss(value: Decimal, now: number): void {
+    if (!this.state.boss) return;
+    this.emit({ type: 'bossHit', value });
+    const won = meta.hitBoss(this.state, value, now);
+    if (won) this.emit({ type: 'bossDefeated', ...won });
+  }
+
+  claimStreak(): void {
+    const reward = meta.claimLogin(this.state, Date.now());
+    if (reward) this.emit({ type: 'streakClaim', reward });
+  }
+
+  buyPet(id: PetId): void {
+    if (meta.buyPet(this.state, id)) this.emit({ type: 'pet', id, adopted: true });
+  }
+
+  choosePet(id: PetId | null): void {
+    if (meta.choosePet(this.state, id)) this.emit({ type: 'pet', id, adopted: false });
+  }
+
+  readStory(): void {
+    this.state.storySeen = this.state.story.length;
   }
 
   /** The tutorial step the player is on, or null once it is finished or skipped. */
@@ -204,8 +260,10 @@ export class Game {
   }
 
   tap(): Decimal {
-    const value = eco.tap(this.state, Date.now());
+    const now = Date.now();
+    const value = eco.tap(this.state, now);
     this.emit({ type: 'tap', value });
+    this.hitBoss(value, now);
     return value;
   }
 
@@ -214,7 +272,8 @@ export class Game {
     const now = Date.now();
     const a = eco.income(this.state, now).mul(30);
     const b = eco.tapValue(this.state, now).mul(25);
-    const value = a.gt(b) ? a : b;
+    // The Orbit Pup doubles what crates are worth.
+    const value = (a.gt(b) ? a : b).mul(meta.petActive(this.state, 'pup') ? 2 : 1);
     eco.earn(this.state, value);
     this.state.stats.crates++;
     this.emit({ type: 'bonus', value });

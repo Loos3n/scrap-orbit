@@ -1,5 +1,5 @@
 import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
-import { CREW, TUTORIAL, type CrewId, type EventKind, type MissionKind, type TutorialStep } from './content';
+import { CREW, PETS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -39,6 +39,15 @@ export interface GameState {
   tutorial: number;
   /** One-time tips the player has already seen (after the tutorial). */
   tips: Set<string>;
+  /** Daily login streak: the last day visited, the run of days, and the last day claimed. */
+  login: { day: string; streak: number; claimed: string; best: number };
+  pets: { owned: Set<PetId>; active: PetId | null };
+  /** The boss wreck on screen, if any. `name` indexes BOSS_NAMES; hp values are Decimal strings. */
+  boss: { name: number; hp: string; max: string; endsAt: number } | null;
+  nextBossAt: number;
+  /** Story log entries unlocked, in order, and how many of them have been read. */
+  story: string[];
+  storySeen: number;
   stats: {
     crates: number;
     boosts: number;
@@ -51,6 +60,7 @@ export interface GameState {
     runSec: number;
     bestIncome: string;
     events: number;
+    bosses: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -82,6 +92,12 @@ interface SaveData {
   tutorial?: number;
   tut?: string;
   tips?: string[];
+  login?: GameState['login'];
+  pets?: { owned?: string[]; active?: string | null };
+  boss?: GameState['boss'];
+  nextBossAt?: number;
+  story?: string[];
+  storySeen?: number;
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -121,6 +137,12 @@ export function newState(now: number): GameState {
     nextEventAt: 0,
     tutorial: 0,
     tips: new Set(),
+    login: { day: '', streak: 0, claimed: '', best: 0 },
+    pets: { owned: new Set(), active: null },
+    boss: null,
+    nextBossAt: 0,
+    story: [],
+    storySeen: 0,
     stats: {
       crates: 0,
       boosts: 0,
@@ -133,6 +155,7 @@ export function newState(now: number): GameState {
       runSec: 0,
       bestIncome: '0',
       events: 0,
+      bosses: 0,
     },
     boostUntil: 0,
     boostReadyAt: 0,
@@ -163,6 +186,12 @@ export function serialize(state: GameState): string {
     tutorial: state.tutorial,
     tut: state.tutorial >= 0 ? TUTORIAL[state.tutorial] : undefined,
     tips: [...state.tips],
+    login: { ...state.login },
+    pets: { owned: [...state.pets.owned], active: state.pets.active },
+    boss: state.boss,
+    nextBossAt: state.nextBossAt,
+    story: [...state.story],
+    storySeen: state.storySeen,
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -220,6 +249,15 @@ export function deserialize(json: string | null, now: number): GameState | null 
   else if (typeof data.tutorial === 'number') state.tutorial = data.tutorial < 0 ? -1 : 0;
   else state.tutorial = state.allTime.gt(0) ? -1 : 0;
   for (const id of strings(data.tips)) state.tips.add(id);
+  if (data.login && typeof data.login.day === 'string') state.login = { ...state.login, ...data.login };
+  const petIds = new Set<string>(PETS.map((p) => p.id));
+  for (const id of strings(data.pets?.owned)) if (petIds.has(id)) state.pets.owned.add(id as PetId);
+  const pet = data.pets?.active;
+  state.pets.active = typeof pet === 'string' && state.pets.owned.has(pet as PetId) ? (pet as PetId) : null;
+  state.boss = data.boss && typeof data.boss.endsAt === 'number' ? data.boss : null;
+  state.nextBossAt = Number(data.nextBossAt) || 0;
+  state.story = strings(data.story);
+  state.storySeen = Math.min(int(data.storySeen), state.story.length);
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
   state.boostUntil = Number(data.boostUntil) || 0;
   state.boostReadyAt = Number(data.boostReadyAt) || 0;

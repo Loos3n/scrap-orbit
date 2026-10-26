@@ -254,7 +254,9 @@ export function activateBoost(state: GameState, now: number): boolean {
 export function applyOffline(state: GameState, now: number): { seconds: number; earned: Decimal } {
   const away = Math.max(0, (now - state.lastSeen) / 1000);
   const seconds = Math.min(away, offlineCapSec(state));
-  const earned = baseIncome(state).mul(seconds).mul(researchProduct(state, 'offlineMult'));
+  // The Star Owl keeps watch while the player is away.
+  const owl = state.pets.active === 'owl' ? 1.5 : 1;
+  const earned = baseIncome(state).mul(seconds).mul(researchProduct(state, 'offlineMult') * owl);
   earn(state, earned);
   state.lastSeen = now;
   return { seconds, earned };

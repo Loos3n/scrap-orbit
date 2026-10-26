@@ -191,3 +191,91 @@ export type TutorialStep = (typeof TUTORIAL)[number];
 export const TUTORIAL_TAPS = 8;
 /** Drones asked for in the "build a few more" step. */
 export const TUTORIAL_DRONES = 5;
+
+// ---------- Daily login streak ----------
+
+export type StreakReward = { kind: 'crystals'; amount: number } | { kind: 'scrap'; minutes: number } | { kind: 'pet'; crystals: number };
+
+/** One week of rewards; the track loops, and the streak count keeps climbing. */
+export const STREAK_REWARDS: readonly StreakReward[] = [
+  { kind: 'crystals', amount: 5 },
+  { kind: 'scrap', minutes: 10 },
+  { kind: 'crystals', amount: 10 },
+  { kind: 'scrap', minutes: 30 },
+  { kind: 'crystals', amount: 15 },
+  { kind: 'scrap', minutes: 60 },
+  // Day 7: a free pet while any are left to adopt, otherwise a pile of crystals.
+  { kind: 'pet', crystals: 40 },
+];
+
+// ---------- Pets ----------
+
+export type PetId = 'cat' | 'pup' | 'owl' | 'blob';
+
+export interface PetDef {
+  id: PetId;
+  name: string;
+  desc: string;
+  cost: number;
+  color: number;
+}
+
+/** One pet follows the station at a time; each helps in its own way. */
+export const PETS: readonly PetDef[] = [
+  { id: 'cat', name: 'Nebula Cat', desc: 'Pounces on the station every 4 seconds for a free tap.', cost: 15, color: 0xc58cff },
+  { id: 'pup', name: 'Orbit Pup', desc: 'Sniffs out salvage: crates turn up 50% more often and are worth 2x.', cost: 40, color: 0xffb547 },
+  { id: 'owl', name: 'Star Owl', desc: 'Keeps watch while you are away: offline earnings +50%.', cost: 60, color: 0x5cd6ff },
+  { id: 'blob', name: 'Goo Blob', desc: 'Loves chewing wrecks: +50% damage to boss wrecks.', cost: 90, color: 0x9dff6b },
+];
+export const CAT_TAP_SEC = 4;
+
+// ---------- Boss wrecks ----------
+
+export const BOSS_NAMES = ['Derelict Freighter', 'Shattered Cruiser', 'Ghost Dreadnought', 'Hollow Ark'] as const;
+export const BOSS = {
+  /** Seconds of play before the first wreck shows up. */
+  firstSec: 4 * 60,
+  /** Minutes between wrecks. */
+  gap: [9, 15] as [number, number],
+  /** Seconds to break it before it drifts away. */
+  seconds: 60,
+  /** Health, as taps-worth plus seconds-of-income-worth at the moment it arrives. */
+  hpTaps: 110,
+  hpIncomeSec: 25,
+  /** Machines chip away this share of income as damage every second. */
+  machineShare: 0.5,
+  /** Each wreck beaten makes the next one this much tougher. */
+  growth: 1.12,
+  /** Payout: seconds of income (or 300 taps' worth if more), plus crystals. */
+  rewardIncomeSec: 300,
+  rewardTaps: 300,
+  crystals: 10,
+};
+
+// ---------- Story log ----------
+
+export interface StoryEntry {
+  id: string;
+  who: CrewId;
+  title: string;
+  text: string;
+}
+
+/**
+ * The crew's log. Entries unlock in order as the station grows; together they tell the
+ * mystery of the Hollow Fleet, whose wrecks fill the orbit. Unlock rules live in meta.ts.
+ */
+export const STORY: readonly StoryEntry[] = [
+  { id: 'arrival', who: 'mika', title: 'Day one', text: "Salvage licence signed, captain. This orbit is a graveyard: hundreds of wrecks and no one to claim them. Odd thing, though. Every hull I've scanned has the same scorch marks." },
+  { id: 'stamp', who: 'mika', title: 'A hollow circle', text: 'The drones pulled in a hull plate stamped with a hollow circle. No registry in the galaxy lists it. I pinned it to the wall of the mess hall.' },
+  { id: 'cargo', who: 'bolt', title: 'Emptied, not smashed', text: "Towed in half a freighter today. Its cargo bay was empty, but tidily so. Somebody unloaded it before it died. Pirates don't stack crates neatly." },
+  { id: 'blackbox', who: 'bolt', title: 'The first black box', text: "That big wreck had a flight recorder. Last words, crackly: 'They came out of the quiet.' Then nothing. I've listened forty times." },
+  { id: 'inside', who: 'ash', title: 'Burned from the inside', text: 'Melted down a reactor housing. The scarring runs outward, like something burned its way out rather than in. I double-checked. Triple-checked.' },
+  { id: 'fleet', who: 'juno', title: 'The Hollow Fleet', text: "I printed a copy of the circle stamp and ran it past the archives. It's a fleet mark. Old spacers called them the Hollow Fleet, and nobody ever saw one up close." },
+  { id: 'maps', who: 'mika', title: 'Every map, one place', text: "The crates are full of star charts. Different ships, different years, and every chart has the same patch of empty sky circled in red." },
+  { id: 'three', who: 'bolt', title: 'Same words, again', text: "Third black box. Same last words, 'out of the quiet.' And this time, coordinates. You can guess where: that empty patch of sky." },
+  { id: 'pilotless', who: 'hex', title: 'Nobody aboard', text: 'A ship docked itself tonight. No pilot, no crew, engines cold. Its log was blank except for a countdown that had already reached zero.' },
+  { id: 'moving', who: 'mika', title: 'New sector, old marks', text: "We jumped sectors and the scorch marks were waiting for us. The Hollow Fleet passed through here too. Either we're following them, or they're following us." },
+  { id: 'signal', who: 'orin', title: 'A voice in the gate', text: "The Warp Gate caught a signal from the empty patch. It's a voice, very faint, reading out our station's call sign. Captain... it sounds like you." },
+  { id: 'backwards', who: 'nova', title: 'Running backwards', text: "I lined up all ten black boxes by timestamp. They don't run forwards. The newest wreck is the oldest. Whatever the Hollow Fleet is, it hasn't happened yet. To be continued." },
+];

@@ -1,10 +1,11 @@
-import { BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, RESEARCH, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type ResearchDef } from '../core/content';
+import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STORY, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
 import { GENERATORS } from '../core/config';
 import * as eco from '../core/economy';
 import * as meta from '../core/meta';
 import { Decimal, formatDuration } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
+import { petUrl } from '../scene/art';
 import { portrait } from './portrait';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -293,6 +294,144 @@ export function renderEventBanner(game: Game): void {
   const left = (s.event!.endsAt - now) / 1000;
   setText($('event-time'), `${Math.ceil(left)}s`);
   $('event-bar').style.width = `${(100 * left) / def.seconds}%`;
+}
+
+// ---------- Boss wrecks ----------
+
+export function renderBossBanner(game: Game): void {
+  const b = game.state.boss;
+  const banner = $('boss-banner');
+  banner.hidden = !b;
+  if (!b) return;
+  setText($('boss-name'), BOSS_NAMES[b.name % BOSS_NAMES.length]);
+  setText($('boss-time'), `${Math.max(0, Math.ceil((b.endsAt - Date.now()) / 1000))}s`);
+  $('boss-hp').style.width = `${meta.bossHealth(game.state) * 100}%`;
+}
+
+/** Jolts the boss banner when a hit lands. */
+export function shakeBossBanner(): void {
+  const banner = $('boss-banner');
+  banner.classList.remove('hit');
+  void banner.offsetWidth;
+  banner.classList.add('hit');
+}
+
+// ---------- Pets ----------
+
+const petArt = new Map<PetId, string>();
+const petImg = (id: PetId) => {
+  if (!petArt.has(id)) petArt.set(id, petUrl(id));
+  const url = petArt.get(id)!;
+  return url ? `<img src="${url}" alt="" />` : '';
+};
+
+export class PetPanel {
+  private key = '';
+  constructor(private game: Game) {
+    $('pet-list').addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-pet]');
+      if (!btn) return;
+      const id = btn.dataset.pet as PetId;
+      const s = this.game.state;
+      if (!s.pets.owned.has(id)) this.game.buyPet(id);
+      else this.game.choosePet(s.pets.active === id ? null : id);
+    });
+  }
+
+  /** A dot on the tab when a pet can be adopted. */
+  anyAffordable(): boolean {
+    const s = this.game.state;
+    return PETS.some((p) => !s.pets.owned.has(p.id) && s.crystals >= p.cost);
+  }
+
+  render(): void {
+    const s = this.game.state;
+    const key = PETS.map((p) => (s.pets.owned.has(p.id) ? 1 : 0)).join('') + (s.pets.active ?? '') + s.crystals;
+    if (key === this.key) return;
+    this.key = key;
+    $('pet-list').innerHTML = PETS.map((p) => {
+      const owned = s.pets.owned.has(p.id);
+      const active = s.pets.active === p.id;
+      const action = !owned
+        ? `<button class="crew-btn" type="button" data-pet="${p.id}" ${s.crystals < p.cost ? 'disabled' : ''}>Adopt ${crystalCost(p.cost)}</button>`
+        : `<button class="crew-btn" type="button" data-pet="${p.id}">${active ? 'Send home' : 'Bring along'}</button>`;
+      return `<li class="crew-card${owned ? ' hired' : ' locked'}${active ? ' active' : ''}" style="--c:${hex(p.color)}">
+        <div class="pet-art">${petImg(p.id)}</div>
+        <div class="crew-name">${esc(p.name)}</div>
+        <div class="crew-effect">${esc(p.desc)}</div>
+        ${active ? '<div class="pet-status">Following you</div>' : ''}
+        ${action}
+      </li>`;
+    }).join('');
+  }
+}
+
+// ---------- Story log ----------
+
+export class LogPanel {
+  private key = '';
+  constructor(private game: Game) {}
+
+  /** `since` is how many entries had been read when the log was opened; newer ones glow. */
+  render(since: number): void {
+    const s = this.game.state;
+    const key = `${s.story.length}|${since}`;
+    if (key === this.key) return;
+    this.key = key;
+    // Newest first.
+    const html = s.story
+      .map((id, i) => {
+        const e = STORY.find((x) => x.id === id);
+        if (!e) return '';
+        const who = CREW.find((c) => c.id === e.who)!;
+        return `<li class="log-entry${i >= since ? ' new' : ''}">
+          <div class="log-face">${portrait(who)}</div>
+          <div><div class="log-head"><b>${esc(e.title)}</b><small>${esc(who.name)}, ${esc(who.role)} · entry ${i + 1}</small></div><p>${esc(e.text)}</p></div>
+        </li>`;
+      })
+      .reverse()
+      .join('');
+    $('log-list').innerHTML = html;
+    const left = STORY.length - s.story.length;
+    setText($('log-more'), left > 0 ? `${left} more ${left === 1 ? 'entry' : 'entries'} to uncover as the station grows.` : 'That is every entry so far. The story continues in a future update.');
+  }
+}
+
+// ---------- Daily streak ----------
+
+export class StreakModal {
+  constructor(private game: Game, private fmt: Fmt) {
+    $('streak-claim').addEventListener('click', () => {
+      this.game.claimStreak();
+      $('streak').hidden = true;
+    });
+  }
+
+  open(): void {
+    const s = this.game.state;
+    const slot = meta.streakSlot(s);
+    setText($('streak-title'), `Day ${s.login.streak} streak`);
+    setText($('streak-sub'), s.login.streak > 1 ? 'You came back! Visit every day to climb the reward track.' : 'Come back tomorrow to start a streak. Day 7 brings a free pet.');
+    const now = Date.now();
+    $('streak-days').innerHTML = STREAK_REWARDS.map((r, i) => {
+      let icon: string;
+      let label: string;
+      if (r.kind === 'crystals') {
+        icon = ICONS.crystal;
+        label = `${r.amount}`;
+      } else if (r.kind === 'scrap') {
+        icon = ICONS.scrap;
+        label = this.fmt(meta.streakScrap(s, r.minutes, now));
+      } else {
+        const pet = meta.nextFreePet(s);
+        icon = pet ? petImg(pet) : ICONS.crystal;
+        label = pet ? PETS.find((p) => p.id === pet)!.name : `${r.crystals}`;
+      }
+      const cls = i < slot ? ' done' : i === slot ? ' today' : '';
+      return `<li class="streak-day${cls}${i === 6 ? ' big' : ''}"><span>Day ${i + 1}</span><span class="ic">${icon}</span><b>${esc(label)}</b></li>`;
+    }).join('');
+    $('streak').hidden = false;
+  }
 }
 
 // ---------- Tutorial ----------

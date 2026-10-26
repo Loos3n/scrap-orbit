@@ -23,6 +23,10 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
 - Decorations: six sky themes and five hull paints
+- Boss wrecks: every 9 to 15 minutes a giant derelict drifts in; break it with taps (the claw fires a bolt) and machine fire within 60 seconds for 5 minutes of income and crystals
+- Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
+- Story log: 12 entries from the crew, unlocked as the station grows, telling the mystery of the Hollow Fleet
+- Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
 - Ambient generative music, three number formats and a full stats screen
 - A hands-on first-run tutorial with Mika, the drone wrangler: every step waits for the player to do it, with a spotlight and progress bar, plus one-time tips as the crew, lab and relocation unlock
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars

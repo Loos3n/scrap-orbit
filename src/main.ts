@@ -4,13 +4,14 @@ import 'pixi.js/unsafe-eval';
 import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
-import { CREW, EVENTS, PAINTS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS } from './core/content';
+import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, STORY, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS } from './core/content';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { format } from './core/num';
 import { Game } from './game';
 import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
+import { shakeBossBanner } from './ui/meta-ui';
 import { UI } from './ui/ui';
 
 /**
@@ -65,7 +66,8 @@ async function boot(): Promise<void> {
   if (scene.ready) ui.coach.crate = () => scene.crateOnScreen();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
-  const syncPerks = () => scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate'));
+  const syncPerks = () =>
+    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1));
   syncPerks();
   const syncDecor = () => {
     const s = game.state;
@@ -155,6 +157,8 @@ async function boot(): Promise<void> {
         break;
       case 'reset':
         scene.setOwned(game.state.owned);
+        scene.setPet(null);
+        scene.setBoss(null);
         syncPerks();
         syncDecor();
         break;
@@ -206,6 +210,66 @@ async function boot(): Promise<void> {
         ui.toast(ICONS.crystal, `<b>Convoy boarded!</b> +${e.crystals} crystals`);
         sfx.crate();
         break;
+      case 'streak':
+        ui.streak.open();
+        break;
+      case 'streakClaim': {
+        const r = e.reward;
+        if (r.kind === 'pet') {
+          const p = PETS.find((x) => x.id === r.pet)!;
+          ui.toast(ICONS.crew.replace('currentColor', '#c58cff'), `<b>${p.name}</b> joined the station!`);
+          scene.setPet(game.state.pets.active);
+          syncPerks();
+        } else {
+          ui.toast(r.kind === 'crystals' ? ICONS.crystal : ICONS.scrap, `<b>Day ${game.state.login.streak} reward!</b> +${r.kind === 'crystals' ? `${r.amount} crystals` : fmt(r.amount)}`);
+        }
+        scene.celebrate(0xffd166);
+        sfx.coins();
+        buzz(30);
+        break;
+      }
+      case 'pet':
+        scene.setPet(game.state.pets.active);
+        syncPerks();
+        if (e.adopted) {
+          const p = PETS.find((x) => x.id === e.id)!;
+          ui.toast(ICONS.crew.replace('currentColor', '#c58cff'), `<b>${p.name}</b> adopted!`);
+          scene.celebrate(p.color);
+          sfx.upgrade();
+          buzz(20);
+        }
+        break;
+      case 'petTap':
+        scene.petPounce(`+${fmt(e.value)}`);
+        sfx.tap();
+        break;
+      case 'boss':
+        if (e.phase === 'arrive') {
+          scene.setBoss(game.state.boss!.name);
+          ui.toast(ICONS.warp.replace('currentColor', '#ff5d6c'), `<b>${BOSS_NAMES[game.state.boss!.name % BOSS_NAMES.length]}!</b> Tap to break it before it drifts away`);
+          sfx.event();
+          buzz(40);
+        } else {
+          scene.setBoss(null);
+          ui.toast(ICONS.warp, '<b>The wreck drifted away.</b> Another will turn up soon.');
+        }
+        break;
+      case 'bossHit':
+        scene.bossHit();
+        shakeBossBanner();
+        break;
+      case 'bossDefeated':
+        scene.setBoss(null, true);
+        ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>Wreck broken!</b> +${fmt(e.scrap)} and ${e.crystals} crystals`);
+        sfx.warp();
+        buzz(80);
+        break;
+      case 'story': {
+        const entry = STORY.find((x) => x.id === e.id)!;
+        const who = CREW.find((c) => c.id === entry.who)!;
+        ui.toast(ICONS.missions.replace('currentColor', '#4fe3c1'), `<b>New log entry</b> from ${who.name}: ${entry.title}`);
+        break;
+      }
       case 'tutorial':
         if (e.step === 'drone') ui.showTab('build');
         if (e.step === 'upgrade') ui.showTab('upgrades');
@@ -246,6 +310,8 @@ async function boot(): Promise<void> {
 
   game.start();
   scene.setEvent(meta.eventActive(game.state, Date.now()));
+  scene.setPet(game.state.pets.active);
+  if (game.state.boss) scene.setBoss(game.state.boss.name);
 
   let lastUi = 0;
   let lastFrame = performance.now();
@@ -257,6 +323,7 @@ async function boot(): Promise<void> {
     game.update(now);
     scene.setBoost(eco.boostActive(game.state, now));
     scene.holdCrate = game.tutorialStep === 'crate';
+    scene.setBossHealth(meta.bossHealth(game.state));
     ui.renderHud((t - lastFrame) / 1000);
     lastFrame = t;
     if (now - lastUi > 100) {

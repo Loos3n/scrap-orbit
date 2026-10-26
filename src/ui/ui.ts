@@ -6,7 +6,7 @@ import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/nu
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { holdToRepeat, makePanelDraggable } from './gestures';
-import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, renderEventBanner } from './meta-ui';
+import { Coach, CrewPanel, DecorPanel, LabPanel, LogPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -77,6 +77,10 @@ export class UI {
   private decor: DecorPanel;
   readonly missions: MissionsPanel;
   readonly coach: Coach;
+  private pets: PetPanel;
+  private log: LogPanel;
+  readonly streak: StreakModal;
+  private logSince: number | null = null;
 
   /** Called when the sound or music setting changes, so main can update the synth. */
   onSoundChange: ((sound: boolean, music: boolean) => void) | null = null;
@@ -98,6 +102,9 @@ export class UI {
     this.decor = new DecorPanel(game);
     this.missions = new MissionsPanel(game, this.fmt);
     this.coach = new Coach(game);
+    this.pets = new PetPanel(game);
+    this.log = new LogPanel(game);
+    this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
     makePanelDraggable($('app'), $('panel'), $('grabber'), document.querySelector<HTMLElement>('.tabs'), $('hud'));
@@ -177,10 +184,10 @@ export class UI {
   }
 
   private bindSegments(): void {
-    const segs = document.querySelectorAll<HTMLButtonElement>('.segments button');
-    segs.forEach((b) =>
+    // Each tab's segment bar switches only its own sections.
+    document.querySelectorAll<HTMLButtonElement>('.segments button').forEach((b) =>
       b.addEventListener('click', () => {
-        segs.forEach((x) => {
+        b.parentElement!.querySelectorAll<HTMLButtonElement>('button').forEach((x) => {
           x.setAttribute('aria-selected', String(x === b));
           $(`seg-${x.dataset.seg}`).hidden = x !== b;
         });
@@ -310,16 +317,34 @@ export class UI {
     this.renderUpgrades();
     this.renderCores();
     setText($('crystals'), s.crystals.toLocaleString('en-US'));
-    $('crew-dot').hidden = !this.crew.anyAffordable();
+    const petsReady = this.pets.anyAffordable();
+    $('pets-dot').hidden = !petsReady;
+    $('crew-dot').hidden = !this.crew.anyAffordable() && !petsReady;
+    const unread = s.storySeen < s.story.length;
+    $('log-dot').hidden = !unread;
+    $('station-dot').hidden = !unread;
     $('lab-dot').hidden = !this.lab.idle();
-    if (!$('tab-crew').hidden) this.crew.render();
+    if (!$('tab-crew').hidden) {
+      if (!$('seg-crewlist').hidden) this.crew.render();
+      else this.pets.render();
+    }
     if (!$('tab-lab').hidden) this.lab.render();
     if (!$('tab-station').hidden) {
       if (!$('seg-decor').hidden) this.decor.render();
+      if (!$('seg-log').hidden) {
+        // New entries stay highlighted for as long as the log stays open.
+        if (this.logSince === null) this.logSince = s.storySeen;
+        this.log.render(this.logSince);
+        this.game.readStory();
+      } else {
+        this.logSince = null;
+      }
       this.renderStats(now);
     }
+    if ($('tab-station').hidden) this.logSince = null;
     this.missions.render();
     renderEventBanner(this.game);
+    renderBossBanner(this.game);
     this.coach.render();
   }
 

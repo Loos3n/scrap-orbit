@@ -1,4 +1,7 @@
 import {
+  BOSS,
+  BOSS_NAMES,
+  CAT_TAP_SEC,
   CONVOY_CRYSTALS,
   CREW,
   CREW_MAX_LEVEL,
@@ -9,7 +12,10 @@ import {
   MISSION_REWARDS,
   MISSION_TEMPLATES,
   PAINTS,
+  PETS,
   RESEARCH,
+  STORY,
+  STREAK_REWARDS,
   THEMES,
   WEEKLY_REWARD,
   WEEKLY_SCALE,
@@ -18,6 +24,8 @@ import {
   type CrewId,
   type EventKind,
   type MissionKind,
+  type PetId,
+  type StreakReward,
 } from './content';
 import { baseIncome, earn, income, researchProduct, tapValue } from './economy';
 import { D, Decimal } from './num';
@@ -253,7 +261,8 @@ export function updateEvents(state: GameState, now: number, rand = Math.random):
     state.event = null;
     return { ended };
   }
-  if (!state.event && now >= state.nextEventAt) {
+  // Events hold off while a boss wreck is on screen, so the two never share the banner.
+  if (!state.event && !state.boss && now >= state.nextEventAt) {
     const roll = rand();
     const kind: EventKind = roll < 0.45 ? 'meteors' : roll < 0.75 ? 'flare' : 'convoy';
     const endsAt = now + EVENTS[kind].seconds * 1000;
@@ -279,4 +288,206 @@ export function smashMeteor(state: GameState, now: number): Decimal {
 export function boardConvoy(state: GameState): number {
   addCrystals(state, CONVOY_CRYSTALS);
   return CONVOY_CRYSTALS;
+}
+
+// ---------- Daily login streak ----------
+
+/**
+ * Called on start and once a second: on a new calendar day, extends the streak if the last
+ * visit was yesterday, or starts it over. Returns true when today's reward is waiting.
+ */
+export function checkLogin(state: GameState, now: number): boolean {
+  const today = dayKey(now);
+  const l = state.login;
+  if (l.day !== today) {
+    // Noon yesterday, so a daylight-saving shift can't skip or repeat a day.
+    const noon = new Date(now);
+    noon.setHours(12, 0, 0, 0);
+    const yesterday = dayKey(noon.getTime() - 86_400_000);
+    l.streak = l.day === yesterday ? l.streak + 1 : 1;
+    l.best = Math.max(l.best, l.streak);
+    l.day = today;
+  }
+  return l.claimed !== today;
+}
+
+/** Today's place on the 7-day reward track, 0 to 6. */
+export function streakSlot(state: GameState): number {
+  return (Math.max(1, state.login.streak) - 1) % STREAK_REWARDS.length;
+}
+
+/** The next pet a day-7 reward would hand out, if any are left. */
+export function nextFreePet(state: GameState): PetId | null {
+  return PETS.find((p) => !state.pets.owned.has(p.id))?.id ?? null;
+}
+
+/** What a scrap reward is worth right now: minutes of income, or taps if those pay more. */
+export function streakScrap(state: GameState, minutes: number, now: number): Decimal {
+  const a = income(state, now).mul(minutes * 60);
+  const b = tapValue(state, now).mul(minutes * 20);
+  return Decimal.max(a.gt(b) ? a : b, D(100));
+}
+
+export type ClaimedReward = { kind: 'crystals'; amount: number } | { kind: 'scrap'; amount: Decimal } | { kind: 'pet'; pet: PetId };
+
+export function claimLogin(state: GameState, now: number): ClaimedReward | null {
+  if (!checkLogin(state, now)) return null;
+  state.login.claimed = state.login.day;
+  const r: StreakReward = STREAK_REWARDS[streakSlot(state)];
+  if (r.kind === 'scrap') {
+    const amount = streakScrap(state, r.minutes, now);
+    earn(state, amount);
+    return { kind: 'scrap', amount };
+  }
+  if (r.kind === 'pet') {
+    const pet = nextFreePet(state);
+    if (pet) {
+      adoptPet(state, pet);
+      return { kind: 'pet', pet };
+    }
+    addCrystals(state, r.crystals);
+    return { kind: 'crystals', amount: r.crystals };
+  }
+  addCrystals(state, r.amount);
+  return { kind: 'crystals', amount: r.amount };
+}
+
+// ---------- Pets ----------
+
+function adoptPet(state: GameState, id: PetId): void {
+  state.pets.owned.add(id);
+  state.pets.active = id;
+}
+
+export function buyPet(state: GameState, id: PetId): boolean {
+  const def = PETS.find((p) => p.id === id)!;
+  if (state.pets.owned.has(id) || !spend(state, def.cost)) return false;
+  adoptPet(state, id);
+  return true;
+}
+
+export function choosePet(state: GameState, id: PetId | null): boolean {
+  if (id !== null && !state.pets.owned.has(id)) return false;
+  state.pets.active = id;
+  return true;
+}
+
+export function petActive(state: GameState, id: PetId): boolean {
+  return state.pets.active === id;
+}
+
+/** The cat's pounce: due every CAT_TAP_SEC while the cat is out. */
+export function catDue(state: GameState, lastPounce: number, now: number): boolean {
+  return petActive(state, 'cat') && now - lastPounce >= CAT_TAP_SEC * 1000;
+}
+
+// ---------- Boss wrecks ----------
+
+export interface BossUpdate {
+  arrived?: boolean;
+  defeated?: { scrap: Decimal; crystals: number };
+  escaped?: boolean;
+}
+
+function bossHp(state: GameState, now: number): Decimal {
+  const tough = BOSS.growth ** state.stats.bosses;
+  const hp = tapValue(state, now).mul(BOSS.hpTaps).add(baseIncome(state).mul(BOSS.hpIncomeSec));
+  return Decimal.max(hp.mul(tough), D(60));
+}
+
+/** Damage multiplier on boss wrecks (the Goo Blob likes to chew). */
+export function bossDamageMult(state: GameState): number {
+  return petActive(state, 'blob') ? 1.5 : 1;
+}
+
+/**
+ * Brings in, wears down and resolves boss wrecks. Machines chip at the wreck each second;
+ * taps land through hitBoss. Wrecks wait until the tutorial is done and no event is running.
+ */
+export function updateBoss(state: GameState, now: number, dt: number, rand = Math.random): BossUpdate {
+  const b = state.boss;
+  if (!b) {
+    if (state.tutorial >= 0 || eventActive(state, now)) return {};
+    if (state.nextBossAt === 0) state.nextBossAt = now + Math.max(0, BOSS.firstSec - state.stats.playSec) * 1000;
+    if (now < state.nextBossAt) return {};
+    const hp = bossHp(state, now);
+    state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: now + BOSS.seconds * 1000 };
+    return { arrived: true };
+  }
+  const chip = baseIncome(state).mul(BOSS.machineShare * dt * bossDamageMult(state));
+  const defeated = damageBoss(state, chip, now);
+  if (defeated) return { defeated };
+  if (now >= b.endsAt) {
+    state.boss = null;
+    scheduleBoss(state, now, rand);
+    return { escaped: true };
+  }
+  return {};
+}
+
+function scheduleBoss(state: GameState, now: number, rand: () => number): void {
+  const [lo, hi] = BOSS.gap;
+  state.nextBossAt = now + (lo + rand() * (hi - lo)) * 60_000;
+}
+
+function damageBoss(state: GameState, amount: Decimal, now: number): BossUpdate['defeated'] {
+  const b = state.boss;
+  if (!b) return undefined;
+  const hp = D(b.hp).sub(amount);
+  if (hp.gt(0)) {
+    b.hp = hp.toString();
+    return undefined;
+  }
+  state.boss = null;
+  state.stats.bosses++;
+  scheduleBoss(state, now, Math.random);
+  const a = income(state, now).mul(BOSS.rewardIncomeSec);
+  const t = tapValue(state, now).mul(BOSS.rewardTaps);
+  const scrap = a.gt(t) ? a : t;
+  earn(state, scrap);
+  addCrystals(state, BOSS.crystals);
+  return { scrap, crystals: BOSS.crystals };
+}
+
+/** A tap on the scene while a wreck is in range: the claw's tap value lands on it too. */
+export function hitBoss(state: GameState, tap: Decimal, now: number): BossUpdate['defeated'] {
+  return damageBoss(state, tap.mul(bossDamageMult(state)), now);
+}
+
+/** Health left, 0 to 1. */
+export function bossHealth(state: GameState): number {
+  const b = state.boss;
+  if (!b) return 0;
+  return Math.max(0, Math.min(1, D(b.hp).div(b.max).toNumber()));
+}
+
+// ---------- Story log ----------
+
+const STORY_UNLOCKS: Record<string, (s: GameState) => boolean> = {
+  arrival: (s) => s.taps >= 1,
+  stamp: (s) => s.owned.drone >= 10,
+  cargo: (s) => s.owned.hauler >= 1,
+  blackbox: (s) => s.stats.bosses >= 1,
+  inside: (s) => s.owned.smelter >= 1,
+  fleet: (s) => s.owned.fabricator >= 1,
+  maps: (s) => s.stats.crates >= 10,
+  three: (s) => s.stats.bosses >= 3,
+  pilotless: (s) => s.owned.dock >= 1,
+  moving: (s) => s.stats.relocations >= 1,
+  signal: (s) => s.owned.gate >= 1,
+  backwards: (s) => s.stats.bosses >= 10,
+};
+
+/** Unlocks log entries strictly in order, so the story always reads front to back. */
+export function updateStory(state: GameState): string[] {
+  const added: string[] = [];
+  for (let next = STORY[state.story.length]; next && STORY_UNLOCKS[next.id](state); next = STORY[state.story.length]) {
+    state.story.push(next.id);
+    added.push(next.id);
+  }
+  return added;
+}
+
+export function storyUnread(state: GameState): number {
+  return state.story.length - state.storySeen;
 }

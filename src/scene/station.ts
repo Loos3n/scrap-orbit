@@ -1,6 +1,6 @@
 import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
-import type { EventKind, ThemeDef } from '../core/content';
+import type { EventKind, PetId, ThemeDef } from '../core/content';
 import * as art from './art';
 
 /** Size of the world in scene units; the scene scales this to fit the viewport. */
@@ -8,6 +8,9 @@ const WORLD = 380;
 const TAU = Math.PI * 2;
 const DOCK_RADIUS = 160;
 const CLAW_TIP = { x: 0, y: -104 };
+/** Where a boss wreck parks: up and to the left, behind the station. */
+const BOSS_POS = { x: -92, y: -132 };
+const BOSS_SCALE = 0.78;
 
 const COLORS = {
   scrap: 0xffb547,
@@ -83,6 +86,7 @@ export class StationScene {
     galaxy: Texture; rocks: Texture[]; turret: Texture; vortex: Texture; gate: Texture; portal: Texture;
     sun: Texture; panel: Texture; meteor: Texture; shadeDark: Texture; shadeLight: Texture;
     plasma: Texture[]; rays: Texture; reactorRing: Texture; vignette: Texture;
+    bosses: Texture[]; cracks: Texture[]; pets: Record<PetId, Texture>;
   };
 
   private bg = new Sprite();
@@ -113,6 +117,10 @@ export class StationScene {
   private keyLight = new Sprite();
   private dustLayer = new Container();
   private dust: { s: Sprite; depth: number; phase: number; vx: number; vy: number }[] = [];
+  private bossLayer = new Container();
+  private boss: { c: Container; hull: Sprite; cracks: Sprite; glow: Sprite; state: 'in' | 'here' | 'out' | 'dead'; t: number; hit: number; health: number } | null = null;
+  private beams: { x: number; y: number; life: number }[] = [];
+  private pet: { s: Sprite; id: PetId; angle: number; pounce: number } | null = null;
   private claw!: Sprite;
   private podLayer = new Container();
   private lights: Sprite[] = [];
@@ -229,6 +237,9 @@ export class StationScene {
       rays: art.rays(),
       reactorRing: art.reactorRing(),
       vignette: art.vignette(),
+      bosses: [0, 1, 2, 3].map((n) => art.bossWreck(n)),
+      cracks: [0, 1].map((n) => art.bossCracks(n)),
+      pets: { cat: art.pet('cat'), pup: art.pet('pup'), owl: art.pet('owl'), blob: art.pet('blob') },
     };
 
     this.buildHub();
@@ -258,7 +269,7 @@ export class StationScene {
     this.flareGlow.blendMode = 'add';
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
-    this.world.addChild(this.farLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
+    this.world.addChild(this.farLayer, this.bossLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
     const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
     for (const [c, i] of z) {
@@ -735,6 +746,155 @@ export class StationScene {
   }
 
   /** A celebratory pulse for milestones and upgrades. */
+  /** Brings a boss wreck in (an index into the wreck art), or sends it off when null. */
+  setBoss(kind: number | null, defeated = false): void {
+    if (!this.ready) return;
+    if (kind === null) {
+      if (!this.boss) return;
+      if (defeated) this.explodeBoss();
+      else this.boss.state = 'out';
+      this.boss.t = 0;
+      return;
+    }
+    if (this.boss) this.boss.c.destroy({ children: true });
+    const c = new Container();
+    const glow = this.sprite(this.tex.glow, c);
+    glow.blendMode = 'add';
+    glow.tint = 0xff5d6c;
+    glow.scale.set(7, 4);
+    glow.alpha = 0.25;
+    const hull = this.sprite(this.tex.bosses[kind % this.tex.bosses.length], c);
+    const cracks = this.sprite(this.tex.cracks[kind % this.tex.cracks.length], c);
+    cracks.blendMode = 'add';
+    cracks.alpha = 0;
+    c.scale.set(BOSS_SCALE);
+    c.position.set(-WORLD, BOSS_POS.y);
+    this.bossLayer.addChild(c);
+    this.boss = { c, hull, cracks, glow, state: 'in', t: 0, hit: 0, health: 1 };
+  }
+
+  setBossHealth(health: number): void {
+    if (this.boss) this.boss.health = health;
+  }
+
+  /** A tap landed on the wreck: the claw fires a bolt at it. */
+  bossHit(): void {
+    if (!this.ready || !this.boss || this.boss.state !== 'here') return;
+    const b = this.boss;
+    b.hit = 1;
+    const x = b.c.x + rand(-60, 60) * BOSS_SCALE;
+    const y = b.c.y + rand(-22, 22) * BOSS_SCALE;
+    this.beams.push({ x, y, life: 1 });
+    this.burst(x, y, 0xffb070, 5, 0.6);
+  }
+
+  private explodeBoss(): void {
+    const b = this.boss!;
+    b.state = 'dead';
+    for (let i = 0; i < 6; i++) {
+      const x = b.c.x + rand(-80, 80) * BOSS_SCALE;
+      const y = b.c.y + rand(-30, 30) * BOSS_SCALE;
+      this.burst(x, y, i % 2 ? 0xffb070 : 0xff5d6c, 22, 1.8);
+      this.puff(x, y, 0xff9a4c, 3, 0.8);
+    }
+    this.rings.push({ x: b.c.x, y: b.c.y, r: 30, life: 1.2, color: 0xffd166, width: 5 });
+    this.shake = Math.max(this.shake, 9);
+    // The wreck's scrap streams into the claw.
+    for (let i = 0; i < 14; i++) {
+      const s = this.chunkPool.get();
+      s.texture = this.tex.debris[i % this.tex.debris.length];
+      s.scale.set(rand(0.5, 0.9));
+      this.chunks.push({ s, x0: b.c.x + rand(-70, 70), y0: b.c.y + rand(-25, 25), t: -i * 0.06, dur: rand(0.5, 0.8), color: COLORS.scrap });
+    }
+  }
+
+  private updateBoss(dt: number): void {
+    const b = this.boss;
+    if (b) {
+      b.t += dt;
+      b.hit = Math.max(0, b.hit - dt * 5);
+      if (b.state === 'in') {
+        const k = Math.min(1, b.t / 2.2);
+        b.c.x = -WORLD + (BOSS_POS.x + WORLD) * (1 - (1 - k) ** 3);
+        if (k >= 1) b.state = 'here';
+      } else if (b.state === 'out') {
+        b.c.x -= dt * 60 * (1 + b.t * 2);
+        b.c.alpha = Math.max(0, 1 - b.t / 2.5);
+      } else if (b.state === 'dead') {
+        b.c.alpha = Math.max(0, 1 - b.t * 2.5);
+        b.c.scale.set(BOSS_SCALE * (1 + b.t * 0.3));
+      }
+      if (b.state !== 'out' && b.state !== 'dead') b.c.y = BOSS_POS.y + Math.sin(this.time * 0.7) * 4;
+      b.c.rotation = Math.sin(this.time * 0.4) * 0.03 + (b.hit ? rand(-0.012, 0.012) : 0);
+      b.hull.tint = b.hit > 0.5 ? 0xffd6c0 : 0xffffff;
+      b.cracks.alpha = (1 - b.health) * (0.7 + 0.3 * Math.sin(this.time * 6));
+      b.glow.alpha = 0.18 + (1 - b.health) * 0.35;
+      // Smoke and sparks leak from a damaged wreck.
+      if (b.state === 'here' && Math.random() < dt * (1 + (1 - b.health) * 6)) {
+        const s = this.sparkPool.get();
+        s.position.set(b.c.x + rand(-70, 70) * BOSS_SCALE, b.c.y + rand(-25, 25) * BOSS_SCALE);
+        s.tint = Math.random() < 0.5 ? 0xffb070 : 0xff5d6c;
+        s.scale.set(0.35);
+        const a = rand(0, TAU);
+        this.sparks.push({ s, vx: Math.cos(a) * 30, vy: Math.sin(a) * 30 - 10, life: 0.7, max: 0.7 });
+      }
+      if ((b.state === 'out' || b.state === 'dead') && b.c.alpha <= 0) {
+        b.c.destroy({ children: true });
+        this.boss = null;
+      }
+    }
+    const g = this.beamG;
+    const tip = { x: CLAW_TIP.x, y: CLAW_TIP.y + this.hub.y };
+    for (const beam of [...this.beams]) {
+      beam.life -= dt * 6;
+      if (beam.life <= 0) {
+        this.beams.splice(this.beams.indexOf(beam), 1);
+        continue;
+      }
+      g.moveTo(tip.x, tip.y).lineTo(beam.x, beam.y).stroke({ width: 4 * beam.life, color: 0xffb070, alpha: beam.life * 0.5 });
+      g.moveTo(tip.x, tip.y).lineTo(beam.x, beam.y).stroke({ width: 1.5 * beam.life, color: 0xffffff, alpha: beam.life });
+    }
+  }
+
+  /** Shows the active pet floating around the station, or none. */
+  setPet(id: PetId | null): void {
+    if (!this.ready) return;
+    if (this.pet?.id === id) return;
+    if (this.pet) this.pet.s.destroy();
+    this.pet = null;
+    if (!id) return;
+    const s = this.sprite(this.tex.pets[id], this.droneLayer);
+    s.scale.set(0.9);
+    this.pet = { s, id, angle: rand(0, TAU), pounce: 0 };
+    this.puff(s.x, s.y, 0xffffff, 2, 0.4);
+  }
+
+  /** The cat leaps at the core for a free tap. */
+  petPounce(label: string): void {
+    if (!this.ready || !this.pet) return;
+    this.pet.pounce = 1;
+    this.squash = Math.max(this.squash, 0.6);
+    this.puff(0, 0, 0xc58cff, 1.2, 0.25);
+    this.floatText(this.pet.s.x * 0.5, this.pet.s.y * 0.5 - 14, label);
+  }
+
+  private updatePet(dt: number): void {
+    const p = this.pet;
+    if (!p) return;
+    p.angle += dt * 0.45;
+    p.pounce = Math.max(0, p.pounce - dt * 2.2);
+    // A lazy figure-of-eight around the hub; a pounce pulls it to the core and back.
+    const ox = Math.sin(p.angle) * 96;
+    const oy = Math.sin(p.angle * 2) * 34 + 8;
+    const k = Math.sin(p.pounce * Math.PI);
+    const x = ox * (1 - k);
+    const y = oy * (1 - k) + this.hub.y;
+    const facing = Math.cos(p.angle) >= 0 ? 1 : -1;
+    p.s.position.set(x, y + Math.sin(this.time * 2.4) * 3);
+    p.s.scale.set(0.9 * facing * (1 + k * 0.2), 0.9 * (1 - k * 0.1));
+    p.s.rotation = Math.sin(this.time * 1.7) * 0.12;
+  }
+
   celebrate(color = COLORS.dock): void {
     if (!this.ready) return;
     this.rings.push({ x: 0, y: 0, r: 40, life: 1, color, width: 4 });
@@ -766,6 +926,8 @@ export class StationScene {
     this.updateMachines(dt * speed);
     this.updateFar(dt * speed);
     this.updateHub(dt);
+    this.updateBoss(dt);
+    this.updatePet(dt);
     this.updateFx(dt);
     if (!this.reducedMotion && this.shake > 0.05) {
       this.world.pivot.set(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);
