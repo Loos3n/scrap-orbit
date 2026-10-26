@@ -42,7 +42,8 @@ export function makePanelDraggable(app: HTMLElement, panel: HTMLElement, handle:
     return min + (max - min) * f;
   };
   let fraction = load() ?? 0.5;
-  const apply = (px: number) => app.style.setProperty('--panel-h', `${Math.round(px)}px`);
+  // Set the row sizes directly: some web views mishandle var() fallbacks inside grid templates.
+  const apply = (px: number) => (app.style.gridTemplateRows = `auto minmax(120px, 1fr) ${Math.round(px)}px`);
   const applyFraction = (animate: boolean) => {
     app.classList.toggle('snapping', animate);
     apply(heightFor(fraction));
@@ -91,7 +92,16 @@ export function makePanelDraggable(app: HTMLElement, panel: HTMLElement, handle:
   const up = (e: PointerEvent) => {
     if (e.pointerId !== pointer) return;
     pointer = -1;
-    if (!dragging) return;
+    if (!dragging) {
+      // A plain tap on the handle steps through the sizes, for screens where dragging is
+      // taken over by the app around the game.
+      if (e.currentTarget === handle) {
+        fraction = fraction < 0.25 ? 0.5 : fraction < 0.7 ? SNAPS[SNAPS.length - 1] : 0;
+        store(fraction);
+        applyFraction(true);
+      }
+      return;
+    }
     panel.classList.remove('dragging');
     const { min, max } = range();
     const current = (panel.getBoundingClientRect().height - min) / Math.max(1, max - min);
@@ -122,12 +132,6 @@ export function makePanelDraggable(app: HTMLElement, panel: HTMLElement, handle:
     else if (e.key === 'ArrowDown' && i > 0) fraction = SNAPS[i - 1];
     else return;
     e.preventDefault();
-    store(fraction);
-    applyFraction(true);
-  });
-  // A double tap on the handle toggles between half and tall.
-  handle.addEventListener('dblclick', () => {
-    fraction = fraction >= 0.8 ? 0.5 : 0.82;
     store(fraction);
     applyFraction(true);
   });

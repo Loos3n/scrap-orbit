@@ -180,7 +180,9 @@ export class StationScene {
       antialias: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true,
-      preference: 'webgl',
+      // Skip WebGPU: when WebGL is unavailable, probing for WebGPU can hang some phone web
+      // views. Canvas is a slower but dependable fallback.
+      preference: ['webgl', 'canvas'],
     });
     el.appendChild(this.app.canvas);
 
@@ -249,7 +251,11 @@ export class StationScene {
       this.resizeTimer = window.setTimeout(() => this.layout(), 120);
     });
     this.app.ticker.add((t) => this.frame(Math.min(t.deltaMS / 1000, 0.1)));
+    this.ready = true;
   }
+
+  /** False until init finishes; every public method is a no-op before then. */
+  ready = false;
 
   private sprite(tex: Texture, parent: Container, x = 0, y = 0): Sprite {
     const s = new Sprite(tex);
@@ -349,6 +355,7 @@ export class StationScene {
   }
 
   setOwned(owned: Record<GeneratorId, number>): void {
+    if (!this.ready) return;
     const t = this.tex;
 
     const droneCount = Math.min(30, Math.ceil(Math.sqrt(owned.drone) * 3.2));
@@ -505,12 +512,14 @@ export class StationScene {
 
   /** Crate Magnet perk: crates show up `mult` times as often. */
   setCrateRate(mult: number): void {
+    if (!this.ready) return;
     if (mult > this.crateRate) this.nextCrate /= mult / this.crateRate;
     this.crateRate = mult;
   }
 
   /** Colours the sky, core and beacons, and paints the hull. */
   setTheme(theme: ThemeDef, paint: number): void {
+    if (!this.ready) return;
     const changedSky = this.theme?.id !== theme.id;
     this.theme = theme;
     this.coreColor = theme.core;
@@ -521,6 +530,7 @@ export class StationScene {
 
   /** Timed events change what drifts past (meteors, a convoy) and the light (solar flare). */
   setEvent(kind: EventKind | null): void {
+    if (!this.ready) return;
     if (kind === this.event) return;
     this.event = kind;
     this.nextMeteor = 0.3;
@@ -529,6 +539,7 @@ export class StationScene {
 
   /** The big jump when the station relocates: a warp, a flash, and a fresh start. */
   warpJump(): void {
+    if (!this.ready) return;
     this.jump = 2.4;
     this.shake = Math.max(this.shake, 9);
     this.celebrate(COLORS.gate);
@@ -550,6 +561,7 @@ export class StationScene {
 
   /** Checks for a tap on a crate, meteor or convoy ship, and consumes it. */
   hitSpecial(sx: number, sy: number): 'crate' | 'meteor' | 'convoy' | null {
+    if (!this.ready) return null;
     const p = this.toWorld(sx, sy);
     const reach: Record<DriftKind, number> = { debris: 0, crate: 34, meteor: 32, convoy: 46 };
     const hit = this.drifts.find((d) => d.kind !== 'debris' && Math.hypot(d.s.x - p.x, d.s.y - p.y) < reach[d.kind]);
@@ -569,6 +581,7 @@ export class StationScene {
 
   /** Effects for a tap at screen point (sx, sy) worth `label`. */
   tapAt(sx: number, sy: number, label: string): void {
+    if (!this.ready) return;
     const p = this.toWorld(sx, sy);
     const color = this.boosting ? COLORS.boost : this.flare > 0.5 ? 0xfff0c0 : this.coreColor;
     this.squash = 1;
@@ -611,6 +624,7 @@ export class StationScene {
   }
 
   floatText(x: number, y: number, label: string, big = false): void {
+    if (!this.ready) return;
     let text = this.textPool.pop();
     if (!text) {
       text = new Text({
@@ -647,6 +661,7 @@ export class StationScene {
 
   /** A celebratory pulse for milestones and upgrades. */
   celebrate(color = COLORS.dock): void {
+    if (!this.ready) return;
     this.rings.push({ x: 0, y: 0, r: 40, life: 1, color, width: 4 });
     this.rings.push({ x: 0, y: 0, r: 20, life: 1.3, color, width: 2 });
     this.puff(0, 0, color, 5, 0.7);

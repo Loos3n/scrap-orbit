@@ -13,6 +13,28 @@ import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { UI } from './ui/ui';
 
+/**
+ * If anything throws, say so on screen instead of silently freezing, so a player can report
+ * what went wrong from a screenshot.
+ */
+function showCrash(message: string): void {
+  let el = document.getElementById('crash');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'crash';
+    el.className = 'crash';
+    document.body.appendChild(el);
+  }
+  el.textContent = `Something went wrong: ${message}`;
+}
+window.addEventListener('error', (e) => showCrash(e.message || String(e.error)));
+window.addEventListener('unhandledrejection', (e) => showCrash(String((e.reason as Error)?.message ?? e.reason)));
+
+/** Waits for `p`, but gives up after `ms` so a stuck graphics driver can't hang the game. */
+function within<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timed out')), ms))]);
+}
+
 async function boot(): Promise<void> {
   const game = new Game();
   const sfx = new Sfx();
@@ -31,7 +53,14 @@ async function boot(): Promise<void> {
     scene.setFocus(r.top, r.bottom);
   };
   syncFocus();
-  await scene.init(sceneEl);
+  // The game runs even if the graphics can't start (old or locked-down web views): the
+  // station just isn't drawn, and taps still count.
+  try {
+    await within(scene.init(sceneEl), 6000);
+  } catch (err) {
+    console.warn('Scene failed to start', err);
+    sceneEl.classList.add('fallback');
+  }
   syncFocus();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
@@ -206,7 +235,9 @@ async function boot(): Promise<void> {
 
   let lastUi = 0;
   let lastFrame = performance.now();
-  scene.app.ticker.add(() => {
+  // The game loop has its own animation frame, separate from the renderer's.
+  const loop = () => {
+    requestAnimationFrame(loop);
     const now = Date.now();
     const t = performance.now();
     game.update(now);
@@ -217,7 +248,8 @@ async function boot(): Promise<void> {
       lastUi = now;
       ui.render();
     }
-  });
+  };
+  requestAnimationFrame(loop);
 
   const save = () => game.save();
   document.addEventListener('visibilitychange', () => {
