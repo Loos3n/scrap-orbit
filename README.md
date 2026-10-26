@@ -20,13 +20,13 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - 27 achievements, each worth +1% income
 - Crew: 10 collectible crew members with their own portraits, each one multiplying a machine's output, levelled up with crystals
 - Missions: three daily goals and a weekly challenge that pay out crystals
-- Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
+- Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals), every 12 to 20 minutes. Events, bosses, golden crates and the trader never overlap, and each is followed by at least 4 minutes of calm
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
 - Decorations: six sky themes and five hull paints
-- Boss wrecks: the first after 12 minutes of play, then one every 25 to 40 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in with a health bar; break it with taps (the claw fires a bolt) and machine fire within 60 seconds or it flies away. The payout is fixed when it arrives (5 minutes of scrap per second) plus crystals
+- Boss wrecks: the first after 15 minutes of play, then one every 35 to 55 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in with a health bar; break it with taps (the claw fires a bolt) and machine fire within 60 seconds or it flies away. The payout is fixed when it arrives (5 minutes of scrap per second) plus crystals
 - Boss loot: each broken wreck has a 20% chance (guaranteed after four dry runs) to drop a rare part with a permanent bonus or a pet skin
-- Golden scrap: every 5 to 10 minutes a glittering golden crate drifts past; tap it for a 30-second golden rush where everything earns 7x
-- Trading post: every 20 to 30 minutes a trader docks for 4 minutes with three one-off deals (crystals for scrap, scrap for crystals, a missing blueprint, an express recall for expeditions, or a missing wreck part)
+- Golden scrap: every 12 to 20 minutes a glittering golden crate drifts past; tap it for a 30-second golden rush where everything earns 7x
+- Trading post: every 30 to 45 minutes a trader docks for 4 minutes with three one-off deals (crystals for scrap, scrap for crystals, a missing blueprint, an express recall for expeditions, or a missing wreck part)
 - Challenge runs: from 5 Star Cores, start a fresh run under a rule (no taps, no upgrades, no crew, 3x prices); salvage the goal in one run for a permanent bonus, or give up and carry on
 - A fuller welcome-back screen: besides offline earnings it lists finished research, crew back from trips, a trader on the way, golden scrap nearby, a boss that drifted off and your offline bonuses
 - Expeditions: send recruited crew on 15-minute to 8-hour trips for crystals, scrap and module blueprints (their machine loses their bonus while they are away)

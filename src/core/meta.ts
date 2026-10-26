@@ -1,6 +1,7 @@
 import {
   BOSS,
   BOSS_NAMES,
+  CALM_SEC,
   CAT_TAP_SEC,
   CONVOY_CRYSTALS,
   CREW,
@@ -270,6 +271,14 @@ export function claimableMissions(state: GameState): number {
 
 // ---------- Events ----------
 
+/**
+ * True when nothing is going on: no event, boss, golden rush or trader, and the last one
+ * started at least CALM_SEC ago. Anything due waits for this, so they never pile up.
+ */
+export function calm(state: GameState, now: number): boolean {
+  return !eventActive(state, now) && !state.boss && now >= state.trader.until && now >= state.golden.until && now - state.lastHappening >= CALM_SEC * 1000;
+}
+
 export function eventActive(state: GameState, now: number): EventKind | null {
   return state.event && now < state.event.endsAt ? state.event.kind : null;
 }
@@ -285,14 +294,15 @@ export function updateEvents(state: GameState, now: number, rand = Math.random):
     state.event = null;
     return { ended };
   }
-  // Events hold off while a boss wreck is on screen, so the two never share the banner.
-  if (!state.event && !state.boss && now >= state.nextEventAt) {
+  // Events hold off while anything else is going on, so there is always calm time between.
+  if (!state.event && now >= state.nextEventAt && calm(state, now)) {
     const roll = rand();
     const kind: EventKind = roll < 0.45 ? 'meteors' : roll < 0.75 ? 'flare' : 'convoy';
     const endsAt = now + EVENTS[kind].seconds * 1000;
     const gap = (EVENT_GAP[0] + rand() * (EVENT_GAP[1] - EVENT_GAP[0])) / researchProduct(state, 'eventRate');
     state.event = { kind, endsAt };
     state.nextEventAt = endsAt + gap * 1000;
+    state.lastHappening = now;
     state.stats.events++;
     return { started: kind };
   }
@@ -440,9 +450,10 @@ export function bossDamageMult(state: GameState): number {
 export function updateBoss(state: GameState, now: number, dt: number, rand = Math.random): BossUpdate {
   const b = state.boss;
   if (!b) {
-    if (state.tutorial >= 0 || eventActive(state, now)) return {};
+    if (state.tutorial >= 0) return {};
     if (state.nextBossAt === 0) state.nextBossAt = now + Math.max(0, BOSS.firstSec - state.stats.playSec) * 1000;
-    if (now < state.nextBossAt) return {};
+    if (now < state.nextBossAt || !calm(state, now)) return {};
+    state.lastHappening = now;
     const hp = bossHp(state, now);
     state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: now + BOSS.seconds * 1000, reward: bossReward(state, now).toString() };
     return { arrived: true };
@@ -590,7 +601,8 @@ export function goldenDue(state: GameState, now: number, rand = Math.random): bo
     state.golden.nextAt = now + GOLDEN.firstMin * 60_000;
     return false;
   }
-  if (now < state.golden.nextAt) return false;
+  if (now < state.golden.nextAt || !calm(state, now)) return false;
+  state.lastHappening = now;
   const [lo, hi] = GOLDEN.gap;
   state.golden.nextAt = now + ((lo + rand() * (hi - lo)) * 60_000) / (1 + bonuses(state).golden);
   return true;
@@ -656,7 +668,8 @@ export function updateTrader(state: GameState, now: number, rand = Math.random):
     t.nextAt = now + TRADER.firstMin * 60_000;
     return null;
   }
-  if (t.until || now < t.nextAt) return null;
+  if (t.until || now < t.nextAt || !calm(state, now)) return null;
+  state.lastHappening = now;
   t.until = now + TRADER.stayMin * 60_000;
   const [lo, hi] = TRADER.gap;
   t.nextAt = t.until + (lo + rand() * (hi - lo)) * 60_000;

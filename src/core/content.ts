@@ -176,8 +176,13 @@ export const EVENTS: Record<EventKind, { name: string; desc: string; seconds: nu
 };
 
 /** Seconds between events, before research. */
-export const EVENT_GAP: [number, number] = [6 * MIN, 11 * MIN];
-export const FIRST_EVENT_SEC = 3 * MIN;
+export const EVENT_GAP: [number, number] = [12 * MIN, 20 * MIN];
+export const FIRST_EVENT_SEC = 5 * MIN;
+/**
+ * Calm time: after an event, boss, golden crate or trader starts, nothing else of the kind
+ * begins for at least this long, and never while another is still running.
+ */
+export const CALM_SEC = 4 * MIN;
 export const FLARE_TAP_MULT = 5;
 /** A meteor is worth this many seconds of income (or 5 taps, whichever is more). */
 export const METEOR_INCOME_SEC = 8;
@@ -234,9 +239,9 @@ export const CAT_TAP_SEC = 4;
 export const BOSS_NAMES = ['Derelict Freighter', 'Shattered Cruiser', 'Ghost Dreadnought', 'Hollow Ark'] as const;
 export const BOSS = {
   /** Seconds of play before the first wreck shows up. */
-  firstSec: 12 * 60,
+  firstSec: 15 * 60,
   /** Minutes between wrecks. */
-  gap: [25, 40] as [number, number],
+  gap: [35, 55] as [number, number],
   /** Seconds to break it before it flies off. */
   seconds: 60,
   /** Health, as taps-worth plus seconds-of-income-worth at the moment it arrives. */

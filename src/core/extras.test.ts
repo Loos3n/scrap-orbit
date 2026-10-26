@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS } from './content';
+import { BOSS, CALM_SEC } from './content';
 import { baseIncome, tapValue } from './economy';
-import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss } from './meta';
+import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss, updateEvents } from './meta';
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
 import { GOLDEN, LOOT_PITY, TRIPS, bonuses, moduleYield, tripMs } from './expansion';
@@ -246,8 +246,8 @@ describe('bug fixes', () => {
     rushed.owned.drone = 50;
     rushed.tutorial = -1;
     rushed.nextBossAt = NOW;
+    // (A golden rush now holds bosses back entirely; Overdrive doesn't.)
     rushed.boostUntil = NOW + 30_000;
-    claimGolden(rushed, NOW);
     updateBoss(plain, NOW, 0.01, () => 0.5);
     updateBoss(rushed, NOW, 0.01, () => 0.5);
     expect(rushed.boss!.reward).toBe(plain.boss!.reward);
@@ -309,5 +309,28 @@ describe('challenge runs', () => {
     abandonChallenge(s);
     expect(baseIncome(s).gt(benched)).toBe(true);
     expect(s.challengesDone.size).toBe(0);
+  });
+});
+
+describe('calm time', () => {
+  it('never starts an event, boss, golden crate or trader while another is running or just began', () => {
+    const s = newState(NOW);
+    s.tutorial = -1;
+    s.owned.drone = 20;
+    s.nextEventAt = NOW;
+    s.nextBossAt = NOW;
+    s.golden.nextAt = NOW;
+    s.trader.nextAt = NOW;
+    expect(updateEvents(s, NOW, () => 0.1).started).toBe('meteors');
+    expect(updateBoss(s, NOW, 0.01).arrived).toBeUndefined();
+    expect(goldenDue(s, NOW)).toBe(false);
+    expect(updateTrader(s, NOW)).toBeNull();
+    const end = s.event!.endsAt;
+    updateEvents(s, end);
+    // Over, but still inside the calm window.
+    expect(goldenDue(s, end + 1000)).toBe(false);
+    const later = NOW + CALM_SEC * 1000;
+    expect(updateBoss(s, later, 0.01).arrived).toBe(true);
+    expect(goldenDue(s, later + 1000)).toBe(false);
   });
 });

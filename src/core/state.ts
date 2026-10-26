@@ -66,6 +66,8 @@ export interface GameState {
   /** The challenge run in progress, if any, and the ones already beaten. */
   challenge: string | null;
   challengesDone: Set<string>;
+  /** When the last event, boss, golden crate or trader began, to keep calm time between them. */
+  lastHappening: number;
   stats: {
     crates: number;
     boosts: number;
@@ -127,6 +129,7 @@ interface SaveData {
   trader?: GameState['trader'];
   challenge?: string | null;
   challengesDone?: string[];
+  lastHappening?: number;
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -181,6 +184,7 @@ export function newState(now: number): GameState {
     trader: { until: 0, nextAt: 0, name: 0, offers: [] },
     challenge: null,
     challengesDone: new Set(),
+    lastHappening: 0,
     stats: {
       crates: 0,
       boosts: 0,
@@ -239,6 +243,7 @@ export function serialize(state: GameState): string {
     trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
     challenge: state.challenge,
     challengesDone: [...state.challengesDone],
+    lastHappening: state.lastHappening,
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -356,6 +361,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   const challengeIds = new Set(CHALLENGES.map((c) => c.id));
   for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);
   state.challenge = typeof data.challenge === 'string' && challengeIds.has(data.challenge) && !state.challengesDone.has(data.challenge) ? data.challenge : null;
+  state.lastHappening = Number(data.lastHappening) || 0;
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
   state.boostUntil = Number(data.boostUntil) || 0;
   state.boostReadyAt = Number(data.boostReadyAt) || 0;

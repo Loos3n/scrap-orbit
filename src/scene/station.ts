@@ -1153,7 +1153,7 @@ export class StationScene {
     }
     if (this.nextCrate <= 0) {
       this.spawnDrift('crate');
-      this.nextCrate = rand(60, 110) / this.crateRate;
+      this.nextCrate = rand(90, 160) / this.crateRate;
     }
     if (this.holdCrate && !this.drifts.some((d) => d.kind === 'crate')) {
       this.spawnDrift('crate');

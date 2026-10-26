@@ -172,8 +172,8 @@ export function onTrip(state: GameState, crew: CrewId): boolean {
 
 export const GOLDEN = {
   /** Minutes between golden crates. */
-  gap: [5, 10] as [number, number],
-  firstMin: 3,
+  gap: [12, 20] as [number, number],
+  firstMin: 8,
   /** The rush: income and taps multiplied, for this long. */
   mult: 7,
   seconds: 30,
@@ -199,8 +199,8 @@ export interface Offer {
 
 export const TRADER = {
   /** Minutes of play before the first visit, then the gap between visits. */
-  firstMin: 10,
-  gap: [18, 32] as [number, number],
+  firstMin: 20,
+  gap: [30, 45] as [number, number],
   /** How long the trader stays docked. */
   stayMin: 4,
   /** Scrap-for-crystals: this many minutes of income buys `crystalsBought` crystals. */
