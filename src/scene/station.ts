@@ -173,6 +173,7 @@ export class StationScene {
   private nextEmber = 0;
   private nextSteam = 1;
   private nextTraffic = rand(4, 9);
+  private traderShip: { s: Sprite; light: Sprite; t: number } | null = null;
   private traffic: { s: Sprite; light: Sprite; vx: number; vy: number; life: number; blink: number }[] = [];
   private scale = 1;
   private skyKey = '';
@@ -665,6 +666,42 @@ export class StationScene {
 
   /** Checks for a tap on a crate, meteor or convoy ship, and consumes it. */
   /** A golden crate drifts slowly across, glittering. */
+  /** The trading post's ship parks beside the station while the trader is docked. */
+  setTrader(on: boolean): void {
+    if (!this.ready) return;
+    if (on && !this.traderShip) {
+      const s = this.sprite(this.tex.hauler, this.dockLayer, -420, 118);
+      s.scale.set(1.35);
+      s.tint = 0xbff0ff;
+      s.alpha = 0;
+      const light = this.sprite(this.tex.glow, this.dockLayer, s.x, s.y);
+      light.blendMode = 'add';
+      light.tint = 0x5cd6ff;
+      this.traderShip = { s, light, t: 0 };
+    } else if (!on && this.traderShip) {
+      const { s, light } = this.traderShip;
+      this.burst(s.x, s.y, 0x5cd6ff, 18, 1);
+      s.destroy();
+      light.destroy();
+      this.traderShip = null;
+    }
+  }
+
+  private updateTrader(dt: number): void {
+    const o = this.traderShip;
+    if (!o) return;
+    o.t += dt;
+    // Glide in from the left, then bob gently at the berth.
+    const arrive = Math.min(1, o.t / 2.5);
+    const ease = 1 - Math.pow(1 - arrive, 3);
+    o.s.alpha = ease;
+    o.s.x = -420 + 265 * ease;
+    o.s.y = 118 + Math.sin(o.t * 1.3) * 4;
+    o.s.rotation = Math.sin(o.t * 0.9) * 0.04;
+    o.light.position.set(o.s.x - 26, o.s.y);
+    o.light.scale.set(Math.sin(o.t * 4) > 0.4 ? 0.3 : 0.08);
+  }
+
   spawnGolden(): void {
     if (this.ready && !this.drifts.some((d) => d.kind === 'golden')) this.spawnDrift('golden');
   }
@@ -1234,6 +1271,7 @@ export class StationScene {
     }
 
     this.updateTraffic(dt);
+    this.updateTrader(dt);
 
     // Drones dart around in a loose swarm, leaving short trails.
     for (const o of this.drones) {

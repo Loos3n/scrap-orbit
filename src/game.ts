@@ -1,6 +1,6 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { checkAchievements, type AchievementDef } from './core/achievements';
-import { ACHIEVEMENT_CRYSTALS, TUTORIAL, type CrewId, type EventKind, type PetId, type TutorialStep } from './core/content';
+import { ACHIEVEMENT_CRYSTALS, RESEARCH, TUTORIAL, type CrewId, type EventKind, type PetId, type TutorialStep } from './core/content';
 import * as eco from './core/economy';
 import type { ModuleId } from './core/expansion';
 import * as meta from './core/meta';
@@ -22,7 +22,7 @@ export type GameEvent =
   | { type: 'milestone'; gen: GeneratorId; at: number }
   | { type: 'upgrade'; id: string }
   | { type: 'boost' }
-  | { type: 'offline'; seconds: number; earned: Decimal }
+  | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
   | { type: 'bonus'; value: Decimal }
   | { type: 'achievement'; def: AchievementDef }
   | { type: 'relocate'; cores: number; crystals: number }
@@ -51,7 +51,21 @@ export type GameEvent =
   | { type: 'tripHome'; reward: meta.TripReward }
   | { type: 'skin'; pet: PetId }
   | { type: 'bossHit'; value: Decimal }
+  | { type: 'trader'; phase: 'arrived' | 'left' }
+  | { type: 'trade'; result: meta.TradeResult }
+  | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
   | { type: 'reset' };
+
+/** What happened while the player was away, for the welcome-back screen. */
+export interface OfflineReport {
+  research?: string;
+  trips: CrewId[];
+  bossEscaped: boolean;
+  golden: boolean;
+  trader: boolean;
+  /** The multiplier offline earnings got (owl, research, greenhouses, loot). */
+  mult: number;
+}
 
 function storageGet(): string | null {
   try {
@@ -151,6 +165,10 @@ export class Game {
     if (ev.started) this.emit({ type: 'event', kind: ev.started, phase: 'start' });
     if (ev.ended) this.emit({ type: 'event', kind: ev.ended, phase: 'end' });
     if (meta.goldenDue(s, now)) this.emit({ type: 'goldenSpawn' });
+    const trader = meta.updateTrader(s, now);
+    if (trader) this.emit({ type: 'trader', phase: trader });
+    const beaten = meta.checkChallenge(s);
+    if (beaten) this.emit({ type: 'challenge', id: beaten.id, phase: 'done' });
     for (const t of s.trips) {
       if (now >= t.endsAt && !this.tripsReady.has(t.crew)) {
         this.tripsReady.add(t.crew);
@@ -217,6 +235,23 @@ export class Game {
     if (!reward) return;
     this.tripsReady.delete(reward.crew);
     this.emit({ type: 'tripHome', reward });
+  }
+
+  trade(index: number): void {
+    const result = meta.trade(this.state, index, Date.now());
+    if (result) this.emit({ type: 'trade', result });
+  }
+
+  startChallenge(id: string): void {
+    const cores = meta.startChallenge(this.state, id, Date.now());
+    if (cores < 0) return;
+    this.save();
+    this.emit({ type: 'challenge', id, phase: 'start', cores });
+  }
+
+  abandonChallenge(): void {
+    const id = this.state.challenge;
+    if (id && meta.abandonChallenge(this.state)) this.emit({ type: 'challenge', id, phase: 'abandon' });
   }
 
   chooseSkin(pet: PetId, skin: string | null): void {
@@ -294,9 +329,21 @@ export class Game {
   }
 
   private collectOffline(now: number): void {
-    const { seconds, earned } = eco.applyOffline(this.state, now);
+    const s = this.state;
+    const since = s.lastSeen;
+    // Read what changed while away before the regular updates tidy it up.
+    const research = s.research.active && s.research.active.endsAt <= now ? RESEARCH.find((r) => r.id === s.research.active!.id)?.name : undefined;
+    const report: OfflineReport = {
+      research,
+      trips: s.trips.filter((t) => t.endsAt > since && t.endsAt <= now).map((t) => t.crew),
+      bossEscaped: !!s.boss && s.boss.endsAt <= now,
+      golden: s.tutorial < 0 && s.golden.nextAt > 0 && s.golden.nextAt <= now,
+      trader: s.tutorial < 0 && s.trader.nextAt > 0 && s.trader.nextAt <= now && !s.trader.until,
+      mult: eco.offlineMult(s),
+    };
+    const { seconds, earned } = eco.applyOffline(s, now);
     this.lastFrame = now;
-    if (seconds >= 30 && earned.gt(0)) this.emit({ type: 'offline', seconds, earned });
+    if (seconds >= 30 && earned.gt(0)) this.emit({ type: 'offline', seconds, earned, report });
   }
 
   tap(): Decimal {

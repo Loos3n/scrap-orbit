@@ -2,7 +2,8 @@ import type { CrewId, PetId } from './content';
 import type { GameState } from './state';
 
 /*
- * Station modules, expeditions, boss loot and golden scrap: definitions, plus the bonuses they
+ * Station modules, expeditions, boss loot, golden scrap, the trading post and challenge runs:
+ * definitions, plus the bonuses they
  * add up to. These only read the save, so the economy can use them without a cycle; the
  * actions that pay out scrap live in meta.ts.
  */
@@ -182,12 +183,74 @@ export function goldenActive(state: GameState, now: number): boolean {
   return now < state.golden.until;
 }
 
+// ---------- Trading post ----------
+
+export type OfferKind = 'crystals' | 'scrap' | 'blueprint' | 'recall' | 'loot';
+
+export interface Offer {
+  kind: OfferKind;
+  /** What the trader wants: scrap (a Decimal string) or crystals. */
+  pay: 'scrap' | 'crystals';
+  price: string;
+  /** What the player gets: crystals, or scrap as a Decimal string. Unused for blueprints, recalls and loot. */
+  amount: string;
+  bought: boolean;
+}
+
+export const TRADER = {
+  /** Minutes of play before the first visit, then the gap between visits. */
+  firstMin: 10,
+  gap: [18, 32] as [number, number],
+  /** How long the trader stays docked. */
+  stayMin: 4,
+  /** Scrap-for-crystals: this many minutes of income buys `crystalsBought` crystals. */
+  crystalsPriceMin: 12,
+  crystalsBought: 4,
+  /** Crystals-for-scrap: `scrapPrice` crystals buy this many minutes of income. */
+  scrapPrice: 5,
+  scrapMin: 30,
+  blueprintPrice: 30,
+  recallPrice: 6,
+  lootPrice: 45,
+};
+
+export const TRADER_NAMES = ['Captain Bramble', 'Old Mag', 'Zeph the Peddler', 'Tilly Twobolts', 'The Rust Baron'];
+
+// ---------- Challenge runs ----------
+
+export interface ChallengeDef {
+  id: string;
+  name: string;
+  rule: string;
+  /** Scrap to salvage in the challenge run. */
+  goal: number;
+  stat: keyof Bonuses;
+  amount: number;
+  reward: string;
+  color: number;
+}
+
+export const CHALLENGES: readonly ChallengeDef[] = [
+  { id: 'notap', name: 'Hands Off', rule: 'Taps earn nothing. Your machines have to do it all.', goal: 1e9, stat: 'income', amount: 0.1, reward: '+10% income, forever', color: 0x4fe3c1 },
+  { id: 'noupg', name: 'Bare Bones', rule: 'Upgrades cannot be installed.', goal: 1e9, stat: 'tap', amount: 0.5, reward: '+50% tap power, forever', color: 0x7aa7ff },
+  { id: 'nocrew', name: 'Skeleton Crew', rule: 'Crew bonuses are switched off.', goal: 5e9, stat: 'offline', amount: 0.5, reward: '+50% offline earnings, forever', color: 0xff8a4c },
+  { id: 'pricey', name: 'Inflation', rule: 'Every machine costs 3x as much.', goal: 1e10, stat: 'income', amount: 0.15, reward: '+15% income, forever', color: 0xc58cff },
+];
+
+/** Challenge runs open up once the player holds this many Star Cores. */
+export const CHALLENGE_CORES = 5;
+
+export function challengeOn(state: GameState, id: string): boolean {
+  return state.challenge === id;
+}
+
 // ---------- Totals ----------
 
 export function bonuses(state: GameState): Bonuses {
   const b = NONE();
   for (let i = 0; i < state.modules.length; i++) for (const [stat, a] of moduleYield(state.modules, i)) b[stat] += a;
   for (const l of LOOT) if (l.stat && state.loot.has(l.id)) b[l.stat] += l.amount!;
+  for (const c of CHALLENGES) if (state.challengesDone.has(c.id)) b[c.stat] += c.amount;
   return b;
 }
 

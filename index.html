@@ -43,6 +43,7 @@
           </div>
           <div class="boss-hp"><i id="boss-hp"></i></div>
         </div>
+        <button id="trader-banner" class="trader-banner" type="button" hidden><span data-icon="crystal"></span>Trader docked <b id="trader-time"></b></button>
         <div id="golden-banner" class="golden-banner" hidden><span data-icon="star"></span>Golden rush <b id="golden-time"></b></div>
         <div id="event-banner" class="event-banner" hidden>
           <span id="event-icon" class="event-icon"></span>
@@ -54,6 +55,7 @@
       <section id="panel">
         <div id="sheet" class="sheet">
         <div id="tab-build" class="tab-body">
+          <div id="challenge-line" class="challenge-line" hidden><span data-icon="trophy"></span><span>Challenge: <b id="challenge-line-name"></b></span><div class="bar"><i id="challenge-line-bar"></i></div><b id="challenge-line-pct"></b></div>
           <ul class="list claw-list">
             <li id="claw-row" class="gen claw">
               <div class="gen-icon"><span data-icon="claw"></span><span id="claw-level" class="gen-count">0</span></div>
@@ -123,6 +125,8 @@
               </div>
             </div>
           </div>
+          <h3 class="section-title">Challenge runs</h3>
+          <ul id="challenge-list" class="list challenge-list"></ul>
           <h3 class="section-title">Core perks</h3>
           <ul id="perk-list" class="list"></ul>
         </div>
@@ -197,6 +201,7 @@
         <h2 id="modal-title">Your crew kept salvaging</h2>
         <div id="modal-amount" class="modal-amount">+0</div>
         <p id="modal-time" class="modal-time"></p>
+        <ul id="modal-report" class="modal-report"></ul>
         <button id="modal-ok" class="primary" type="button">Collect</button>
       </div>
     </div>
@@ -204,6 +209,16 @@
       <div class="modal-card info-card" role="dialog" aria-modal="true">
         <button id="info-close" class="close-btn" type="button" aria-label="Close">&times;</button>
         <div id="info-body"></div>
+      </div>
+    </div>
+    <div id="trader" class="modal" hidden>
+      <div class="modal-card trader-card" role="dialog" aria-modal="true" aria-labelledby="trader-name">
+        <button id="trader-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Trading post</div>
+        <h2 id="trader-name">Trader</h2>
+        <p class="trader-hello">"Fine wares for a fine station! One of each, mind."</p>
+        <ul id="trader-offers" class="offer-list"></ul>
+        <p id="trader-left" class="mission-reset"></p>
       </div>
     </div>
     <div id="missions" class="modal" hidden>

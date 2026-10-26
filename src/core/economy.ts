@@ -15,7 +15,7 @@ import {
   type UpgradeDef,
 } from './config';
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
-import { GOLDEN, bonuses, goldenActive, onTrip } from './expansion';
+import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
 
@@ -45,7 +45,7 @@ export function maxAffordable(gen: GeneratorDef, owned: number, scrap: Decimal, 
 
 /** Price multiplier for machines from research. */
 export function costDiscount(state: GameState): number {
-  return researchProduct(state, 'costMult');
+  return researchProduct(state, 'costMult') * (challengeOn(state, 'pricey') ? 3 : 1);
 }
 
 /** Units and price for a buy button in the given mode. Max with nothing affordable shows 1. */
@@ -101,8 +101,8 @@ function researchSum(state: GameState, kind: 'offlineSec' | 'boostSec' | 'corePe
 /** Output multiplier a machine gets from its crew member. */
 export function crewMult(state: GameState, gen: GeneratorId): number {
   const def = CREW.find((c) => c.gen === gen);
-  // Crew away on an expedition can't tend their machine.
-  const level = def && !onTrip(state, def.id) ? state.crew[def.id] : 0;
+  // Crew away on an expedition can't tend their machine, and the Skeleton Crew challenge benches everyone.
+  const level = def && !onTrip(state, def.id) && !challengeOn(state, 'nocrew') ? state.crew[def.id] : 0;
   return 1 + level * CREW_PER_LEVEL * researchProduct(state, 'crewMult');
 }
 
@@ -182,6 +182,7 @@ export function buyClaw(state: GameState): boolean {
 
 /** What one tap earns. `plain` leaves out timed boosts (Overdrive, golden rush, solar flare). */
 export function tapValue(state: GameState, now: number, plain = false): Decimal {
+  if (challengeOn(state, 'notap')) return D(0);
   let mult = clawBase(state.claw) * researchProduct(state, 'tapMult');
   let share = researchSum(state, 'tapIncomeShare');
   if (!plain && flareActive(state, now)) mult *= FLARE_TAP_MULT * researchProduct(state, 'flareMult');
@@ -236,7 +237,7 @@ export function upgradeVisible(state: GameState, u: UpgradeDef): boolean {
 
 export function buyUpgrade(state: GameState, id: string): boolean {
   const u = UPGRADES.find((x) => x.id === id);
-  if (!u || state.upgrades.has(id) || !upgradeVisible(state, u)) return false;
+  if (!u || state.upgrades.has(id) || !upgradeVisible(state, u) || challengeOn(state, 'noupg')) return false;
   if (state.scrap.lt(u.cost)) return false;
   state.scrap = state.scrap.sub(u.cost);
   state.upgrades.add(id);
@@ -253,6 +254,13 @@ export function activateBoost(state: GameState, now: number): boolean {
   return true;
 }
 
+/** How much more offline time earns than base income: research, the Star Owl, rooms, loot and challenges. */
+export function offlineMult(state: GameState): number {
+  // The Star Owl keeps watch while the player is away.
+  const owl = state.pets.active === 'owl' ? 1.5 : 1;
+  return researchProduct(state, 'offlineMult') * owl * (1 + bonuses(state).offline);
+}
+
 /**
  * Credits production for time spent away, from the last-seen timestamp.
  * Uses base income (boosts don't run while away) and caps the time.
@@ -260,9 +268,7 @@ export function activateBoost(state: GameState, now: number): boolean {
 export function applyOffline(state: GameState, now: number): { seconds: number; earned: Decimal } {
   const away = Math.max(0, (now - state.lastSeen) / 1000);
   const seconds = Math.min(away, offlineCapSec(state));
-  // The Star Owl keeps watch while the player is away.
-  const owl = state.pets.active === 'owl' ? 1.5 : 1;
-  const earned = baseIncome(state).mul(seconds).mul(researchProduct(state, 'offlineMult') * owl * (1 + bonuses(state).offline));
+  const earned = baseIncome(state).mul(seconds).mul(offlineMult(state));
   earn(state, earned);
   state.lastSeen = now;
   return { seconds, earned };
@@ -296,6 +302,14 @@ export function relocate(state: GameState, now: number): number {
   if (gained <= 0) return 0;
   state.cores += gained;
   state.stats.relocations++;
+  // Relocating out of a challenge run gives it up.
+  state.challenge = null;
+  resetRun(state, now);
+  return gained;
+}
+
+/** Starts a fresh run: scrap, machines, upgrades and the claw go; everything permanent stays. */
+export function resetRun(state: GameState, now: number): void {
   state.scrap = D(0);
   state.lifetime = D(0);
   state.owned = emptyOwned();
@@ -310,7 +324,6 @@ export function relocate(state: GameState, now: number): number {
   state.stats.runSec = 0;
   if (hasPerk(state, 'headstart')) state.owned.drone = 10;
   if (hasPerk(state, 'seedfund')) state.scrap = D(1e6);
-  return gained;
 }
 
 /** The cheapest single machine purchase, for the Auto-Builder perk. */

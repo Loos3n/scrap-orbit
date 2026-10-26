@@ -5,7 +5,7 @@ import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakS
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
 import { GOLDEN, LOOT_PITY, TRIPS, bonuses, moduleYield, tripMs } from './expansion';
-import { buildModule, claimGolden, claimTrip, goldenDue, removeModule, startTrip } from './meta';
+import { abandonChallenge, buildModule, checkChallenge, claimGolden, claimTrip, goldenDue, removeModule, startChallenge, startTrip, trade, updateTrader } from './meta';
 import { income } from './economy';
 
 const DAY = 86_400_000;
@@ -253,5 +253,61 @@ describe('bug fixes', () => {
     expect(rushed.boss!.reward).toBe(plain.boss!.reward);
     expect(rushed.boss!.max).toBe(plain.boss!.max);
     expect(tapValue(rushed, NOW).gt(tapValue(rushed, NOW, true))).toBe(true);
+  });
+});
+
+describe('trading post', () => {
+  it('visits after the first wait, offers three deals, sells each once, then leaves', () => {
+    const s = newState(NOW);
+    s.tutorial = -1;
+    s.owned.drone = 20;
+    expect(updateTrader(s, NOW)).toBeNull();
+    const at = s.trader.nextAt;
+    expect(updateTrader(s, at - 1)).toBeNull();
+    expect(updateTrader(s, at, () => 0.3)).toBe('arrived');
+    expect(s.trader.offers).toHaveLength(3);
+    s.crystals = 100;
+    s.scrap = D(1e12);
+    const before = s.crystals;
+    const i = s.trader.offers.findIndex((o) => o.kind === 'crystals' || o.kind === 'scrap');
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(trade(s, i, at + 1000)).not.toBeNull();
+    expect(trade(s, i, at + 1000)).toBeNull();
+    expect(s.crystals === before && s.scrap.eq(1e12)).toBe(false);
+    expect(updateTrader(s, s.trader.until)).toBe('left');
+    expect(trade(s, 0, s.trader.until + 1)).toBeNull();
+  });
+});
+
+describe('challenge runs', () => {
+  it('starts a fresh run under a rule and pays a permanent bonus at the goal', () => {
+    const s = newState(NOW);
+    s.cores = 5;
+    s.owned.drone = 50;
+    expect(tapValue(s, NOW).gt(0)).toBe(true);
+    expect(startChallenge(s, 'notap', NOW)).toBeGreaterThanOrEqual(0);
+    // A fresh run (Head Start hands back 10 drones at 3 cores).
+    expect(s.owned.drone).toBe(10);
+    expect(tapValue(s, NOW).eq(0)).toBe(true);
+    expect(startChallenge(s, 'noupg', NOW)).toBe(-1);
+    s.lifetime = D(2e9);
+    expect(checkChallenge(s)!.id).toBe('notap');
+    expect(s.challenge).toBeNull();
+    expect(bonuses(s).income).toBeCloseTo(0.1);
+    expect(startChallenge(s, 'notap', NOW)).toBe(-1);
+    const back = deserialize(serialize(s), NOW)!;
+    expect(back.challengesDone.has('notap')).toBe(true);
+  });
+
+  it('applies the price and crew rules only while running, and can be given up', () => {
+    const s = newState(NOW);
+    s.cores = 5;
+    s.crew.mika = 3;
+    startChallenge(s, 'nocrew', NOW);
+    s.owned.drone = 10;
+    const benched = baseIncome(s);
+    abandonChallenge(s);
+    expect(baseIncome(s).gt(benched)).toBe(true);
+    expect(s.challengesDone.size).toBe(0);
   });
 });

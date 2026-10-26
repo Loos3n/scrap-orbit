@@ -2,13 +2,15 @@ import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
-import { LOOT, MODULES } from '../core/expansion';
+import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { holdToRepeat, makePanelToggle, type PanelToggle } from './gestures';
 import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
+import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
+import type { OfflineReport } from '../game';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -95,6 +97,8 @@ export class UI {
   private trips: TripPanel;
   private lootShelf: LootShelf;
   private info: InfoSheet;
+  private trader: TraderPanel;
+  private challenges: ChallengePanel;
   private panel!: PanelToggle;
   readonly streak: StreakModal;
 
@@ -123,6 +127,8 @@ export class UI {
     this.trips = new TripPanel(game, this.fmt);
     this.lootShelf = new LootShelf(game);
     this.info = new InfoSheet(game, this.fmt);
+    this.trader = new TraderPanel(game, this.fmt);
+    this.challenges = new ChallengePanel(game, this.fmt);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
@@ -369,6 +375,8 @@ export class UI {
     renderEventBanner(this.game);
     renderBossBanner(this.game);
     renderGoldenBanner(this.game);
+    this.trader.render();
+    this.challenges.render();
     this.coach.render();
     this.info.render();
   }
@@ -578,6 +586,8 @@ export class UI {
       ['Adventures', [
         ['Boss wrecks broken', n(s.stats.bosses)],
         ['Golden rushes', n(s.stats.golden ?? 0)],
+        ['Trader deals', n(s.stats.trades ?? 0)],
+        ['Challenges beaten', `${s.challengesDone.size} of ${CHALLENGES.length}`],
         ['Crew on trips now', n(s.trips.length)],
         ['Login streak', `${n(s.login.streak)} days (best ${n(s.login.best)})`],
       ]],
@@ -596,7 +606,8 @@ export class UI {
     $('opt-auto-row').hidden = !eco.hasPerk(s, 'autobuy');
   }
 
-  showOffline(seconds: number, earned: Decimal, onCollect: () => void): void {
+  showOffline(seconds: number, earned: Decimal, report: OfflineReport, onCollect: () => void): void {
+    $('modal-report').innerHTML = offlineReportHtml(report);
     const modal = $('modal');
     const amount = $('modal-amount');
     const cap = eco.offlineCapSec(this.game.state);

@@ -5,7 +5,7 @@ import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
 import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
-import { GOLDEN, LOOT, TRIPS, moduleDef } from './core/expansion';
+import { CHALLENGES, GOLDEN, LOOT, TRIPS, moduleDef } from './core/expansion';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { D, format } from './core/num';
@@ -13,6 +13,7 @@ import { Game } from './game';
 import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
+import { tradeText } from './ui/trade-ui';
 import { UI } from './ui/ui';
 
 /**
@@ -145,7 +146,7 @@ async function boot(): Promise<void> {
         buzz(40);
         break;
       case 'offline':
-        ui.showOffline(e.seconds, e.earned, () => sfx.coins());
+        ui.showOffline(e.seconds, e.earned, e.report, () => sfx.coins());
         break;
       case 'bonus':
         ui.toast(ICONS.scrap, `<b>Salvage crate!</b> +${fmt(e.value)}`);
@@ -341,6 +342,39 @@ async function boot(): Promise<void> {
         buzz(25);
         break;
       }
+      case 'trader':
+        if (e.phase === 'arrived') {
+          ui.toast(ICONS.crystal.replace('currentColor', '#5cd6ff'), '<b>A trader has docked!</b> Tap the banner to see the deals');
+          sfx.event();
+        } else ui.toast(ICONS.warp, 'The trader has moved on');
+        scene.setTrader(e.phase === 'arrived');
+        break;
+      case 'trade':
+        ui.toast(ICONS.crystal.replace('currentColor', '#5cd6ff'), tradeText(e.result, fmt));
+        if (e.result.loot) scene.setPet(game.state.pets.active, petTint());
+        sfx.coins();
+        buzz(20);
+        break;
+      case 'challenge': {
+        const c = CHALLENGES.find((x) => x.id === e.id)!;
+        if (e.phase === 'start') {
+          scene.warpJump();
+          setTimeout(() => {
+            scene.setOwned(game.state.owned);
+            scene.setSector(sectorFor(game.state.stats.relocations));
+          }, 1500);
+          syncPerks();
+          ui.showTab('build');
+          ui.toast(ICONS.trophy.replace('currentColor', hexColor(c.color)), `<b>Challenge: ${c.name}</b> ${c.rule}${e.cores ? ` (+${e.cores} Star Cores banked)` : ''}`);
+          sfx.boost();
+        } else if (e.phase === 'done') {
+          ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>Challenge beaten: ${c.name}!</b> ${c.reward}`);
+          scene.celebrate(c.color);
+          sfx.achievement();
+          buzz(60);
+        } else ui.toast(ICONS.trophy, `Gave up on ${c.name}. The run carries on as normal`);
+        break;
+      }
       case 'skin':
         scene.setPet(game.state.pets.active, petTint());
         sfx.upgrade();
@@ -393,6 +427,7 @@ async function boot(): Promise<void> {
   scene.setEvent(meta.eventActive(game.state, Date.now()));
   scene.setPet(game.state.pets.active, petTint());
   if (game.state.boss) scene.setBoss(game.state.boss.name);
+  scene.setTrader(meta.traderHere(game.state, Date.now()));
 
   let lastUi = 0;
   let lastFrame = performance.now();

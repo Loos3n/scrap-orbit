@@ -1,6 +1,6 @@
 import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
 import { CREW, PETS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
-import { GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Trip } from './expansion';
+import { CHALLENGES, GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Offer, type Trip } from './expansion';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -61,6 +61,11 @@ export interface GameState {
   skins: Partial<Record<PetId, string>>;
   /** Golden scrap: the rush ends at `until`; the next crate is due at `nextAt`. */
   golden: { until: number; nextAt: number };
+  /** The trading post: docked until `until` with these offers; the next visit is due at `nextAt`. */
+  trader: { until: number; nextAt: number; name: number; offers: Offer[] };
+  /** The challenge run in progress, if any, and the ones already beaten. */
+  challenge: string | null;
+  challengesDone: Set<string>;
   stats: {
     crates: number;
     boosts: number;
@@ -75,6 +80,7 @@ export interface GameState {
     events: number;
     bosses: number;
     golden?: number;
+    trades?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -118,6 +124,9 @@ interface SaveData {
   lootMiss?: number;
   skins?: Partial<Record<PetId, string>>;
   golden?: GameState['golden'];
+  trader?: GameState['trader'];
+  challenge?: string | null;
+  challengesDone?: string[];
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -169,6 +178,9 @@ export function newState(now: number): GameState {
     lootMiss: 0,
     skins: {},
     golden: { until: 0, nextAt: 0 },
+    trader: { until: 0, nextAt: 0, name: 0, offers: [] },
+    challenge: null,
+    challengesDone: new Set(),
     stats: {
       crates: 0,
       boosts: 0,
@@ -224,6 +236,9 @@ export function serialize(state: GameState): string {
     lootMiss: state.lootMiss,
     skins: { ...state.skins },
     golden: { ...state.golden },
+    trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
+    challenge: state.challenge,
+    challengesDone: [...state.challengesDone],
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -323,6 +338,24 @@ export function deserialize(json: string | null, now: number): GameState | null 
     if (typeof skin === 'string' && state.loot.has(skin)) state.skins[p.id] = skin;
   }
   if (data.golden) state.golden = { until: Number(data.golden.until) || 0, nextAt: Number(data.golden.nextAt) || 0 };
+  const t = data.trader;
+  if (t && typeof t === 'object') {
+    const kinds = new Set(['crystals', 'scrap', 'blueprint', 'recall', 'loot']);
+    state.trader = {
+      until: Number(t.until) || 0,
+      nextAt: Number(t.nextAt) || 0,
+      name: int(t.name),
+      offers: Array.isArray(t.offers)
+        ? t.offers
+            .filter((o) => o && kinds.has(o.kind) && (o.pay === 'scrap' || o.pay === 'crystals'))
+            .slice(0, 4)
+            .map((o) => ({ kind: o.kind, pay: o.pay, price: num(o.price).toString(), amount: num(o.amount).toString(), bought: !!o.bought }))
+        : [],
+    };
+  }
+  const challengeIds = new Set(CHALLENGES.map((c) => c.id));
+  for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);
+  state.challenge = typeof data.challenge === 'string' && challengeIds.has(data.challenge) && !state.challengesDone.has(data.challenge) ? data.challenge : null;
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
   state.boostUntil = Number(data.boostUntil) || 0;
   state.boostReadyAt = Number(data.boostReadyAt) || 0;

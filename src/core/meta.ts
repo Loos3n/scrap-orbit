@@ -26,14 +26,18 @@ import {
   type PetId,
   type StreakReward,
 } from './content';
-import { baseIncome, earn, income, researchProduct, tapValue } from './economy';
+import { baseIncome, claimableCores, earn, income, researchProduct, resetRun, tapValue } from './economy';
 import {
+  CHALLENGES,
+  CHALLENGE_CORES,
   GOLDEN,
   GRID,
   LOOT,
   LOOT_CHANCE,
   LOOT_PITY,
   MODULES,
+  TRADER,
+  TRADER_NAMES,
   TRIPS,
   TRIP_PER_LEVEL,
   TRIP_SLOTS,
@@ -43,7 +47,10 @@ import {
   moduleUnlocked,
   onTrip,
   tripMs,
+  type ChallengeDef,
   type ModuleId,
+  type Offer,
+  type OfferKind,
 } from './expansion';
 import { D, Decimal } from './num';
 import type { GameState, Mission } from './state';
@@ -605,4 +612,139 @@ export function chooseSkin(state: GameState, pet: PetId, skin: string | null): b
   if (!def || def.pet !== pet || !state.loot.has(skin)) return false;
   state.skins[pet] = skin;
   return true;
+}
+
+// ---------- Trading post ----------
+
+export function traderHere(state: GameState, now: number): boolean {
+  return now < state.trader.until;
+}
+
+/** Fills the trader's hold with three deals that make sense right now. */
+function makeOffers(state: GameState, now: number, rand: () => number): Offer[] {
+  const inc = Decimal.max(baseIncome(state), 1);
+  const missingBlueprint = MODULES.some((m) => m.blueprint && !state.blueprints.has(m.id));
+  const missingLoot = LOOT.some((l) => !state.loot.has(l.id));
+  const pool: Offer[] = [
+    { kind: 'crystals', pay: 'scrap', price: inc.mul(TRADER.crystalsPriceMin * 60).ceil().toString(), amount: String(TRADER.crystalsBought), bought: false },
+    { kind: 'scrap', pay: 'crystals', price: String(TRADER.scrapPrice), amount: inc.mul(TRADER.scrapMin * 60).floor().toString(), bought: false },
+  ];
+  if (missingBlueprint) pool.push({ kind: 'blueprint', pay: 'crystals', price: String(TRADER.blueprintPrice), amount: '0', bought: false });
+  if (state.trips.some((t) => t.endsAt > now)) pool.push({ kind: 'recall', pay: 'crystals', price: String(TRADER.recallPrice), amount: '0', bought: false });
+  if (missingLoot) pool.push({ kind: 'loot', pay: 'crystals', price: String(TRADER.lootPrice), amount: '0', bought: false });
+  // Shuffle and keep three.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 3);
+}
+
+/**
+ * Brings the trader in and sends them off. Returns 'arrived' or 'left' when that happens.
+ * The trader waits for the tutorial to finish.
+ */
+export function updateTrader(state: GameState, now: number, rand = Math.random): 'arrived' | 'left' | null {
+  const t = state.trader;
+  if (state.tutorial >= 0) return null;
+  if (t.until && now >= t.until) {
+    t.until = 0;
+    t.offers = [];
+    return 'left';
+  }
+  if (t.nextAt === 0) {
+    t.nextAt = now + TRADER.firstMin * 60_000;
+    return null;
+  }
+  if (t.until || now < t.nextAt) return null;
+  t.until = now + TRADER.stayMin * 60_000;
+  const [lo, hi] = TRADER.gap;
+  t.nextAt = t.until + (lo + rand() * (hi - lo)) * 60_000;
+  t.name = Math.floor(rand() * TRADER_NAMES.length);
+  t.offers = makeOffers(state, now, rand);
+  return 'arrived';
+}
+
+export type TradeResult = { kind: OfferKind; scrap?: Decimal; crystals?: number; blueprint?: string; loot?: string; recalled?: number };
+
+/** Takes one of the trader's deals, if it's still on the table and affordable. */
+export function trade(state: GameState, index: number, now: number, rand = Math.random): TradeResult | null {
+  const o = state.trader.offers[index];
+  if (!o || o.bought || !traderHere(state, now)) return null;
+  const price = D(o.price);
+  if (o.pay === 'scrap' ? state.scrap.lt(price) : state.crystals < price.toNumber()) return null;
+  const result: TradeResult = { kind: o.kind };
+  if (o.kind === 'blueprint') {
+    const missing = MODULES.filter((m) => m.blueprint && !state.blueprints.has(m.id));
+    if (!missing.length) return null;
+    result.blueprint = missing[Math.floor(rand() * missing.length)].id;
+    state.blueprints.add(result.blueprint);
+  } else if (o.kind === 'loot') {
+    const left = LOOT.filter((l) => !state.loot.has(l.id));
+    if (!left.length) return null;
+    result.loot = left[Math.floor(rand() * left.length)].id;
+    state.loot.add(result.loot);
+  } else if (o.kind === 'recall') {
+    const away = state.trips.filter((t) => t.endsAt > now);
+    if (!away.length) return null;
+    for (const t of away) t.endsAt = now;
+    result.recalled = away.length;
+  }
+  if (o.pay === 'scrap') state.scrap = state.scrap.sub(price);
+  else state.crystals -= price.toNumber();
+  if (o.kind === 'crystals') {
+    result.crystals = Number(o.amount);
+    addCrystals(state, result.crystals);
+  } else if (o.kind === 'scrap') {
+    result.scrap = D(o.amount);
+    earn(state, result.scrap);
+  }
+  o.bought = true;
+  state.stats.trades = (state.stats.trades ?? 0) + 1;
+  return result;
+}
+
+// ---------- Challenge runs ----------
+
+export function challengesOpen(state: GameState): boolean {
+  return state.cores >= CHALLENGE_CORES || state.challengesDone.size > 0 || state.challenge !== null;
+}
+
+/**
+ * Starts a challenge run: banks any Star Cores waiting (like relocating), then starts a fresh
+ * run under the challenge's rule. Returns the cores banked, or -1 if it can't start.
+ */
+export function startChallenge(state: GameState, id: string, now: number): number {
+  const def = CHALLENGES.find((c) => c.id === id);
+  if (!def || !challengesOpen(state) || state.challengesDone.has(id) || state.challenge) return -1;
+  const gained = claimableCores(state);
+  if (gained > 0) {
+    state.cores += gained;
+    state.stats.relocations++;
+  }
+  resetRun(state, now);
+  state.challenge = id;
+  return gained;
+}
+
+/** Gives up the challenge: its rule lifts and the run carries on as normal. */
+export function abandonChallenge(state: GameState): boolean {
+  if (!state.challenge) return false;
+  state.challenge = null;
+  return true;
+}
+
+/** Progress toward the running challenge's goal, 0 to 1. */
+export function challengeProgress(state: GameState): number {
+  const def = CHALLENGES.find((c) => c.id === state.challenge);
+  return def ? Math.min(1, state.lifetime.div(def.goal).toNumber()) : 0;
+}
+
+/** Completes the running challenge once its goal is reached. Returns the one beaten. */
+export function checkChallenge(state: GameState): ChallengeDef | null {
+  const def = CHALLENGES.find((c) => c.id === state.challenge);
+  if (!def || state.lifetime.lt(def.goal)) return null;
+  state.challengesDone.add(def.id);
+  state.challenge = null;
+  return def;
 }
