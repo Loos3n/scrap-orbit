@@ -1,5 +1,5 @@
 import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
-import { CREW, type CrewId, type EventKind, type MissionKind } from './content';
+import { CREW, TUTORIAL, type CrewId, type EventKind, type MissionKind, type TutorialStep } from './content';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -35,6 +35,8 @@ export interface GameState {
   nextEventAt: number;
   /** Tutorial step; -1 when finished. */
   tutorial: number;
+  /** One-time tips the player has already seen (after the tutorial). */
+  tips: Set<string>;
   stats: {
     crates: number;
     boosts: number;
@@ -75,6 +77,8 @@ interface SaveData {
   event?: GameState['event'];
   nextEventAt?: number;
   tutorial?: number;
+  tut?: string;
+  tips?: string[];
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -112,6 +116,7 @@ export function newState(now: number): GameState {
     event: null,
     nextEventAt: 0,
     tutorial: 0,
+    tips: new Set(),
     stats: {
       crates: 0,
       boosts: 0,
@@ -151,6 +156,8 @@ export function serialize(state: GameState): string {
     event: state.event,
     nextEventAt: state.nextEventAt,
     tutorial: state.tutorial,
+    tut: state.tutorial >= 0 ? TUTORIAL[state.tutorial] : undefined,
+    tips: [...state.tips],
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -200,8 +207,13 @@ export function deserialize(json: string | null, now: number): GameState | null 
   if (data.missions && Array.isArray(data.missions.daily)) state.missions = data.missions;
   state.event = data.event && typeof data.event.endsAt === 'number' ? data.event : null;
   state.nextEventAt = Number(data.nextEventAt) || 0;
-  // Players from before the tutorial existed already know the basics.
-  state.tutorial = typeof data.tutorial === 'number' ? data.tutorial : state.allTime.gt(0) ? -1 : 0;
+  // Players from before the tutorial existed already know the basics. Saves from before the
+  // tutorial was reworked store only a step number, so those restart it from the welcome.
+  const tut = TUTORIAL.indexOf(data.tut as TutorialStep);
+  if (tut >= 0) state.tutorial = tut;
+  else if (typeof data.tutorial === 'number') state.tutorial = data.tutorial < 0 ? -1 : 0;
+  else state.tutorial = state.allTime.gt(0) ? -1 : 0;
+  for (const id of strings(data.tips)) state.tips.add(id);
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
   state.boostUntil = Number(data.boostUntil) || 0;
   state.boostReadyAt = Number(data.boostReadyAt) || 0;

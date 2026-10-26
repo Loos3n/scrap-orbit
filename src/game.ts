@@ -1,6 +1,6 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { checkAchievements, type AchievementDef } from './core/achievements';
-import { ACHIEVEMENT_CRYSTALS, type CrewId, type EventKind } from './core/content';
+import { ACHIEVEMENT_CRYSTALS, TUTORIAL, type CrewId, type EventKind, type TutorialStep } from './core/content';
 import * as eco from './core/economy';
 import * as meta from './core/meta';
 import type { Decimal } from './core/num';
@@ -33,7 +33,7 @@ export type GameEvent =
   | { type: 'event'; kind: EventKind; phase: 'start' | 'end' }
   | { type: 'meteor'; value: Decimal }
   | { type: 'convoy'; crystals: number }
-  | { type: 'tutorial'; step: number }
+  | { type: 'tutorial'; step: TutorialStep | null }
   | { type: 'reset' };
 
 function storageGet(): string | null {
@@ -126,16 +126,27 @@ export class Game {
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
   }
 
+  /** The tutorial step the player is on, or null once it is finished or skipped. */
+  get tutorialStep(): TutorialStep | null {
+    return this.state.tutorial >= 0 ? (TUTORIAL[this.state.tutorial] ?? null) : null;
+  }
+
   /** Moves the tutorial on when the player has done what the current step asks. */
-  advanceTutorial(step: number): void {
-    if (this.state.tutorial !== step) return;
-    this.state.tutorial = step + 1;
-    this.emit({ type: 'tutorial', step: this.state.tutorial });
+  advanceTutorial(step: TutorialStep): void {
+    if (this.tutorialStep !== step) return;
+    if (this.state.tutorial >= TUTORIAL.length - 1) return this.endTutorial();
+    this.state.tutorial += 1;
+    this.emit({ type: 'tutorial', step: this.tutorialStep });
+  }
+
+  /** Marks a one-time tip as seen. */
+  seeTip(id: string): void {
+    this.state.tips.add(id);
   }
 
   endTutorial(): void {
     this.state.tutorial = -1;
-    this.emit({ type: 'tutorial', step: -1 });
+    this.emit({ type: 'tutorial', step: null });
   }
 
   trainCrew(id: CrewId): void {

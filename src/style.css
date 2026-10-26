@@ -743,22 +743,50 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .coach {
   --arrow: 50%;
   position: fixed;
-  z-index: 15;
-  padding: 12px 14px 10px;
-  border-radius: 16px;
+  z-index: 16;
+  padding: 10px 14px 10px;
+  border-radius: 18px;
   background: linear-gradient(#fff6e0, #ffe2a8);
   color: #2b1600;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.45), 0 0 0 3px rgb(255 181 71 / 0.4);
-  animation: rise 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.5), 0 0 0 3px rgb(255 181 71 / 0.45);
   pointer-events: auto;
+  transition: top 0.25s ease, left 0.25s ease;
 }
+.coach.pop { animation: rise 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
 .coach::after { content: ''; position: absolute; left: calc(var(--arrow) - 9px); width: 18px; height: 18px; background: #fff3d6; transform: rotate(45deg); border-radius: 3px; }
 .coach[data-place='below']::after { top: -8px; }
 .coach[data-place='above']::after { bottom: -8px; background: #ffe2a8; }
-.coach p { position: relative; z-index: 1; margin: 0 0 6px; font-weight: 500; font-size: 14.5px; line-height: 1.35; }
-.coach button { position: relative; z-index: 1; border: 0; padding: 4px 0; background: none; color: #8a5a1c; font-weight: 600; font-size: 12.5px; text-decoration: underline; }
-.coach-target { position: relative; z-index: 1; animation: coach-pulse 1.4s ease-in-out infinite !important; }
-@keyframes coach-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgb(255 209 102 / 0.8); } 50% { box-shadow: 0 0 0 8px rgb(255 209 102 / 0); } }
+.coach.centre::after { display: none; }
+.coach-head { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.coach-face { flex: none; width: 46px; height: 46px; border-radius: 50%; background: #20264f; box-shadow: 0 0 0 3px #fff, 0 3px 8px rgb(0 0 0 / 0.25); overflow: hidden; }
+.coach-face svg { display: block; width: 100%; height: 100%; }
+.coach-who { display: flex; flex-direction: column; line-height: 1.15; }
+.coach-who b { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.coach-who small { font-size: 11.5px; color: #8a5a1c; }
+.coach-count { margin-left: auto; padding: 2px 8px; border-radius: 99px; background: rgb(138 90 28 / 0.14); color: #8a5a1c; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.coach p { position: relative; z-index: 1; margin: 0 0 8px; font-weight: 500; font-size: 14.5px; line-height: 1.38; }
+.coach-bar { position: relative; z-index: 1; height: 8px; margin: 0 0 8px; border-radius: 99px; background: rgb(138 90 28 / 0.18); overflow: hidden; }
+.coach-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #ffb547, #ff8a4c); transition: width 0.2s ease; }
+.coach-actions { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.coach-skip { border: 0; padding: 4px 0; background: none; color: #8a5a1c; font-weight: 600; font-size: 12.5px; text-decoration: underline; }
+.coach-next { margin-left: auto; border: 0; padding: 8px 18px; border-radius: 99px; background: linear-gradient(#ffc766, #ff9a3c); color: #3a1c00; font-family: var(--font-display); font-weight: 600; font-size: 15px; box-shadow: 0 3px 0 #c76a1c; }
+.coach-next:active { transform: translateY(2px); box-shadow: 0 1px 0 #c76a1c; }
+/* Dims everything except the thing to touch. Taps pass straight through. */
+.coach-spot {
+  position: fixed;
+  z-index: 15;
+  border-radius: 14px;
+  box-shadow: 0 0 0 200vmax rgb(4 6 20 / 0.55), 0 0 0 3px rgb(255 209 102 / 0.9) inset;
+  pointer-events: none;
+  transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
+  animation: coach-pulse 1.4s ease-in-out infinite;
+}
+.coach-spot.chase { transition-duration: 0.1s; transition-timing-function: linear; }
+.coach-spot.round { border-radius: 50%; box-shadow: 0 0 0 200vmax rgb(4 6 20 / 0.35), 0 0 40px 6px rgb(255 209 102 / 0.35) inset; }
+@keyframes coach-pulse { 50% { outline: 3px solid rgb(255 209 102 / 0.35); outline-offset: 6px; } }
+/* The welcome and goodbye cards hold the screen until their button is pressed. */
+.coach-dim { position: fixed; inset: 0; z-index: 15; background: rgb(4 6 20 / 0.6); animation: fade-in 0.3s ease; }
+@keyframes fade-in { from { opacity: 0; } }
 
 /* Shown only if the game hits an error, so it can be reported. */
 .crash { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 50; padding: 10px 12px; border-radius: 12px; background: #3a0f1c; border: 1px solid var(--danger); color: #ffd6dc; font-size: 13px; line-height: 1.35; }

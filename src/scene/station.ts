@@ -555,6 +555,18 @@ export class StationScene {
     this.boosting = active;
   }
 
+  /** While the tutorial asks for a crate, a slow one is always drifting past. */
+  holdCrate = false;
+
+  /** Where the crate is on screen, so the tutorial can point at it. */
+  crateOnScreen(): { x: number; y: number } | null {
+    const c = this.ready ? this.drifts.find((d) => d.kind === 'crate') : undefined;
+    if (!c) return null;
+    const x = this.world.x + c.s.x * this.scale;
+    const y = this.world.y + c.s.y * this.scale;
+    return x > 0 && x < window.innerWidth ? { x, y } : null;
+  }
+
   private toWorld(sx: number, sy: number): { x: number; y: number } {
     return { x: (sx - this.world.x) / this.scale, y: (sy - this.world.y) / this.scale };
   }
@@ -566,12 +578,14 @@ export class StationScene {
     const reach: Record<DriftKind, number> = { debris: 0, crate: 34, meteor: 32, convoy: 46 };
     const hit = this.drifts.find((d) => d.kind !== 'debris' && Math.hypot(d.s.x - p.x, d.s.y - p.y) < reach[d.kind]);
     if (!hit) return null;
+    // Read the position before removing it: a destroyed sprite has none.
+    const { x, y } = hit.s;
     this.removeDrift(hit);
-    this.lastHit = { x: hit.s.x, y: hit.s.y };
+    this.lastHit = { x, y };
     const color = hit.kind === 'meteor' ? 0xff9a4c : hit.kind === 'convoy' ? 0x5cd6ff : COLORS.dock;
-    this.burst(hit.s.x, hit.s.y, color, hit.kind === 'meteor' ? 22 : 34, 1.7);
-    this.puff(hit.s.x, hit.s.y, color, 3, 0.6);
-    this.rings.push({ x: hit.s.x, y: hit.s.y, r: 10, life: 1, color, width: 3 });
+    this.burst(x, y, color, hit.kind === 'meteor' ? 22 : 34, 1.7);
+    this.puff(x, y, color, 3, 0.6);
+    this.rings.push({ x, y, r: 10, life: 1, color, width: 3 });
     this.shake = Math.max(this.shake, hit.kind === 'meteor' ? 4 : 6);
     return hit.kind as 'crate' | 'meteor' | 'convoy';
   }
@@ -807,6 +821,14 @@ export class StationScene {
     if (this.nextCrate <= 0) {
       this.spawnDrift('crate');
       this.nextCrate = rand(60, 110) / this.crateRate;
+    }
+    if (this.holdCrate && !this.drifts.some((d) => d.kind === 'crate')) {
+      this.spawnDrift('crate');
+      const c = this.drifts[this.drifts.length - 1];
+      // Start it just inside the view, below the station and clear of Mika's card.
+      c.vx *= 0.45;
+      c.vy = 0;
+      c.s.position.set(Math.sign(c.vx) * -WORLD * 0.4, rand(WORLD * 0.14, WORLD * 0.24));
     }
     if (this.event === 'meteors') {
       this.nextMeteor -= dt;

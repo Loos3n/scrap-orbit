@@ -1,4 +1,4 @@
-import { BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, RESEARCH, THEMES, type ResearchDef } from '../core/content';
+import { BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, RESEARCH, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type ResearchDef } from '../core/content';
 import { GENERATORS } from '../core/config';
 import * as eco from '../core/economy';
 import * as meta from '../core/meta';
@@ -297,68 +297,229 @@ export function renderEventBanner(game: Game): void {
 
 // ---------- Tutorial ----------
 
-const STEPS: { text: string; target: string; place: 'above' | 'below' }[] = [
-  { text: 'Tap the station to salvage scrap.', target: '#stage', place: 'below' },
-  { text: 'Nice haul! Build a Salvage Drone. It salvages for you, even while you are away.', target: '#gen-list .gen:first-child .buy', place: 'above' },
-  { text: 'Keep tapping and building. When an upgrade is ready, the Upgrades tab lights up.', target: '.tab[data-tab="upgrades"]', place: 'above' },
-  { text: 'Overdrive doubles everything for a short burst. Give it a tap!', target: '#boost', place: 'below' },
-  { text: 'Missions, crew, research and more unlock as you go. Have fun out there, captain!', target: '#missions-btn', place: 'below' },
+interface CoachStep {
+  /** What Mika says. */
+  text: string;
+  /** The element to point at; none means a centred card. */
+  target?: string;
+  /** The tab the target lives in; if it is closed, Mika points at the tab first. */
+  tab?: string;
+  /** A progress bar under the text, as [done, goal]. */
+  progress?: [number, number];
+  /** Label of a button that finishes the step, for steps there is nothing to do in. */
+  next?: string;
+}
+
+const TAB_NAMES: Record<string, string> = { build: 'Build', upgrades: 'Upgrades', crew: 'Crew', lab: 'Lab', cores: 'Cores', station: 'Station' };
+const MIKA = CREW.find((c) => c.id === 'mika')!;
+
+/** One-time tips for things that unlock after the tutorial. Each is seen once its tab is opened. */
+const TIPS: { id: string; tab: string; text: string; when: (game: Game) => boolean }[] = [
+  {
+    id: 'crew',
+    tab: 'crew',
+    text: "You've earned crystals! Spend 5 to recruit me in the Crew tab, and your drones will work twice as hard.",
+    when: (g) => g.state.crystals >= MIKA.cost && Object.values(g.state.crew).every((l) => l === 0),
+  },
+  {
+    id: 'lab',
+    tab: 'lab',
+    text: 'The Lab researches big upgrades over real time, even while you are away. Start a project!',
+    when: (g) => g.state.stats.upgradesBought >= 3 && g.state.research.done.size === 0 && !g.state.research.active,
+  },
+  {
+    id: 'cores',
+    tab: 'cores',
+    text: 'We can relocate to a new sector now! You start over, but Star Cores make everything faster for good. Take a look.',
+    when: (g) => eco.claimableCores(g.state) >= 1 && g.state.cores === 0,
+  },
 ];
 
+/**
+ * The first-time tutorial. Mika walks the player through tapping, building, upgrades,
+ * Overdrive, crates, missions and the panel, dimming everything but the thing to touch.
+ * Afterwards she pops up once for each system as it unlocks.
+ */
 export class Coach {
-  private shownFor = -2;
-  private highlighted: Element | null = null;
+  private shownKey = '';
+  /** Where the tutorial's crate is on screen, if the graphics are running. */
+  crate: (() => { x: number; y: number } | null) | null = null;
+
   constructor(private game: Game) {
-    $('coach-skip').addEventListener('click', () => this.game.endTutorial());
+    $('coach-face').innerHTML = portrait(MIKA);
+    $('coach-skip').addEventListener('click', () => {
+      const tip = this.tip();
+      if (tip) this.game.seeTip(tip.id);
+      else this.game.endTutorial();
+      this.render();
+    });
+    $('coach-next').addEventListener('click', () => {
+      const tip = this.tip();
+      if (tip) this.game.seeTip(tip.id);
+      else if (this.game.tutorialStep) this.game.advanceTutorial(this.game.tutorialStep);
+      this.render();
+    });
+    $('missions-btn').addEventListener('click', () => this.game.advanceTutorial('missions'));
+    const grabbed = () => this.game.advanceTutorial('panel');
+    $('grabber').addEventListener('pointerup', grabbed);
+    $('grabber').addEventListener('keydown', grabbed);
+  }
+
+  /** Called when the player opens a panel tab. */
+  tabOpened(tab: string): void {
+    if (tab === 'upgrades') this.game.advanceTutorial('upgradeTab');
+    const tip = this.tip();
+    if (tip && tip.tab === tab) this.game.seeTip(tip.id);
+  }
+
+  private tip() {
+    if (this.game.state.tutorial >= 0) return null;
+    return TIPS.find((t) => !this.game.state.tips.has(t.id) && t.when(this.game)) ?? null;
+  }
+
+  private step(): CoachStep | null {
+    const s = this.game.state;
+    switch (this.game.tutorialStep) {
+      case 'welcome':
+        return {
+          text: "Welcome aboard, captain! I'm Mika. This old station isn't much yet, but the orbit is full of scrap. Let me show you the ropes.",
+          next: "Let's go",
+        };
+      case 'tap':
+        return { text: 'Tap the station to salvage scrap. Tap, tap, tap!', target: '#stage', progress: [Math.min(s.taps, TUTORIAL_TAPS), TUTORIAL_TAPS] };
+      case 'drone': {
+        const cost = eco.costFor(GENERATORS[0], s.owned.drone, 1, eco.costDiscount(s)).toNumber();
+        if (s.scrap.lt(cost)) return { text: `A Salvage Drone costs ${Math.ceil(cost)} scrap. Keep tapping!`, target: '#stage', progress: [Math.floor(s.scrap.toNumber()), Math.ceil(cost)] };
+        return { text: 'Nice haul! Build a Salvage Drone. It salvages for you, even while you are away.', target: '#gen-list .gen:first-child .buy', tab: 'build' };
+      }
+      case 'more':
+        return {
+          text: 'Drones add up fast. Build a few more. Tip: hold the button down to keep buying.',
+          target: '#gen-list .gen:first-child .buy',
+          tab: 'build',
+          progress: [Math.min(s.owned.drone, TUTORIAL_DRONES), TUTORIAL_DRONES],
+        };
+      case 'upgradeTab':
+        if ($('upgrade-dot').hidden) return { text: "Keep tapping and building. I'll shout when an upgrade is ready." };
+        return { text: 'An upgrade is ready! Open the Upgrades tab.', target: '.tab[data-tab="upgrades"]' };
+      case 'upgrade':
+        return {
+          text: 'Upgrades make your machines much stronger. Install one!',
+          target: document.querySelector('#upgrade-list .upg.can .buy') ? '#upgrade-list .upg.can .buy' : '#upgrade-list .upg .buy',
+          tab: 'upgrades',
+        };
+      case 'boost':
+        return { text: 'Overdrive doubles everything for a short burst. Give it a tap!', target: '#boost' };
+      case 'crate': {
+        // Without graphics there is no crate to tap, so just explain it.
+        if (!this.crate) return { text: 'Salvage crates drift past now and then. Tap one before it floats away for a big bonus.', next: 'Will do' };
+        return { text: 'A salvage crate! Tap it before it floats away for a big bonus.', target: '@crate' };
+      }
+      case 'missions':
+        return { text: 'Your mission board has daily goals that pay crystals. Have a look.', target: '#missions-btn' };
+      case 'panel':
+        return { text: 'Tap this handle to make the panel bigger or smaller. You can drag it too.', target: '#grabber' };
+      case 'done':
+        return {
+          text: "That's the basics, captain! Crew, research and new sectors open up as you go. I'll pop by when there's something new.",
+          next: "Let's salvage!",
+        };
+      default:
+        return null;
+    }
   }
 
   render(): void {
-    const step = this.game.state.tutorial;
     const coach = $('coach');
-    const def = step >= 0 ? STEPS[step] : undefined;
-    // Step 2 waits until there is actually an upgrade to buy.
-    const waiting = step === 2 && $('upgrade-dot').hidden;
-    if (!def || waiting) {
-      coach.hidden = true;
-      this.highlight(null);
-      this.shownFor = -2;
+    const spot = $('coach-spot');
+    const dim = $('coach-dim');
+    const s = this.game.state;
+    const tip = this.tip();
+    let def = tip ? { text: tip.text, target: `.tab[data-tab="${tip.tab}"]`, next: 'Got it' } : this.step();
+    // Never sit on top of a pop-up such as the welcome-back screen.
+    const modalOpen = [...document.querySelectorAll<HTMLElement>('.modal')].some((m) => !m.hidden);
+    if (!def || modalOpen) {
+      coach.hidden = spot.hidden = dim.hidden = true;
+      this.shownKey = '';
       return;
     }
-    const target = document.querySelector(def.target);
-    if (!target) return;
-    if (this.shownFor !== step) {
-      this.shownFor = step;
-      $('coach-text').textContent = def.text;
-      setText($('coach-skip'), step === STEPS.length - 1 ? 'Got it' : 'Skip tutorial');
+    // A target inside a closed tab: point at the tab first.
+    if (def.tab && $(`tab-${def.tab}`).hidden) def = { text: `Open the ${TAB_NAMES[def.tab]} tab.`, target: `.tab[data-tab="${def.tab}"]` };
+    if (this.game.tutorialStep === 'upgradeTab' && !$('tab-upgrades').hidden) this.game.advanceTutorial('upgradeTab');
+
+    // '@crate' follows the drifting crate rather than an element.
+    const crate = def.target === '@crate' ? this.crate?.() : null;
+    const target = crate ? { getBoundingClientRect: () => ({ left: crate.x - 36, top: crate.y - 36, width: 72, height: 72 }) } : def.target && def.target !== '@crate' ? document.querySelector<HTMLElement>(def.target) : null;
+    const key = `${tip?.id ?? s.tutorial}|${def.text}`;
+    if (key !== this.shownKey) {
+      this.shownKey = key;
+      setText($('coach-text'), def.text);
+      const next = $('coach-next');
+      next.hidden = !def.next;
+      setText(next, def.next ?? '');
+      const skip = $('coach-skip');
+      // The last tutorial card and tips have only one button.
+      skip.hidden = !!tip || this.game.tutorialStep === 'done';
+      setText(skip, 'Skip tutorial');
+      setText($('coach-count'), tip ? 'New!' : `${s.tutorial + 1} / ${TUTORIAL.length}`);
       coach.hidden = false;
-      this.highlight(def.target === '#stage' ? null : target);
+      // Replays the pop-in animation for each new card.
+      coach.classList.remove('pop');
+      void coach.offsetWidth;
+      coach.classList.add('pop');
     }
-    const r = target.getBoundingClientRect();
-    const w = Math.min(300, window.innerWidth - 32);
-    const left = Math.max(16, Math.min(window.innerWidth - w - 16, r.left + r.width / 2 - w / 2));
+    const bar = $('coach-bar');
+    bar.hidden = !def.progress;
+    if (def.progress) (bar.firstElementChild as HTMLElement).style.width = `${Math.min(100, (def.progress[0] / def.progress[1]) * 100)}%`;
+
+    const w = Math.min(320, window.innerWidth - 32);
     coach.style.width = `${w}px`;
-    coach.style.left = `${left}px`;
-    coach.style.setProperty('--arrow', `${r.left + r.width / 2 - left}px`);
-    if (def.target === '#stage') {
-      coach.dataset.place = 'below';
-      coach.style.top = `${r.top + r.height * 0.78}px`;
-    } else if (def.place === 'below') {
-      coach.dataset.place = 'below';
-      coach.style.top = `${r.bottom + 12}px`;
-    } else {
-      coach.dataset.place = 'above';
-      coach.style.top = `${r.top - coach.offsetHeight - 12}px`;
+    const centred = !target || !def.target;
+    coach.classList.toggle('centre', centred);
+    // The welcome and goodbye cards dim the screen and wait for their button.
+    dim.hidden = !(centred && def.next && !tip);
+    if (centred) {
+      spot.hidden = true;
+      coach.style.left = `${(window.innerWidth - w) / 2}px`;
+      const stage = $('stage').getBoundingClientRect();
+      // A card with nothing to press waits at the top of the view, clear of the station.
+      const top = def.next ? stage.top + stage.height / 2 - coach.offsetHeight / 2 : stage.top + 8;
+      coach.style.top = `${Math.max(16, top)}px`;
+      delete coach.dataset.place;
+      return;
     }
-  }
-
-  private highlight(el: Element | null): void {
-    if (this.highlighted === el) return;
-    this.highlighted?.classList.remove('coach-target');
-    el?.classList.add('coach-target');
-    this.highlighted = el;
-  }
-
-  static get last(): number {
-    return STEPS.length - 1;
+    const r = target!.getBoundingClientRect();
+    const isStage = def.target === '#stage';
+    spot.classList.toggle('chase', !!crate);
+    // The stage gets a soft ring around the station; anything else gets a snug cut-out.
+    const pad = isStage ? 0 : 6;
+    const sr = isStage
+      ? (() => {
+          const d = Math.min(r.width, r.height) * 0.62;
+          return { left: r.left + r.width / 2 - d / 2, top: r.top + r.height / 2 - d / 2, width: d, height: d };
+        })()
+      : { left: r.left - pad, top: r.top - pad, width: r.width + pad * 2, height: r.height + pad * 2 };
+    spot.hidden = false;
+    spot.classList.toggle('round', isStage || !!crate);
+    spot.style.left = `${sr.left}px`;
+    spot.style.top = `${sr.top}px`;
+    spot.style.width = `${sr.width}px`;
+    spot.style.height = `${sr.height}px`;
+    if (crate) {
+      // The crate moves, so the card stays put at the top of the view.
+      const stage = $('stage').getBoundingClientRect();
+      coach.style.left = `${(window.innerWidth - w) / 2}px`;
+      coach.style.top = `${stage.top + 8}px`;
+      delete coach.dataset.place;
+      coach.classList.add('centre');
+      return;
+    }
+    const left = Math.max(16, Math.min(window.innerWidth - w - 16, sr.left + sr.width / 2 - w / 2));
+    coach.style.left = `${left}px`;
+    coach.style.setProperty('--arrow', `${Math.max(24, Math.min(w - 24, sr.left + sr.width / 2 - left))}px`);
+    const below = isStage || sr.top + sr.height / 2 < window.innerHeight / 2;
+    coach.dataset.place = below ? 'below' : 'above';
+    const top = below ? sr.top + sr.height + 14 : sr.top - coach.offsetHeight - 14;
+    coach.style.top = `${Math.max(8, Math.min(window.innerHeight - coach.offsetHeight - 8, top))}px`;
   }
 }

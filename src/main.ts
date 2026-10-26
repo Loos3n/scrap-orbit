@@ -4,7 +4,7 @@ import 'pixi.js/unsafe-eval';
 import './style.css';
 import { Sfx } from './audio';
 import { GENERATORS, UPGRADES } from './core/config';
-import { CREW, EVENTS, PAINTS, RESEARCH, THEMES } from './core/content';
+import { CREW, EVENTS, PAINTS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS } from './core/content';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { format } from './core/num';
@@ -62,6 +62,7 @@ async function boot(): Promise<void> {
     sceneEl.classList.add('fallback');
   }
   syncFocus();
+  if (scene.ready) ui.coach.crate = () => scene.crateOnScreen();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
   const syncPerks = () => scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate'));
@@ -72,9 +73,6 @@ async function boot(): Promise<void> {
     document.documentElement.style.setProperty('--theme-core', '#' + (THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0]).core.toString(16).padStart(6, '0'));
   };
   syncDecor();
-  ui.onTab = (tab) => {
-    if (tab === 'upgrades') game.advanceTutorial(2);
-  };
 
   const fmt = (v: Parameters<typeof format>[0]) => format(v, game.state.settings.numbers);
   const buzz = (ms: number) => {
@@ -97,7 +95,10 @@ async function boot(): Promise<void> {
         ui.flashRow(e.gen);
         sfx.buy();
         buzz(5);
-        if (e.gen === 'drone') game.advanceTutorial(1);
+        if (e.gen === 'drone') {
+          game.advanceTutorial('drone');
+          if (game.state.owned.drone >= TUTORIAL_DRONES) game.advanceTutorial('more');
+        }
         break;
       case 'milestone': {
         const g = GENERATORS.find((x) => x.id === e.gen)!;
@@ -110,12 +111,13 @@ async function boot(): Promise<void> {
       case 'upgrade': {
         const u = UPGRADES.find((x) => x.id === e.id)!;
         ui.toast(ICONS.star, `<b>${u.name}</b> installed`);
+        game.advanceTutorial('upgrade');
         scene.celebrate();
         sfx.upgrade();
         break;
       }
       case 'boost':
-        game.advanceTutorial(3);
+        game.advanceTutorial('boost');
         ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), `<b>Overdrive!</b> 2x everything for ${eco.boostDurationSec(game.state)} seconds`);
         sfx.boost();
         buzz(40);
@@ -125,6 +127,7 @@ async function boot(): Promise<void> {
         break;
       case 'bonus':
         ui.toast(ICONS.scrap, `<b>Salvage crate!</b> +${fmt(e.value)}`);
+        game.advanceTutorial('crate');
         sfx.crate();
         break;
       case 'achievement':
@@ -194,7 +197,8 @@ async function boot(): Promise<void> {
         sfx.crate();
         break;
       case 'tutorial':
-        if (e.step === 1) ui.showTab('build');
+        if (e.step === 'drone') ui.showTab('build');
+        if (e.step === 'upgrade') ui.showTab('upgrades');
         break;
     }
   });
@@ -223,7 +227,7 @@ async function boot(): Promise<void> {
       return;
     }
     const value = game.tap();
-    if (game.state.tutorial === 0 && game.state.taps >= 8) game.advanceTutorial(0);
+    if (game.state.taps >= TUTORIAL_TAPS) game.advanceTutorial('tap');
     scene.tapAt(x, y, `+${fmt(value)}`);
     ui.bumpScrap();
     sfx.tap();
@@ -242,6 +246,7 @@ async function boot(): Promise<void> {
     const t = performance.now();
     game.update(now);
     scene.setBoost(eco.boostActive(game.state, now));
+    scene.holdCrate = game.tutorialStep === 'crate';
     ui.renderHud((t - lastFrame) / 1000);
     lastFrame = t;
     if (now - lastUi > 100) {

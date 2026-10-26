@@ -76,12 +76,10 @@ export class UI {
   private lab: LabPanel;
   private decor: DecorPanel;
   readonly missions: MissionsPanel;
-  private coach: Coach;
+  readonly coach: Coach;
 
   /** Called when the sound or music setting changes, so main can update the synth. */
   onSoundChange: ((sound: boolean, music: boolean) => void) | null = null;
-  /** Called when the player opens a tab, for the tutorial. */
-  onTab: ((tab: string) => void) | null = null;
   /** Called after the player confirms a relocation. */
   onRelocate: (() => void) | null = null;
 
@@ -154,7 +152,7 @@ export class UI {
           t.setAttribute('aria-selected', String(on));
           $(`tab-${t.dataset.tab}`).hidden = !on;
         });
-        this.onTab?.(tab.dataset.tab!);
+        this.coach.tabOpened(tab.dataset.tab!);
         this.render();
       }),
     );

@@ -164,9 +164,20 @@
         <ul id="weekly-list" class="mission-list"></ul>
       </div>
     </div>
-    <div id="coach" class="coach" hidden>
+    <div id="coach-dim" class="coach-dim" hidden></div>
+    <div id="coach-spot" class="coach-spot" hidden></div>
+    <div id="coach" class="coach" role="status" hidden>
+      <div class="coach-head">
+        <span id="coach-face" class="coach-face"></span>
+        <div class="coach-who"><b>Mika</b><small>Drone Wrangler</small></div>
+        <span id="coach-count" class="coach-count"></span>
+      </div>
       <p id="coach-text"></p>
-      <button id="coach-skip" type="button">Skip tutorial</button>
+      <div id="coach-bar" class="coach-bar" hidden><i></i></div>
+      <div class="coach-actions">
+        <button id="coach-skip" class="coach-skip" type="button">Skip tutorial</button>
+        <button id="coach-next" class="coach-next" type="button" hidden>Next</button>
+      </div>
     </div>
     <div id="toasts" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>

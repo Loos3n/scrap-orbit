@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CREW, RESEARCH } from './content';
+import { CREW, RESEARCH, TUTORIAL } from './content';
 import { baseIncome, buyGenerator, costFor, genById, tapValue } from './economy';
 import {
   addCrystals,
@@ -172,5 +172,19 @@ describe('save v3', () => {
     const s = deserialize(old, NOW)!;
     expect(s.settings.numbers).toBe('scientific');
     expect(s.tutorial).toBe(-1);
+  });
+
+  it('saves the tutorial step by name and remembers seen tips', () => {
+    const s = newState(NOW);
+    s.tutorial = TUTORIAL.indexOf('boost');
+    s.tips.add('crew');
+    const back = deserialize(serialize(s), NOW)!;
+    expect(TUTORIAL[back.tutorial]).toBe('boost');
+    expect(back.tips.has('crew')).toBe(true);
+    // A save from the first tutorial only has a step number, so it starts again.
+    const old = JSON.parse(serialize(s));
+    delete old.tut;
+    old.tutorial = 3;
+    expect(deserialize(JSON.stringify(old), NOW)!.tutorial).toBe(0);
   });
 });

@@ -22,7 +22,8 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
 - Decorations: six sky themes and five hull paints
-- Ambient generative music, a short first-run tutorial, three number formats and a full stats screen
+- Ambient generative music, three number formats and a full stats screen
+- A hands-on first-run tutorial with Mika, the drone wrangler: every step waits for the player to do it, with a spotlight and progress bar, plus one-time tips as the crew, lab and relocation unlock
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
 - Synthesized sound effects (taps climb a musical scale), with a mute button
 - Salvage crates that drift past now and then; tap one for a bonus

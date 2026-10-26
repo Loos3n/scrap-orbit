@@ -183,3 +183,11 @@ export const FLARE_TAP_MULT = 5;
 export const METEOR_INCOME_SEC = 8;
 export const CONVOY_CRYSTALS = 3;
 export const ACHIEVEMENT_CRYSTALS = 3;
+
+/** The first-time tutorial, in order. The save stores the step's id, so steps can be added later. */
+export const TUTORIAL = ['welcome', 'tap', 'drone', 'more', 'upgradeTab', 'upgrade', 'boost', 'crate', 'missions', 'panel', 'done'] as const;
+export type TutorialStep = (typeof TUTORIAL)[number];
+/** Taps asked for in the first tutorial step. */
+export const TUTORIAL_TAPS = 8;
+/** Drones asked for in the "build a few more" step. */
+export const TUTORIAL_DRONES = 5;
