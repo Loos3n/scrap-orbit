@@ -1,13 +1,15 @@
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
-import { CREW, RESEARCH, sectorFor } from '../core/content';
+import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
+import { LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { holdToRepeat, makePanelDraggable } from './gestures';
+import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
-import { Coach, CrewPanel, DecorPanel, LabPanel, LogPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
+import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -79,12 +81,11 @@ export class UI {
   readonly missions: MissionsPanel;
   readonly coach: Coach;
   private pets: PetPanel;
-  private log: LogPanel;
   private modules: ModulePanel;
   private trips: TripPanel;
   private lootShelf: LootShelf;
+  private info: InfoSheet;
   readonly streak: StreakModal;
-  private logSince: number | null = null;
 
   /** Called when the sound or music setting changes, so main can update the synth. */
   onSoundChange: ((sound: boolean, music: boolean) => void) | null = null;
@@ -107,10 +108,11 @@ export class UI {
     this.missions = new MissionsPanel(game, this.fmt);
     this.coach = new Coach(game);
     this.pets = new PetPanel(game);
-    this.log = new LogPanel(game);
     this.modules = new ModulePanel(game);
     this.trips = new TripPanel(game, this.fmt);
     this.lootShelf = new LootShelf(game);
+    this.info = new InfoSheet(game, this.fmt);
+    $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
@@ -124,7 +126,7 @@ export class UI {
       li.className = 'gen';
       li.style.setProperty('--c', hex(g.color));
       li.innerHTML = `
-        <div class="gen-icon">${GEN_ICONS[g.id]}<span class="gen-count">0</span></div>
+        <button class="gen-icon" type="button" aria-label="About ${g.name}">${GEN_ICONS[g.id]}<span class="gen-count">0</span><span class="info-dot">i</span></button>
         <div class="gen-info">
           <div class="gen-name"></div>
           <div class="gen-rate"></div>
@@ -145,6 +147,7 @@ export class UI {
         btnCost: li.querySelector('.buy-cost .n')!,
       };
       holdToRepeat(row.btn, () => this.game.buy(g.id));
+      li.querySelector('.gen-icon')!.addEventListener('click', () => this.info.open({ kind: 'machine', id: g.id }));
       list.appendChild(li);
       this.rows.set(g.id, row);
     }
@@ -329,9 +332,6 @@ export class UI {
     const tripsReady = this.trips.anyReady();
     $('trips-dot').hidden = !tripsReady;
     $('crew-dot').hidden = !this.crew.anyAffordable() && !petsReady && !tripsReady;
-    const unread = s.storySeen < s.story.length;
-    $('log-dot').hidden = !unread;
-    $('station-dot').hidden = !unread;
     $('lab-dot').hidden = !this.lab.idle();
     if (!$('tab-crew').hidden) {
       if (!$('seg-crewlist').hidden) this.crew.render();
@@ -343,22 +343,14 @@ export class UI {
       if (!$('seg-decor').hidden) this.decor.render();
       if (!$('seg-modules').hidden) this.modules.render();
       if (!$('seg-awards').hidden) this.lootShelf.render();
-      if (!$('seg-log').hidden) {
-        // New entries stay highlighted for as long as the log stays open.
-        if (this.logSince === null) this.logSince = s.storySeen;
-        this.log.render(this.logSince);
-        this.game.readStory();
-      } else {
-        this.logSince = null;
-      }
       this.renderStats(now);
     }
-    if ($('tab-station').hidden) this.logSince = null;
     this.missions.render();
     renderEventBanner(this.game);
     renderBossBanner(this.game);
     renderGoldenBanner(this.game);
     this.coach.render();
+    this.info.render();
   }
 
   private renderCores(): void {
@@ -558,6 +550,16 @@ export class UI {
         ['Research finished', `${s.research.done.size} of ${RESEARCH.length}`],
         ['Achievements', `${s.achievements.size} of ${ACHIEVEMENTS.length}`],
         ['Star Cores', n(s.cores)],
+        ['Boss loot found', `${s.loot.size} of ${LOOT.length}`],
+        ['Station rooms built', `${s.modules.filter(Boolean).length} of ${s.modules.length}`],
+        ['Blueprints found', `${s.blueprints.size} of ${MODULES.filter((m) => m.blueprint).length}`],
+        ['Pets adopted', `${s.pets.owned.size} of ${PETS.length}`],
+      ]],
+      ['Adventures', [
+        ['Boss wrecks broken', n(s.stats.bosses)],
+        ['Golden rushes', n(s.stats.golden ?? 0)],
+        ['Crew on trips now', n(s.trips.length)],
+        ['Login streak', `${n(s.login.streak)} days (best ${n(s.login.best)})`],
       ]],
     ];
     const html = sections.map(([title, rows]) => `<dt class="stats-head">${title}</dt><dd class="stats-head"></dd>` + rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')).join('');

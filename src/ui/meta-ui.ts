@@ -1,4 +1,4 @@
-import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STORY, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
+import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
 import { GENERATORS } from '../core/config';
 import { LOOT } from '../core/expansion';
 import * as eco from '../core/economy';
@@ -396,39 +396,6 @@ export class PetPanel {
     }).join('');
   }
 }
-
-// ---------- Story log ----------
-
-export class LogPanel {
-  private key = '';
-  constructor(private game: Game) {}
-
-  /** `since` is how many entries had been read when the log was opened; newer ones glow. */
-  render(since: number): void {
-    const s = this.game.state;
-    const key = `${s.story.length}|${since}`;
-    if (key === this.key) return;
-    this.key = key;
-    // Newest first.
-    const html = s.story
-      .map((id, i) => {
-        const e = STORY.find((x) => x.id === id);
-        if (!e) return '';
-        const who = CREW.find((c) => c.id === e.who)!;
-        return `<li class="log-entry${i >= since ? ' new' : ''}">
-          <div class="log-face">${portrait(who)}</div>
-          <div><div class="log-head"><b>${esc(e.title)}</b><small>${esc(who.name)}, ${esc(who.role)} · entry ${i + 1}</small></div><p>${esc(e.text)}</p></div>
-        </li>`;
-      })
-      .reverse()
-      .join('');
-    $('log-list').innerHTML = html;
-    const left = STORY.length - s.story.length;
-    setText($('log-more'), left > 0 ? `${left} more ${left === 1 ? 'entry' : 'entries'} to uncover as the station grows.` : 'That is every entry so far. The story continues in a future update.');
-  }
-}
-
-// ---------- Daily streak ----------
 
 export class StreakModal {
   constructor(private game: Game, private fmt: Fmt) {

@@ -4,7 +4,7 @@ import 'pixi.js/unsafe-eval';
 import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
-import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, STORY, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
+import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
 import { GOLDEN, LOOT, TRIPS, moduleDef } from './core/expansion';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
@@ -345,12 +345,6 @@ async function boot(): Promise<void> {
         scene.setPet(game.state.pets.active, petTint());
         sfx.upgrade();
         break;
-      case 'story': {
-        const entry = STORY.find((x) => x.id === e.id)!;
-        const who = CREW.find((c) => c.id === entry.who)!;
-        ui.toast(ICONS.missions.replace('currentColor', '#4fe3c1'), `<b>New log entry</b> from ${who.name}: ${entry.title}`);
-        break;
-      }
       case 'tutorial':
         if (e.step === 'drone') ui.showTab('build');
         if (e.step === 'upgrade') ui.showTab('upgrades');

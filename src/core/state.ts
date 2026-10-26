@@ -59,9 +59,6 @@ export interface GameState {
   skins: Partial<Record<PetId, string>>;
   /** Golden scrap: the rush ends at `until`; the next crate is due at `nextAt`. */
   golden: { until: number; nextAt: number };
-  /** Story log entries unlocked, in order, and how many of them have been read. */
-  story: string[];
-  storySeen: number;
   stats: {
     crates: number;
     boosts: number;
@@ -118,8 +115,6 @@ interface SaveData {
   lootMiss?: number;
   skins?: Partial<Record<PetId, string>>;
   golden?: GameState['golden'];
-  story?: string[];
-  storySeen?: number;
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -170,8 +165,6 @@ export function newState(now: number): GameState {
     lootMiss: 0,
     skins: {},
     golden: { until: 0, nextAt: 0 },
-    story: [],
-    storySeen: 0,
     stats: {
       crates: 0,
       boosts: 0,
@@ -226,8 +219,6 @@ export function serialize(state: GameState): string {
     lootMiss: state.lootMiss,
     skins: { ...state.skins },
     golden: { ...state.golden },
-    story: [...state.story],
-    storySeen: state.storySeen,
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -307,8 +298,6 @@ export function deserialize(json: string | null, now: number): GameState | null 
     if (typeof skin === 'string' && state.loot.has(skin)) state.skins[p.id] = skin;
   }
   if (data.golden) state.golden = { until: Number(data.golden.until) || 0, nextAt: Number(data.golden.nextAt) || 0 };
-  state.story = strings(data.story);
-  state.storySeen = Math.min(int(data.storySeen), state.story.length);
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
   state.boostUntil = Number(data.boostUntil) || 0;
   state.boostReadyAt = Number(data.boostReadyAt) || 0;

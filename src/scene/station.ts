@@ -171,6 +171,9 @@ export class StationScene {
   private nextComet = rand(6, 14);
   private nextWeld = 0;
   private nextEmber = 0;
+  private nextSteam = 1;
+  private nextTraffic = rand(4, 9);
+  private traffic: { s: Sprite; light: Sprite; vx: number; vy: number; life: number; blink: number }[] = [];
   private scale = 1;
   private skyKey = '';
   private baseScale = 1;
@@ -1218,6 +1221,20 @@ export class StationScene {
       }
     }
 
+    // Smelters vent a little heat now and then.
+    const pods = this.pods.length;
+    if (pods) {
+      this.nextSteam -= dt;
+      if (this.nextSteam <= 0) {
+        const p = this.pods[Math.floor(Math.random() * pods)];
+        const a = p.rotation;
+        this.puff(p.x + Math.cos(a) * 12, p.y + Math.sin(a) * 12, Math.random() < 0.5 ? 0xffb070 : 0xffe0c0, 1.1, rand(0.5, 0.8));
+        this.nextSteam = rand(0.6, 1.8) / Math.sqrt(pods);
+      }
+    }
+
+    this.updateTraffic(dt);
+
     // Drones dart around in a loose swarm, leaving short trails.
     for (const o of this.drones) {
       o.angle += o.speed * dt;
@@ -1225,6 +1242,41 @@ export class StationScene {
       o.s.position.set(Math.cos(o.angle) * r, Math.sin(o.angle) * r);
       o.s.rotation = o.angle + (o.speed > 0 ? Math.PI / 2 : -Math.PI / 2);
       this.trail(g, r, o.angle, o.speed > 0 ? -1 : 1, 0.3, COLORS.drone, 1.6);
+    }
+  }
+
+  /** Tiny far-off ships cross the sky now and then, nav lights blinking. */
+  private updateTraffic(dt: number): void {
+    this.nextTraffic -= dt;
+    if (this.nextTraffic <= 0 && this.traffic.length < 3 && !this.reducedMotion) {
+      this.nextTraffic = rand(7, 16);
+      const left = Math.random() < 0.5;
+      const y = rand(-320, 320);
+      const speed = rand(28, 50);
+      const s = this.sprite(this.tex.hauler, this.farLayer, left ? -520 : 520, y);
+      s.scale.set(rand(0.22, 0.32));
+      s.alpha = 0.55;
+      s.tint = 0x9fb0d8;
+      const vy = rand(-6, 6);
+      s.rotation = Math.atan2(vy, left ? speed : -speed) + Math.PI / 2;
+      const light = this.sprite(this.tex.glow, this.farLayer, s.x, s.y);
+      light.blendMode = 'add';
+      light.tint = Math.random() < 0.5 ? 0xff5d6c : 0x7cf7c8;
+      this.traffic.push({ s, light, vx: left ? speed : -speed, vy, life: 1040 / speed, blink: rand(0, TAU) });
+    }
+    for (let i = this.traffic.length - 1; i >= 0; i--) {
+      const o = this.traffic[i];
+      o.life -= dt;
+      o.s.x += o.vx * dt;
+      o.s.y += o.vy * dt;
+      o.light.position.set(o.s.x, o.s.y);
+      o.blink += dt * 5;
+      o.light.scale.set(Math.sin(o.blink) > 0.6 ? 0.18 : 0.04);
+      if (o.life <= 0) {
+        o.s.destroy();
+        o.light.destroy();
+        this.traffic.splice(i, 1);
+      }
     }
   }
 

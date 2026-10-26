@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS, STORY } from './content';
+import { BOSS } from './content';
 import { baseIncome, tapValue } from './economy';
-import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss, updateStory } from './meta';
+import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss } from './meta';
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
 import { GOLDEN, LOOT_PITY, TRIPS, bonuses, moduleYield, tripMs } from './expansion';
@@ -120,21 +120,6 @@ describe('boss wrecks', () => {
     hitBoss(s, D(5), NOW);
     const back = deserialize(serialize(s), NOW)!;
     expect(back.boss!.hp).toBe(s.boss!.hp);
-  });
-});
-
-describe('story log', () => {
-  it('unlocks entries in order and remembers them', () => {
-    const s = newState(NOW);
-    expect(updateStory(s)).toEqual([]);
-    s.taps = 1;
-    s.owned.hauler = 1; // unlocks 'cargo', but only after 'stamp'
-    expect(updateStory(s)).toEqual(['arrival']);
-    s.owned.drone = 10;
-    expect(updateStory(s)).toEqual(['stamp', 'cargo']);
-    const back = deserialize(serialize(s), NOW)!;
-    expect(back.story).toEqual(['arrival', 'stamp', 'cargo']);
-    expect(STORY.length).toBeGreaterThanOrEqual(12);
   });
 });
 

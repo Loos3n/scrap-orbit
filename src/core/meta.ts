@@ -14,7 +14,6 @@ import {
   PAINTS,
   PETS,
   RESEARCH,
-  STORY,
   STREAK_REWARDS,
   THEMES,
   WEEKLY_REWARD,
@@ -503,37 +502,6 @@ export function bossHealth(state: GameState): number {
   const b = state.boss;
   if (!b) return 0;
   return Math.max(0, Math.min(1, D(b.hp).div(b.max).toNumber()));
-}
-
-// ---------- Story log ----------
-
-const STORY_UNLOCKS: Record<string, (s: GameState) => boolean> = {
-  arrival: (s) => s.taps >= 1,
-  stamp: (s) => s.owned.drone >= 10,
-  cargo: (s) => s.owned.hauler >= 1,
-  blackbox: (s) => s.stats.bosses >= 1,
-  inside: (s) => s.owned.smelter >= 1,
-  fleet: (s) => s.owned.fabricator >= 1,
-  maps: (s) => s.stats.crates >= 10,
-  three: (s) => s.stats.bosses >= 3,
-  pilotless: (s) => s.owned.dock >= 1,
-  moving: (s) => s.stats.relocations >= 1,
-  signal: (s) => s.owned.gate >= 1,
-  backwards: (s) => s.stats.bosses >= 10,
-};
-
-/** Unlocks log entries strictly in order, so the story always reads front to back. */
-export function updateStory(state: GameState): string[] {
-  const added: string[] = [];
-  for (let next = STORY[state.story.length]; next && STORY_UNLOCKS[next.id](state); next = STORY[state.story.length]) {
-    state.story.push(next.id);
-    added.push(next.id);
-  }
-  return added;
-}
-
-export function storyUnread(state: GameState): number {
-  return state.story.length - state.storySeen;
 }
 
 // ---------- Station modules ----------

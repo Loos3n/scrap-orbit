@@ -51,7 +51,6 @@ export type GameEvent =
   | { type: 'tripHome'; reward: meta.TripReward }
   | { type: 'skin'; pet: PetId }
   | { type: 'bossHit'; value: Decimal }
-  | { type: 'story'; id: string }
   | { type: 'reset' };
 
 function storageGet(): string | null {
@@ -102,7 +101,6 @@ export class Game {
     this.collectOffline(Date.now());
     meta.refreshMissions(this.state, Date.now());
     this.readyMissions = meta.claimableMissions(this.state);
-    meta.updateStory(this.state);
   }
 
   /** Advances the game to `now`. Called every animation frame. */
@@ -160,7 +158,6 @@ export class Game {
     }
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
-    for (const id of meta.updateStory(s)) this.emit({ type: 'story', id });
     // A new day's reward waits until the tutorial is over, then is offered once per day.
     if (s.tutorial < 0 && meta.checkLogin(s, now) && this.streakShown !== s.login.day) {
       this.streakShown = s.login.day;
@@ -223,10 +220,6 @@ export class Game {
 
   chooseSkin(pet: PetId, skin: string | null): void {
     if (meta.chooseSkin(this.state, pet, skin)) this.emit({ type: 'skin', pet });
-  }
-
-  readStory(): void {
-    this.state.storySeen = this.state.story.length;
   }
 
   /** The tutorial step the player is on, or null once it is finished or skipped. */

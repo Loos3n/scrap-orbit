@@ -20,7 +20,7 @@
           </div>
           <div class="readout-text">
             <div id="scrap" class="scrap">0</div>
-            <div class="rate"><span id="rate">0</span> / sec<span class="crystal-pill"><span data-icon="crystal"></span><span id="crystals">0</span></span></div>
+            <div id="rate-btn" class="rate" role="button" tabindex="0" aria-label="Income breakdown"><span id="rate">0</span> / sec<span class="info-dot">i</span><span class="crystal-pill"><span data-icon="crystal"></span><span id="crystals">0</span></span></div>
           </div>
         </div>
         <div class="hud-actions">
@@ -138,7 +138,6 @@
           <div class="segments" role="tablist" aria-label="Station sections">
             <button type="button" data-seg="modules" aria-selected="true">Rooms</button>
             <button type="button" data-seg="decor" aria-selected="false">Decor</button>
-            <button type="button" data-seg="log" aria-selected="false">Log<span id="log-dot" class="dot" hidden></span></button>
             <button type="button" data-seg="awards" aria-selected="false">Awards</button>
             <button type="button" data-seg="stats" aria-selected="false">Stats</button>
             <button type="button" data-seg="settings" aria-selected="false">Settings</button>
@@ -154,10 +153,6 @@
             <ul id="theme-list" class="decor-grid"></ul>
             <h3 class="section-title">Hull paint</h3>
             <ul id="paint-list" class="decor-grid"></ul>
-          </div>
-          <div id="seg-log" class="seg" hidden>
-            <ol id="log-list" class="log-list"></ol>
-            <p id="log-more" class="hint"></p>
           </div>
           <div id="seg-awards" class="seg" hidden>
             <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
@@ -202,6 +197,12 @@
         <div id="modal-amount" class="modal-amount">+0</div>
         <p id="modal-time" class="modal-time"></p>
         <button id="modal-ok" class="primary" type="button">Collect</button>
+      </div>
+    </div>
+    <div id="info" class="modal" hidden>
+      <div class="modal-card info-card" role="dialog" aria-modal="true">
+        <button id="info-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div id="info-body"></div>
       </div>
     </div>
     <div id="missions" class="modal" hidden>

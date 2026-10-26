@@ -252,34 +252,6 @@ export const BOSS = {
   crystals: 10,
 };
 
-// ---------- Story log ----------
-
-export interface StoryEntry {
-  id: string;
-  who: CrewId;
-  title: string;
-  text: string;
-}
-
-/**
- * The crew's log. Entries unlock in order as the station grows; together they tell the
- * mystery of the Hollow Fleet, whose wrecks fill the orbit. Unlock rules live in meta.ts.
- */
-export const STORY: readonly StoryEntry[] = [
-  { id: 'arrival', who: 'mika', title: 'Day one', text: "Salvage licence signed, captain. This orbit is a graveyard: hundreds of wrecks and no one to claim them. Odd thing, though. Every hull I've scanned has the same scorch marks." },
-  { id: 'stamp', who: 'mika', title: 'A hollow circle', text: 'The drones pulled in a hull plate stamped with a hollow circle. No registry in the galaxy lists it. I pinned it to the wall of the mess hall.' },
-  { id: 'cargo', who: 'bolt', title: 'Emptied, not smashed', text: "Towed in half a freighter today. Its cargo bay was empty, but tidily so. Somebody unloaded it before it died. Pirates don't stack crates neatly." },
-  { id: 'blackbox', who: 'bolt', title: 'The first black box', text: "That big wreck had a flight recorder. Last words, crackly: 'They came out of the quiet.' Then nothing. I've listened forty times." },
-  { id: 'inside', who: 'ash', title: 'Burned from the inside', text: 'Melted down a reactor housing. The scarring runs outward, like something burned its way out rather than in. I double-checked. Triple-checked.' },
-  { id: 'fleet', who: 'juno', title: 'The Hollow Fleet', text: "I printed a copy of the circle stamp and ran it past the archives. It's a fleet mark. Old spacers called them the Hollow Fleet, and nobody ever saw one up close." },
-  { id: 'maps', who: 'mika', title: 'Every map, one place', text: "The crates are full of star charts. Different ships, different years, and every chart has the same patch of empty sky circled in red." },
-  { id: 'three', who: 'bolt', title: 'Same words, again', text: "Third black box. Same last words, 'out of the quiet.' And this time, coordinates. You can guess where: that empty patch of sky." },
-  { id: 'pilotless', who: 'hex', title: 'Nobody aboard', text: 'A ship docked itself tonight. No pilot, no crew, engines cold. Its log was blank except for a countdown that had already reached zero.' },
-  { id: 'moving', who: 'mika', title: 'New sector, old marks', text: "We jumped sectors and the scorch marks were waiting for us. The Hollow Fleet passed through here too. Either we're following them, or they're following us." },
-  { id: 'signal', who: 'orin', title: 'A voice in the gate', text: "The Warp Gate caught a signal from the empty patch. It's a voice, very faint, reading out our station's call sign. Captain... it sounds like you." },
-  { id: 'backwards', who: 'nova', title: 'Running backwards', text: "I lined up all ten black boxes by timestamp. They don't run forwards. The newest wreck is the oldest. Whatever the Hollow Fleet is, it hasn't happened yet. To be continued." },
-];
-
 // ---------- Sectors ----------
 
 export interface SectorDef {

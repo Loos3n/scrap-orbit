@@ -29,9 +29,10 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Expeditions: send recruited crew on 15-minute to 8-hour trips for crystals, scrap and module blueprints (their machine loses their bonus while they are away)
 - Station rooms: build modules on a 3x3 grid with crystals (reactor, hangars, solar arrays and blueprint rooms); layout matters, since the reactor powers its neighbours and rooms like hangars, corners or the centre get extra. Rooms survive relocation and refund in full when taken down
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
-- Story log: 12 entries from the crew, unlocked as the station grows, telling the mystery of the Hollow Fleet
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
-- Ambient generative music, three number formats and a full stats screen
+- Ambient generative music, three number formats and a full stats screen (collection and adventure records too)
+- Info sheets: tap a machine's icon for its story, output, share of income and every multiplier; tap the income line for a full breakdown of where scrap comes from
+- Scene life: smelters vent heat, fabricators weld, and far-off ships cross the sky with blinking nav lights
 - A hands-on first-run tutorial with Mika, the drone wrangler: every step waits for the player to do it, with a spotlight and progress bar, plus one-time tips as the crew, lab and relocation unlock
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
 - Synthesized sound effects: FM bells and mallets, filtered noise for impacts and whooshes, a shared space echo and a compressor (taps climb a musical scale), with a mute button
