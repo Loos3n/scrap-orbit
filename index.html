@@ -53,6 +53,18 @@
           <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station</button>
         </nav>
         <div id="tab-build" class="tab-body">
+          <ul class="list claw-list">
+            <li id="claw-row" class="gen claw">
+              <div class="gen-icon"><span data-icon="claw"></span><span id="claw-level" class="gen-count">0</span></div>
+              <div class="gen-info">
+                <div class="gen-name">Salvage Claw</div>
+                <div id="claw-rate" class="gen-rate"></div>
+                <div class="bar"><i id="claw-bar"></i></div>
+                <div id="claw-next" class="milestone"></div>
+              </div>
+              <button id="claw-buy" class="buy" type="button"><span class="buy-count">Level up</span><span class="buy-cost"><span data-icon="scrap"></span><span id="claw-cost" class="n"></span></span></button>
+            </li>
+          </ul>
           <div class="buy-modes" role="radiogroup" aria-label="Buy amount">
             <button type="button" data-mode="1" aria-checked="true" role="radio">x1</button>
             <button type="button" data-mode="10" aria-checked="false" role="radio">x10</button>

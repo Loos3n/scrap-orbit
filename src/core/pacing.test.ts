@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { GENERATORS, UPGRADES } from './config';
 import {
   baseIncome,
+  buyClaw,
   buyGenerator,
   buyUpgrade,
   claimableCores,
+  clawCost,
   costFor,
   relocate,
   tap,
@@ -26,7 +28,7 @@ function valueOf(state: GameState): number {
 type Option = { label: string; cost: number; apply: (s: GameState) => void };
 
 function options(state: GameState): Option[] {
-  const out: Option[] = [];
+  const out: Option[] = [{ label: 'Salvage Claw', cost: clawCost(state), apply: (s) => buyClaw(s) }];
   for (const g of GENERATORS) {
     out.push({ label: g.name, cost: costFor(g, state.owned[g.id], 1).toNumber(), apply: (s) => buyGenerator(s, g.id, 1) });
   }

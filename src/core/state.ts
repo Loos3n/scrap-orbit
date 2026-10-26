@@ -24,6 +24,8 @@ export interface GameState {
   cores: number;
   achievements: Set<string>;
   taps: number;
+  /** Salvage Claw level, bought with scrap; resets on relocation. */
+  claw: number;
   /** Soft currency for crew, research rushes and decorations. */
   crystals: number;
   /** Crew level by id; 0 means not recruited. */
@@ -69,6 +71,7 @@ interface SaveData {
   cores?: number;
   achievements?: string[];
   taps: number;
+  claw?: number;
   crystals?: number;
   crew?: Partial<Record<CrewId, number>>;
   research?: { done?: string[]; active?: { id: string; endsAt: number } | null };
@@ -108,6 +111,7 @@ export function newState(now: number): GameState {
     cores: 0,
     achievements: new Set(),
     taps: 0,
+    claw: 0,
     crystals: 0,
     crew: emptyCrew(),
     research: { done: new Set(), active: null },
@@ -148,6 +152,7 @@ export function serialize(state: GameState): string {
     cores: state.cores,
     achievements: [...state.achievements],
     taps: state.taps,
+    claw: state.claw,
     crystals: state.crystals,
     crew: { ...state.crew },
     research: { done: [...state.research.done], active: state.research.active },
@@ -196,6 +201,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.cores = int(data.cores);
   state.achievements = new Set(strings(data.achievements));
   state.taps = int(data.taps);
+  state.claw = int(data.claw);
   state.crystals = int(data.crystals);
   for (const c of CREW) state.crew[c.id] = Math.min(5, int(data.crew?.[c.id]));
   state.research.done = new Set(strings(data.research?.done));

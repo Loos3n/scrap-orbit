@@ -13,7 +13,8 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - 10 machine tiers, each visibly added to the scene: drones, haulers, smelters, fabricators, a dock ring, mining lasers that shoot passing rocks, gravity wells, a nanite swarm, a warp gate and a Dyson swarm around a distant star. The camera pulls back as the station grows
 - Buy x1, x10, x100 or Max
 - Milestones at 10, 25, 50, 100, ... owned that double a machine's output
-- 24 upgrades: tap power, per-tier multipliers, global multipliers, and taps that scale with income
+- A Salvage Claw levelled with scrap (+1 per tap per level, doubling every 10 levels)
+- 29 upgrades: tap power, per-tier multipliers, global multipliers, and taps that scale with income
 - Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition
 - 6 core perks unlocked by how many cores you hold, including an Auto-Builder
 - 27 achievements, each worth +1% income

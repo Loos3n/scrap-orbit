@@ -4,6 +4,7 @@ import {
   activateBoost,
   applyOffline,
   baseIncome,
+  buyClaw,
   buyGenerator,
   buyUpgrade,
   claimableCores,
@@ -91,7 +92,7 @@ describe('income', () => {
 
   it('boost doubles income and taps, then cools down', () => {
     const s = newState(NOW);
-    s.owned.drone = 4;
+    s.owned.drone = 5;
     expect(activateBoost(s, NOW)).toBe(true);
     expect(income(s, NOW + 1000).toNumber()).toBeCloseTo(4);
     expect(tap(s, NOW + 1000).toNumber()).toBe(2);
@@ -99,12 +100,24 @@ describe('income', () => {
     expect(activateBoost(s, NOW + 60_000)).toBe(false);
   });
 
+  it('the Salvage Claw adds to each tap and doubles every 10 levels', () => {
+    const s = newState(NOW);
+    s.scrap = D(1e9);
+    expect(buyClaw(s)).toBe(true);
+    expect(tap(s, NOW).toNumber()).toBe(2);
+    s.claw = 10;
+    expect(tapValue(s, NOW).toNumber()).toBe(22);
+    s.claw = 0;
+    s.scrap = D(5);
+    expect(buyClaw(s)).toBe(false);
+  });
+
   it('offline earnings are capped', () => {
     const s = newState(NOW);
-    s.owned.drone = 2; // 1 scrap/s
+    s.owned.drone = 5; // 2 scrap/s
     const { seconds, earned } = applyOffline(s, NOW + 10 * 60 * 60 * 1000);
     expect(seconds).toBe(OFFLINE_CAP_SEC);
-    expect(earned.toNumber()).toBeCloseTo(OFFLINE_CAP_SEC);
+    expect(earned.toNumber()).toBeCloseTo(OFFLINE_CAP_SEC * 2);
   });
 });
 
@@ -167,10 +180,10 @@ describe('prestige', () => {
 
   it('cores and achievements multiply income and taps', () => {
     const s = newState(NOW);
-    s.owned.drone = 2; // 1 scrap/s before bonuses
+    s.owned.drone = 5; // 2 scrap/s before bonuses
     s.cores = 10; // +100%
     s.achievements.add('a').add('b'); // +2%
-    expect(baseIncome(s).toNumber()).toBeCloseTo(2 * 1.02);
+    expect(baseIncome(s).toNumber()).toBeCloseTo(4 * 1.02);
     expect(tapValue(s, NOW).toNumber()).toBeCloseTo(2 * 1.02);
   });
 

@@ -3,7 +3,7 @@
 import 'pixi.js/unsafe-eval';
 import './style.css';
 import { Sfx } from './audio';
-import { GENERATORS, UPGRADES } from './core/config';
+import { CLAW, GENERATORS, UPGRADES } from './core/config';
 import { CREW, EVENTS, PAINTS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS } from './core/content';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
@@ -142,6 +142,16 @@ async function boot(): Promise<void> {
         ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores, +${e.crystals} crystals`);
         sfx.warp();
         buzz(60);
+        break;
+      case 'claw':
+        ui.flashRow('claw');
+        sfx.buy();
+        buzz(5);
+        if (e.level % CLAW.doubleEvery === 0) {
+          ui.toast(ICONS.claw, `<b>Claw level ${e.level}!</b> Taps doubled`);
+          scene.celebrate(0x9aa6ff);
+          sfx.milestone();
+        }
         break;
       case 'reset':
         scene.setOwned(game.state.owned);

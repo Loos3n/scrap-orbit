@@ -34,6 +34,7 @@ export type GameEvent =
   | { type: 'meteor'; value: Decimal }
   | { type: 'convoy'; crystals: number }
   | { type: 'tutorial'; step: TutorialStep | null }
+  | { type: 'claw'; level: number }
   | { type: 'reset' };
 
 function storageGet(): string | null {
@@ -229,6 +230,10 @@ export class Game {
     for (const m of MILESTONES) {
       if (before < m && after >= m) this.emit({ type: 'milestone', gen: id, at: m });
     }
+  }
+
+  levelClaw(): void {
+    if (eco.buyClaw(this.state)) this.emit({ type: 'claw', level: this.state.claw });
   }
 
   buyUpgrade(id: string): void {

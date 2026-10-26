@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
-import { ACHIEVEMENT_BONUS, BOOST, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
+import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { CREW, RESEARCH } from '../core/content';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
@@ -99,6 +99,7 @@ export class UI {
     this.missions = new MissionsPanel(game, this.fmt);
     this.coach = new Coach(game);
     $('boost').addEventListener('click', () => game.boost());
+    holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
     makePanelDraggable($('app'), $('panel'), $('grabber'), document.querySelector<HTMLElement>('.tabs'), $('hud'));
   }
 
@@ -136,8 +137,8 @@ export class UI {
   }
 
   /** Flashes a machine row after a purchase. */
-  flashRow(id: GeneratorId): void {
-    const li = this.rows.get(id)!.li;
+  flashRow(id: GeneratorId | 'claw'): void {
+    const li = id === 'claw' ? $('claw-row') : this.rows.get(id)!.li;
     li.classList.remove('flash');
     void li.offsetWidth;
     li.classList.add('flash');
@@ -386,7 +387,23 @@ export class UI {
     btn.style.setProperty('--p', p.toFixed(3));
   }
 
+  private renderClaw(): void {
+    const s = this.game.state;
+    const level = s.claw;
+    setText($('claw-level'), String(level));
+    const rate = `<b>+${this.fmt(eco.tapValue(s, Date.now()))}</b> / tap`;
+    if ($('claw-rate').innerHTML !== rate) $('claw-rate').innerHTML = rate;
+    const step = CLAW.doubleEvery;
+    $('claw-bar').style.width = `${((level % step) / step) * 100}%`;
+    const next = `Lv ${level} / ${(Math.floor(level / step) + 1) * step} <b>→ 2x taps</b>`;
+    if ($('claw-next').innerHTML !== next) $('claw-next').innerHTML = next;
+    const cost = eco.clawCost(s);
+    ($('claw-buy') as HTMLButtonElement).disabled = s.scrap.lt(cost);
+    setText($('claw-cost'), this.fmt(cost));
+  }
+
   private renderGenerators(): void {
+    this.renderClaw();
     const s = this.game.state;
     let revealNext = true;
     let hidden = 0;

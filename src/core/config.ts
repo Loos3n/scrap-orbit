@@ -23,16 +23,16 @@ export interface GeneratorDef {
 }
 
 export const GENERATORS: readonly GeneratorDef[] = [
-  { id: 'drone', name: 'Salvage Drone', blurb: 'Nibbles bolts off passing wrecks.', baseCost: 15, baseOutput: 0.5, growth: 1.07, color: 0x4fe3c1 },
-  { id: 'hauler', name: 'Hauler', blurb: 'Tows whole hull plates back home.', baseCost: 220, baseOutput: 4, growth: 1.09, color: 0x7aa7ff },
-  { id: 'smelter', name: 'Smelter', blurb: 'Melts junk into tidy ingots.', baseCost: 3_500, baseOutput: 28, growth: 1.11, color: 0xff8a4c },
-  { id: 'fabricator', name: 'Fabricator', blurb: 'Prints parts nobody asked for.', baseCost: 60_000, baseOutput: 210, growth: 1.12, color: 0xc58cff },
-  { id: 'dock', name: 'Orbital Dock', blurb: 'Whole derelicts, parked and stripped.', baseCost: 1_100_000, baseOutput: 1_600, growth: 1.13, color: 0xffd166 },
-  { id: 'laser', name: 'Mining Laser', blurb: 'Slices asteroids into bite-size chunks.', baseCost: 2e7, baseOutput: 12_000, growth: 1.13, color: 0xff5d6c },
-  { id: 'gravity', name: 'Gravity Well', blurb: 'Pulls whole debris fields into reach.', baseCost: 4e8, baseOutput: 90_000, growth: 1.14, color: 0x5ce1ff },
-  { id: 'nanite', name: 'Nanite Hive', blurb: 'Billions of tiny hands, all very busy.', baseCost: 9e9, baseOutput: 700_000, growth: 1.14, color: 0x9dff6b },
-  { id: 'gate', name: 'Warp Gate', blurb: 'Imports scrap from other star systems.', baseCost: 2.2e11, baseOutput: 5.5e6, growth: 1.15, color: 0x8f7bff },
-  { id: 'dyson', name: 'Dyson Collector', blurb: 'Harvests a whole star to feed the smelters.', baseCost: 6e12, baseOutput: 4.5e7, growth: 1.15, color: 0xffe9a8 },
+  { id: 'drone', name: 'Salvage Drone', blurb: 'Nibbles bolts off passing wrecks.', baseCost: 15, baseOutput: 0.4, growth: 1.07, color: 0x4fe3c1 },
+  { id: 'hauler', name: 'Hauler', blurb: 'Tows whole hull plates back home.', baseCost: 220, baseOutput: 3.2, growth: 1.09, color: 0x7aa7ff },
+  { id: 'smelter', name: 'Smelter', blurb: 'Melts junk into tidy ingots.', baseCost: 3_500, baseOutput: 22.4, growth: 1.11, color: 0xff8a4c },
+  { id: 'fabricator', name: 'Fabricator', blurb: 'Prints parts nobody asked for.', baseCost: 60_000, baseOutput: 168, growth: 1.12, color: 0xc58cff },
+  { id: 'dock', name: 'Orbital Dock', blurb: 'Whole derelicts, parked and stripped.', baseCost: 1_100_000, baseOutput: 1_280, growth: 1.13, color: 0xffd166 },
+  { id: 'laser', name: 'Mining Laser', blurb: 'Slices asteroids into bite-size chunks.', baseCost: 2e7, baseOutput: 9_600, growth: 1.13, color: 0xff5d6c },
+  { id: 'gravity', name: 'Gravity Well', blurb: 'Pulls whole debris fields into reach.', baseCost: 4e8, baseOutput: 72_000, growth: 1.14, color: 0x5ce1ff },
+  { id: 'nanite', name: 'Nanite Hive', blurb: 'Billions of tiny hands, all very busy.', baseCost: 9e9, baseOutput: 560_000, growth: 1.14, color: 0x9dff6b },
+  { id: 'gate', name: 'Warp Gate', blurb: 'Imports scrap from other star systems.', baseCost: 2.2e11, baseOutput: 4.4e6, growth: 1.15, color: 0x8f7bff },
+  { id: 'dyson', name: 'Dyson Collector', blurb: 'Harvests a whole star to feed the smelters.', baseCost: 6e12, baseOutput: 3.6e7, growth: 1.15, color: 0xffe9a8 },
 ];
 
 /** Owning this many of a generator multiplies its output by MILESTONE_MULT (cumulative). */
@@ -55,8 +55,19 @@ export interface UpgradeDef {
   effects: UpgradeEffect[];
 }
 
+/**
+ * The Salvage Claw is levelled with scrap from the Build tab. Each level adds 1 to a tap's
+ * base value, and every `doubleEvery` levels doubles it, so tapping keeps up with machines.
+ */
+export const CLAW = { baseCost: 20, growth: 1.45, doubleEvery: 10 };
+
 export const UPGRADES: readonly UpgradeDef[] = [
   { id: 'claw1', name: 'Reinforced Claw', desc: 'Taps are worth 2x.', cost: 75, requires: { gen: 'drone', count: 1 }, effects: [{ kind: 'tapMult', mult: 2 }] },
+  { id: 'grip1', name: 'Servo Grip', desc: 'Taps are worth 2x.', cost: 600, requires: { gen: 'drone', count: 5 }, effects: [{ kind: 'tapMult', mult: 2 }] },
+  { id: 'grip2', name: 'Hauler Hooks', desc: 'Taps 2x, and each tap gives 1% of your income per second.', cost: 3_000, requires: { gen: 'hauler', count: 1 }, effects: [{ kind: 'tapMult', mult: 2 }, { kind: 'tapIncomeShare', share: 0.01 }] },
+  { id: 'grip3', name: 'Spark Gloves', desc: 'Taps are worth 3x.', cost: 70_000, requires: { gen: 'smelter', count: 5 }, effects: [{ kind: 'tapMult', mult: 3 }] },
+  { id: 'grip4', name: 'Printed Talons', desc: 'Each tap also gives 2% of your income per second.', cost: 700_000, requires: { gen: 'fabricator', count: 5 }, effects: [{ kind: 'tapIncomeShare', share: 0.02 }] },
+  { id: 'grip5', name: 'Dock Crane Arm', desc: 'Taps are worth 4x.', cost: 2.5e7, requires: { gen: 'dock', count: 5 }, effects: [{ kind: 'tapMult', mult: 4 }] },
   { id: 'drone1', name: 'Swarm Protocol', desc: 'Drones produce 2x.', cost: 900, requires: { gen: 'drone', count: 10 }, effects: [{ kind: 'genMult', gen: 'drone', mult: 2 }] },
   { id: 'claw2', name: 'Magnetic Claw', desc: 'Each tap also gives 3% of your income per second.', cost: 4_000, requires: { gen: 'hauler', count: 5 }, effects: [{ kind: 'tapIncomeShare', share: 0.03 }] },
   { id: 'hauler1', name: 'Cargo Expanders', desc: 'Haulers produce 2x.', cost: 15_000, requires: { gen: 'hauler', count: 10 }, effects: [{ kind: 'genMult', gen: 'hauler', mult: 2 }] },

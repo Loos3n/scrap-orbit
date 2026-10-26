@@ -1,6 +1,7 @@
 import {
   ACHIEVEMENT_BONUS,
   BOOST,
+  CLAW,
   CORE_PERKS,
   GENERATORS,
   MILESTONE_MULT,
@@ -158,8 +159,26 @@ export function income(state: GameState, now: number): Decimal {
   return boostActive(state, now) ? base.mul(BOOST.mult) : base;
 }
 
+/** What a tap is worth before multipliers, from the Salvage Claw's level. */
+export function clawBase(level: number): number {
+  return (1 + level) * 2 ** Math.floor(level / CLAW.doubleEvery);
+}
+
+export function clawCost(state: GameState): number {
+  return CLAW.baseCost * CLAW.growth ** state.claw * costDiscount(state);
+}
+
+export function buyClaw(state: GameState): boolean {
+  const cost = clawCost(state);
+  if (state.scrap.lt(cost)) return false;
+  state.scrap = state.scrap.sub(cost);
+  state.claw++;
+  state.stats.upgradesBought++;
+  return true;
+}
+
 export function tapValue(state: GameState, now: number): Decimal {
-  let mult = researchProduct(state, 'tapMult');
+  let mult = clawBase(state.claw) * researchProduct(state, 'tapMult');
   let share = researchSum(state, 'tapIncomeShare');
   if (flareActive(state, now)) mult *= FLARE_TAP_MULT * researchProduct(state, 'flareMult');
   for (const u of upgradeDefs(state)) {
@@ -273,6 +292,7 @@ export function relocate(state: GameState, now: number): number {
   state.lifetime = D(0);
   state.owned = emptyOwned();
   state.upgrades = new Set();
+  state.claw = 0;
   state.boostUntil = 0;
   state.boostReadyAt = 0;
   state.lastSeen = now;

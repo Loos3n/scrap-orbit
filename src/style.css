@@ -243,6 +243,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
   animation: flash 0.35s ease-out forwards;
   pointer-events: none;
 }
+.claw-list { margin-bottom: 10px; }
+.gen.claw { --c: #9aa6ff; }
 .gen.locked { filter: saturate(0.2); opacity: 0.6; }
 .gen.locked .gen-name::after { content: ' ?'; }
 .gen-icon {
