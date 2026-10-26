@@ -6,7 +6,7 @@ import { LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
-import { holdToRepeat, makePanelDraggable } from './gestures';
+import { holdToRepeat, makePanelSizer, type PanelSizer } from './gestures';
 import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
@@ -85,6 +85,7 @@ export class UI {
   private trips: TripPanel;
   private lootShelf: LootShelf;
   private info: InfoSheet;
+  private panel!: PanelSizer;
   readonly streak: StreakModal;
 
   /** Called when the sound or music setting changes, so main can update the synth. */
@@ -116,7 +117,6 @@ export class UI {
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
-    makePanelDraggable($('app'), $('panel'), $('grabber'), document.querySelector<HTMLElement>('.tabs'), $('hud'));
   }
 
   private buildGenerators(): void {
@@ -162,18 +162,31 @@ export class UI {
   }
 
   private bindTabs(): void {
-    const tabs = document.querySelectorAll<HTMLButtonElement>('.tab');
-    tabs.forEach((tab) =>
+    this.panel = makePanelSizer($('app'), document.querySelector<HTMLElement>('.tabs')!, $('hud'), $('panel-head'));
+    document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) =>
       tab.addEventListener('click', () => {
-        tabs.forEach((t) => {
-          const on = t === tab;
-          t.setAttribute('aria-selected', String(on));
-          $(`tab-${t.dataset.tab}`).hidden = !on;
-        });
-        this.coach.tabOpened(tab.dataset.tab!);
-        this.render();
+        // Tapping the open tab again hides the panel; any tab opens it.
+        if (tab.getAttribute('aria-selected') === 'true' && this.panel.size !== 'closed') this.panel.set('closed');
+        else this.openTab(tab.dataset.tab!);
       }),
     );
+    $('panel-size').addEventListener('click', () => {
+      this.panel.set(this.panel.size === 'tall' ? 'half' : 'tall');
+      this.coach.panelResized();
+    });
+    $('panel-close').addEventListener('click', () => this.panel.set('closed'));
+  }
+
+  private openTab(name: string): void {
+    document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => {
+      const on = t.dataset.tab === name;
+      t.setAttribute('aria-selected', String(on));
+      $(`tab-${t.dataset.tab}`).hidden = !on;
+      if (on) $('panel-title').textContent = t.textContent;
+    });
+    if (this.panel.size === 'closed') this.panel.set(this.panel.lastOpen);
+    this.coach.tabOpened(name);
+    this.render();
   }
 
   private bindBuyModes(): void {
@@ -190,7 +203,7 @@ export class UI {
 
   /** Opens a panel tab from code (the tutorial uses it). */
   showTab(name: string): void {
-    document.querySelector<HTMLButtonElement>(`.tab[data-tab="${name}"]`)?.click();
+    this.openTab(name);
   }
 
   private bindSegments(): void {
