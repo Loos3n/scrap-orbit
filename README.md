@@ -27,7 +27,7 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Boss loot: each broken wreck has a 20% chance (guaranteed after four dry runs) to drop a rare part with a permanent bonus or a pet skin
 - Golden scrap: every 12 to 20 minutes a glittering golden crate drifts past; tap it for a 30-second golden rush where everything earns 7x
 - Trading post: every 30 to 45 minutes a trader docks for 4 minutes with three one-off deals (crystals for scrap, scrap for crystals, a missing blueprint, an express recall for expeditions, or a missing wreck part)
-- Challenge runs: from 5 Star Cores, start a fresh run under a rule (no taps, no upgrades, no crew, 3x prices); salvage the goal in one run for a permanent bonus, or give up and carry on
+- Challenge runs: from 5 Star Cores, start a fresh run under a rule (no taps, no upgrades, no crew, 3x prices); salvage the goal in one run for a permanent bonus, or give up and carry on. Goals grow with the cube of your station's power (cores, research, achievements, rooms and loot), so a challenge stays about an hour of play however strong the station is; the goal is fixed when you start
 - Locked cargo: every 25 to 40 minutes a wreck's cargo pod drifts by for 2 minutes. Crack its safe by tapping the dial when the needle sweeps through the green; three locks, each faster, and three misses jams it. Every lock opened pays scrap and crystals
 - Collection book (Station, Book): seven sets to fill (boss wrecks, sectors, machines, safes, pets, wreck parts and crew). Each finished set pays crystals and unlocks a station skin
 - Station skins (Station, Decor): seven looks that recolour the hull, reactor, beacons and machines

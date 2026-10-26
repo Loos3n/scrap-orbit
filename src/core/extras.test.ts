@@ -4,8 +4,8 @@ import { baseIncome, tapValue } from './economy';
 import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss, updateEvents } from './meta';
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
-import { GOLDEN, LOOT_PITY, TRIPS, bonuses, moduleYield, tripMs } from './expansion';
-import { abandonChallenge, buildModule, checkChallenge, claimGolden, claimTrip, goldenDue, removeModule, startChallenge, startTrip, trade, updateTrader } from './meta';
+import { CHALLENGES, GOLDEN, LOOT_PITY, TRIPS, bonuses, moduleYield, tripMs } from './expansion';
+import { abandonChallenge, buildModule, challengeGoal, checkChallenge, claimGolden, claimTrip, goldenDue, removeModule, startChallenge, startTrip, trade, updateTrader } from './meta';
 import { income } from './economy';
 
 const DAY = 86_400_000;
@@ -297,6 +297,26 @@ describe('challenge runs', () => {
     expect(startChallenge(s, 'notap', NOW)).toBe(-1);
     const back = deserialize(serialize(s), NOW)!;
     expect(back.challengesDone.has('notap')).toBe(true);
+  });
+
+  it("grows the goal with the station's power and fixes it at the start", () => {
+    const s = newState(NOW);
+    s.cores = 5;
+    const def = CHALLENGES.find((c) => c.id === 'notap')!;
+    expect(challengeGoal(s, def).toNumber()).toBe(def.goal);
+    s.cores = 50;
+    // Power 6 against the base 1.5: 4x stronger, 64x the goal.
+    expect(challengeGoal(s, def).toNumber()).toBeCloseTo(def.goal * 64, -3);
+    startChallenge(s, 'notap', NOW);
+    const goal = s.challengeGoal;
+    s.cores = 500;
+    expect(s.challengeGoal.eq(goal)).toBe(true);
+    s.lifetime = D(def.goal * 2);
+    expect(checkChallenge(s)).toBeNull();
+    expect(deserialize(serialize(s), NOW)!.challengeGoal.eq(goal)).toBe(true);
+    const old = JSON.parse(serialize(s));
+    delete old.challengeGoal;
+    expect(deserialize(JSON.stringify(old), NOW)!.challengeGoal.toNumber()).toBe(def.goal);
   });
 
   it('applies the price and crew rules only while running, and can be given up', () => {

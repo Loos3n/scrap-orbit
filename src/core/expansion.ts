@@ -222,7 +222,7 @@ export interface ChallengeDef {
   id: string;
   name: string;
   rule: string;
-  /** Scrap to salvage in the challenge run. */
+  /** Scrap to salvage in the challenge run, for a station with CHALLENGE_CORES cores and nothing else. */
   goal: number;
   stat: keyof Bonuses;
   amount: number;
@@ -239,6 +239,15 @@ export const CHALLENGES: readonly ChallengeDef[] = [
 
 /** Challenge runs open up once the player holds this many Star Cores. */
 export const CHALLENGE_CORES = 5;
+
+/**
+ * Goals grow with the cube of the station's power (cores, research, achievements, room and
+ * loot income), which keeps a challenge near the same hour or so of play however strong the
+ * station is. Without it a late station cleared one in a couple of minutes.
+ */
+export const CHALLENGE_SCALE = 3;
+/** Power of a station with CHALLENGE_CORES cores and nothing else: the base goals are set for it. */
+export const CHALLENGE_BASE_POWER = 1.5;
 
 export function challengeOn(state: GameState, id: string): boolean {
   return state.challenge === id;

@@ -28,10 +28,12 @@ import {
   type PetId,
   type StreakReward,
 } from './content';
-import { baseIncome, claimableCores, earn, income, researchProduct, resetRun, tapValue } from './economy';
+import { baseIncome, claimableCores, earn, globalMult, income, researchProduct, resetRun, tapValue } from './economy';
 import {
   CHALLENGES,
+  CHALLENGE_BASE_POWER,
   CHALLENGE_CORES,
+  CHALLENGE_SCALE,
   GOLDEN,
   GRID,
   LOOT,
@@ -749,7 +751,28 @@ export function startChallenge(state: GameState, id: string, now: number): numbe
   }
   resetRun(state, now);
   state.challenge = id;
+  state.challengeGoal = challengeGoal(state, def);
   return gained;
+}
+
+/** How strong the station is going into a run: everything that carries over and multiplies income. */
+export function stationPower(state: GameState): number {
+  return globalMult(state) * (1 + bonuses(state).income);
+}
+
+/**
+ * The goal a challenge would have if started now: its base goal, grown with the station's power.
+ * Starting banks any cores waiting, so they count too.
+ */
+export function challengeGoal(state: GameState, def: ChallengeDef): Decimal {
+  const held = state.cores;
+  state.cores += claimableCores(state);
+  try {
+    const ratio = Math.max(1, stationPower(state) / CHALLENGE_BASE_POWER);
+    return D(def.goal).mul(D(ratio).pow(CHALLENGE_SCALE)).floor();
+  } finally {
+    state.cores = held;
+  }
 }
 
 /** Gives up the challenge: its rule lifts and the run carries on as normal. */
@@ -762,13 +785,13 @@ export function abandonChallenge(state: GameState): boolean {
 /** Progress toward the running challenge's goal, 0 to 1. */
 export function challengeProgress(state: GameState): number {
   const def = CHALLENGES.find((c) => c.id === state.challenge);
-  return def ? Math.min(1, state.lifetime.div(def.goal).toNumber()) : 0;
+  return def ? Math.min(1, state.lifetime.div(state.challengeGoal).toNumber()) : 0;
 }
 
 /** Completes the running challenge once its goal is reached. Returns the one beaten. */
 export function checkChallenge(state: GameState): ChallengeDef | null {
   const def = CHALLENGES.find((c) => c.id === state.challenge);
-  if (!def || state.lifetime.lt(def.goal)) return null;
+  if (!def || state.lifetime.lt(state.challengeGoal)) return null;
   state.challengesDone.add(def.id);
   state.challenge = null;
   return def;

@@ -1,3 +1,4 @@
+import { claimableCores } from '../core/economy';
 import { CREW } from '../core/content';
 import { CHALLENGES, CHALLENGE_CORES, LOOT, TRADER_NAMES, moduleDef, type Offer } from '../core/expansion';
 import * as meta from '../core/meta';
@@ -163,14 +164,16 @@ export class ChallengePanel {
       ($('challenge-line-bar') as HTMLElement).style.width = `${(progress * 100).toFixed(1)}%`;
     }
     if ($('tab-cores').hidden) return;
-    const key = `${open}${s.challenge}${[...s.challengesDone].join()}${this.arming}${Math.floor(progress * 200)}`;
+    // Goals follow the station's power, so a new core or research changes them.
+    const key = `${open}${s.challenge}${[...s.challengesDone].join()}${this.arming}${Math.floor(progress * 200)}${meta.stationPower(s).toFixed(3)}${s.cores + claimableCores(s)}`;
     if (key === this.key) return;
     this.key = key;
     if (!open) {
       $('challenge-list').innerHTML = `<li class="challenge locked"><div class="challenge-icon">${ICONS.lock}</div><div><b>Challenge runs</b><div class="challenge-rule">Hold ${CHALLENGE_CORES} Star Cores to unlock runs with a twist and a permanent reward.</div></div></li>`;
       return;
     }
-    $('challenge-list').innerHTML = CHALLENGES.map((c) => {
+    const intro = `<li class="challenge-note">Goals grow with your station's power, so a challenge stays a real test however strong you get. The goal is set when you start.</li>`;
+    $('challenge-list').innerHTML = intro + CHALLENGES.map((c) => {
       const done = s.challengesDone.has(c.id);
       const active = s.challenge === c.id;
       let action: string;
@@ -178,7 +181,11 @@ export class ChallengePanel {
       else if (active) action = `<button type="button" class="crew-btn quiet" data-quit="1">Give up</button>`;
       else if (s.challenge) action = '';
       else action = `<button type="button" class="crew-btn${this.arming === c.id ? ' armed' : ''}" data-start="${c.id}">${this.arming === c.id ? 'Tap to confirm' : 'Start'}</button>`;
-      const bar = active ? `<div class="bar"><i style="width:${(progress * 100).toFixed(1)}%"></i></div><div class="challenge-goal">${this.fmt(s.lifetime)} / ${this.fmt(c.goal)} scrap</div>` : `<div class="challenge-goal">Goal: salvage ${this.fmt(c.goal)} in one run</div>`;
+      const bar = active
+        ? `<div class="bar"><i style="width:${(progress * 100).toFixed(1)}%"></i></div><div class="challenge-goal">${this.fmt(s.lifetime)} / ${this.fmt(s.challengeGoal)} scrap</div>`
+        : done
+          ? ''
+          : `<div class="challenge-goal">Goal: salvage ${this.fmt(meta.challengeGoal(s, c))} in one run</div>`;
       return `<li class="challenge${done ? ' done' : ''}${active ? ' active' : ''}" style="--c:${hex(c.color)}">
         <div class="challenge-icon">${done ? ICONS.check : ICONS.trophy}</div>
         <div class="challenge-info"><b>${esc(c.name)}</b><div class="challenge-rule">${esc(c.rule)}</div>${bar}<div class="challenge-reward">${esc(c.reward)}</div></div>

@@ -66,6 +66,8 @@ export interface GameState {
   trader: { until: number; nextAt: number; name: number; offers: Offer[] };
   /** The challenge run in progress, if any, and the ones already beaten. */
   challenge: string | null;
+  /** The running challenge's goal, fixed when it started. */
+  challengeGoal: Decimal;
   challengesDone: Set<string>;
   /** When the last event, boss, golden crate, trader or cargo pod began, to keep calm time between them. */
   lastHappening: number;
@@ -136,6 +138,7 @@ interface SaveData {
   golden?: GameState['golden'];
   trader?: GameState['trader'];
   challenge?: string | null;
+  challengeGoal?: string;
   challengesDone?: string[];
   lastHappening?: number;
   safe?: GameState['safe'];
@@ -195,6 +198,7 @@ export function newState(now: number): GameState {
     golden: { until: 0, nextAt: 0 },
     trader: { until: 0, nextAt: 0, name: 0, offers: [] },
     challenge: null,
+    challengeGoal: D(0),
     challengesDone: new Set(),
     lastHappening: 0,
     safe: { until: 0, nextAt: 0, type: 'supply', open: null },
@@ -258,6 +262,7 @@ export function serialize(state: GameState): string {
     golden: { ...state.golden },
     trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
     challenge: state.challenge,
+    challengeGoal: state.challengeGoal.toString(),
     challengesDone: [...state.challengesDone],
     lastHappening: state.lastHappening,
     safe: { ...state.safe },
@@ -381,6 +386,9 @@ export function deserialize(json: string | null, now: number): GameState | null 
   const challengeIds = new Set(CHALLENGES.map((c) => c.id));
   for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);
   state.challenge = typeof data.challenge === 'string' && challengeIds.has(data.challenge) && !state.challengesDone.has(data.challenge) ? data.challenge : null;
+  // Saves from before goals scaled keep the old fixed goal.
+  const savedGoal = state.challenge && data.challengeGoal ? num(data.challengeGoal) : null;
+  state.challengeGoal = savedGoal && savedGoal.gt(0) ? savedGoal : D(CHALLENGES.find((c) => c.id === state.challenge)?.goal ?? 0);
   state.lastHappening = Number(data.lastHappening) || 0;
   const safeIds = new Set(SAFE_TYPES.map((t) => t.id));
   if (data.safe && typeof data.safe === 'object') {
