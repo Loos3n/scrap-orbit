@@ -23,14 +23,15 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
 - Decorations: six sky themes and five hull paints
-- Boss wrecks: the first after 12 minutes of play, then one every 25 to 40 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in; break it with taps (the claw fires a bolt) and machine fire within 60 seconds for 5 minutes of income and crystals
+- Boss wrecks: the first after 12 minutes of play, then one every 25 to 40 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in and stays until it is broken, with a health bar over it; break it with taps (the claw fires a bolt) and machine fire for a fixed payout of 5 minutes of scrap per second (shown when it arrives) and crystals
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
 - Story log: 12 entries from the crew, unlocked as the station grows, telling the mystery of the Hollow Fleet
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
 - Ambient generative music, three number formats and a full stats screen
 - A hands-on first-run tutorial with Mika, the drone wrangler: every step waits for the player to do it, with a spotlight and progress bar, plus one-time tips as the crew, lab and relocation unlock
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
-- Synthesized sound effects (taps climb a musical scale), with a mute button
+- Synthesized sound effects: FM bells and mallets, filtered noise for impacts and whooshes, a shared space echo and a compressor (taps climb a musical scale), with a mute button
+- Asteroids, meteors and moons painted per pixel from a height map: lumpy outlines, crater bowls with raised rims, lit from the same direction as the station
 - Salvage crates that drift past now and then; tap one for a bonus
 - Autosave every 30 seconds and when the app is hidden
 - Offline earnings for up to 2 hours (4 with a perk), shown when you come back

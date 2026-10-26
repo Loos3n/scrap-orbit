@@ -118,7 +118,7 @@ export class StationScene {
   private dustLayer = new Container();
   private dust: { s: Sprite; depth: number; phase: number; vx: number; vy: number }[] = [];
   private bossLayer = new Container();
-  private boss: { c: Container; hull: Sprite; cracks: Sprite; glow: Sprite; state: 'in' | 'here' | 'out' | 'dead'; t: number; hit: number; health: number } | null = null;
+  private boss: { c: Container; hull: Sprite; cracks: Sprite; glow: Sprite; bar: Graphics; shown: number; state: 'in' | 'here' | 'out' | 'dead'; t: number; hit: number; health: number } | null = null;
   private beams: { x: number; y: number; life: number }[] = [];
   private pet: { s: Sprite; id: PetId; angle: number; pounce: number } | null = null;
   private claw!: Sprite;
@@ -784,10 +784,35 @@ export class StationScene {
     const cracks = this.sprite(this.tex.cracks[kind % this.tex.cracks.length], c);
     cracks.blendMode = 'add';
     cracks.alpha = 0;
+    const bar = new Graphics();
+    c.addChild(bar);
     c.scale.set(BOSS_SCALE);
     c.position.set(-WORLD, BOSS_POS.y);
     this.bossLayer.addChild(c);
-    this.boss = { c, hull, cracks, glow, state: 'in', t: 0, hit: 0, health: 1 };
+    this.boss = { c, hull, cracks, glow, bar, shown: -1, state: 'in', t: 0, hit: 0, health: 1 };
+  }
+
+  /** The health bar floating over the wreck; the red part eases down after each hit. */
+  private drawBossBar(b: NonNullable<StationScene['boss']>, dt: number): void {
+    const target = b.health;
+    b.shown = b.shown < 0 ? target : Math.max(target, b.shown - Math.max(0.02, (b.shown - target) * 4) * dt);
+    const w = 150;
+    const h = 9;
+    const x = -w / 2;
+    const y = 58;
+    const g = b.bar;
+    g.clear();
+    g.roundRect(x - 3, y - 3, w + 6, h + 6, 7).fill({ color: 0x14081c, alpha: 0.85 });
+    g.roundRect(x - 3, y - 3, w + 6, h + 6, 7).stroke({ color: 0xff5d6c, width: 1.5, alpha: 0.9 });
+    if (b.shown > target) g.roundRect(x, y, w * b.shown, h, 4.5).fill({ color: 0xffffff, alpha: 0.75 });
+    if (target > 0) {
+      g.roundRect(x, y, Math.max(h, w * target), h, 4.5).fill({ color: target > 0.5 ? 0xff7a59 : target > 0.25 ? 0xff5d6c : 0xff3d5a });
+      g.roundRect(x + 2, y + 1.5, Math.max(0, w * target - 4), 2.5, 1.2).fill({ color: 0xffffff, alpha: 0.35 });
+    }
+    // Notches every 10%.
+    for (let i = 1; i < 10; i++) g.rect(x + (w * i) / 10 - 0.5, y, 1, h).fill({ color: 0x14081c, alpha: 0.45 });
+    // Keep the bar level while the wreck rocks.
+    g.rotation = -b.c.rotation;
   }
 
   setBossHealth(health: number): void {
@@ -845,6 +870,7 @@ export class StationScene {
       b.c.rotation = Math.sin(this.time * 0.4) * 0.03 + (b.hit ? rand(-0.012, 0.012) : 0);
       b.hull.tint = b.hit > 0.5 ? 0xffd6c0 : 0xffffff;
       b.cracks.alpha = (1 - b.health) * (0.7 + 0.3 * Math.sin(this.time * 6));
+      this.drawBossBar(b, dt);
       b.glow.alpha = 0.18 + (1 - b.health) * 0.35;
       // Smoke and sparks leak from a damaged wreck.
       if (b.state === 'here' && Math.random() < dt * (1 + (1 - b.health) * 6)) {

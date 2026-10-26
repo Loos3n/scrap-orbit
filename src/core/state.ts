@@ -43,7 +43,7 @@ export interface GameState {
   login: { day: string; streak: number; claimed: string; best: number };
   pets: { owned: Set<PetId>; active: PetId | null };
   /** The boss wreck on screen, if any. `name` indexes BOSS_NAMES; hp values are Decimal strings. */
-  boss: { name: number; hp: string; max: string; endsAt: number } | null;
+  boss: { name: number; hp: string; max: string; endsAt: number; reward?: string } | null;
   nextBossAt: number;
   /** Story log entries unlocked, in order, and how many of them have been read. */
   story: string[];

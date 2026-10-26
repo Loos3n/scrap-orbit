@@ -237,16 +237,14 @@ export const BOSS = {
   firstSec: 12 * 60,
   /** Minutes between wrecks. */
   gap: [25, 40] as [number, number],
-  /** Seconds to break it before it drifts away. */
-  seconds: 60,
   /** Health, as taps-worth plus seconds-of-income-worth at the moment it arrives. */
   hpTaps: 110,
   hpIncomeSec: 25,
   /** Machines chip away this share of income as damage every second. */
-  machineShare: 0.5,
+  machineShare: 0.2,
   /** Each wreck beaten makes the next one this much tougher. */
   growth: 1.12,
-  /** Payout: seconds of income (or 300 taps' worth if more), plus crystals. */
+  /** Payout, fixed when it arrives: this many seconds of scrap per second (or taps' worth if more), plus crystals. */
   rewardIncomeSec: 300,
   rewardTaps: 300,
   crystals: 10,

@@ -876,6 +876,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .log-head small { font-size: 11.5px; color: var(--ink-dim); }
 .log-entry p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: #d4d8ff; }
 
+.boss-reward { display: inline-flex; align-items: center; gap: 3px; color: #ffd166; }
+.boss-reward [data-icon] { width: 14px; height: 14px; }
 .boss-tag { display: inline-block; padding: 1px 7px; margin-right: 2px; border-radius: 6px; background: #ff3d5a; color: #fff; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; vertical-align: 2px; box-shadow: 0 0 10px rgb(255 61 90 / 0.7); }
 /* A red pulse round the screen's edge for as long as a boss wreck is in the fight. */
 .boss-edge { position: fixed; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 60px 6px rgb(255 40 70 / 0.45); animation: boss-pulse 1.4s ease-in-out infinite; }

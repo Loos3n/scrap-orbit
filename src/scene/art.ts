@@ -1255,7 +1255,7 @@ export const dockSegment = (radius: number) =>
 /** Rock and metal scrap variants. */
 export function debris(seed: number): Texture {
   const r = rng(seed);
-  const metal = r() < 0.5;
+  const metal = seed % 3 === 0;
   const size = 22;
   return paint(size, size, (ctx) => {
     const c = size / 2;
@@ -1286,27 +1286,9 @@ export function debris(seed: number): Texture {
       ctx.lineTo(15, 10);
       ctx.stroke();
     } else {
-      const sides = 7 + Math.floor(r() * 3);
-      for (let i = 0; i < sides; i++) {
-        const a = (i / sides) * TAU;
-        const rr = c * (0.65 + r() * 0.3);
-        ctx.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr);
-      }
-      ctx.closePath();
-      ctx.fillStyle = radial(ctx, c - 3, c - 3, c * 1.3, [
-        [0, '#9a95b8'],
-        [0.6, '#5c5878'],
-        [1, '#2e2b45'],
-      ]);
-      ctx.fill();
-      for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = 'rgba(20,18,40,0.45)';
-        ctx.beginPath();
-        ctx.arc(c + (r() - 0.5) * 8, c + (r() - 0.5) * 8, 0.8 + r() * 1.6, 0, TAU);
-        ctx.fill();
-      }
+      drawRock(ctx, c, c, c * 0.8, 4, { ...(seed % 3 ? ROCK_GREY : ROCK_RUST), lumpy: 0.4, craters: 4, seed });
     }
-  }, 4, { bevel: 0.8, light: 0.6, grain: 0.45, grime: 0.5, seed });
+  }, 4, metal ? { bevel: 0.8, light: 0.6, grain: 0.45, grime: 0.5, seed } : undefined);
 }
 
 /** The golden salvage crate. */
@@ -1386,39 +1368,8 @@ export const antenna = () =>
 /** A cratered grey moon, lit from the upper left. */
 export const moon = () =>
   paint(40, 40, (ctx) => {
-    const c = 20;
-    ctx.fillStyle = radial(ctx, c - 6, c - 7, 26, [
-      [0, '#e6e2f0'],
-      [0.6, '#9a95b0'],
-      [1, '#4a4660'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 18, 0, TAU);
-    ctx.fill();
-    const r = rng(21);
-    for (let i = 0; i < 9; i++) {
-      const x = c + (r() - 0.5) * 24;
-      const y = c + (r() - 0.5) * 24;
-      if (Math.hypot(x - c, y - c) > 15) continue;
-      const cr = 1 + r() * 3;
-      ctx.fillStyle = 'rgba(60,55,80,0.45)';
-      ctx.beginPath();
-      ctx.arc(x, y, cr, 0, TAU);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.arc(x, y, cr, Math.PI * 1.1, Math.PI * 1.7);
-      ctx.stroke();
-    }
-    ctx.fillStyle = radial(ctx, c - 8, c - 8, 34, [
-      [0.45, 'rgba(10,8,30,0)'],
-      [1, 'rgba(10,8,30,0.85)'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 18, 0, TAU);
-    ctx.fill();
-  }, 4, { bevel: 1.5, light: 0.35, grain: 0.5, grime: 0.6, seed: 17 });
+    drawRock(ctx, 20, 20, 18, 4, { light: [236, 232, 246], dark: [96, 90, 124], lumpy: 0.03, craters: 14, seed: 21 });
+  }, 4);
 
 /** A distant spiral galaxy. */
 export const galaxy = () =>
@@ -1451,38 +1402,8 @@ export const galaxy = () =>
 /** A big rock for the foreground, drawn soft-edged so it reads as out of focus. */
 export const bigRock = (seed: number) =>
   paint(80, 80, (ctx) => {
-    const r = rng(seed);
-    const c = 40;
-    ctx.beginPath();
-    const sides = 11;
-    for (let i = 0; i < sides; i++) {
-      const a = (i / sides) * TAU;
-      const rr = 30 * (0.7 + r() * 0.3);
-      ctx.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr);
-    }
-    ctx.closePath();
-    ctx.shadowColor = 'rgba(20,16,40,0.9)';
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = radial(ctx, c - 10, c - 12, 50, [
-      [0, '#5c5878'],
-      [0.6, '#2e2b45'],
-      [1, '#16142a'],
-    ]);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = 'rgba(10,8,24,0.4)';
-      ctx.beginPath();
-      ctx.arc(c + (r() - 0.5) * 30, c + (r() - 0.5) * 30, 2 + r() * 5, 0, TAU);
-      ctx.fill();
-    }
-    // Rim light from the station's side.
-    ctx.strokeStyle = 'rgba(255,190,140,0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(c, c, 26, Math.PI * 1.1, Math.PI * 1.6);
-    ctx.stroke();
-  }, 3, { bevel: 2, light: 0.4, grain: 0.6, grime: 0.6, seed });
+    drawRock(ctx, 40, 40, 32, 3, { ...(seed % 3 === 2 ? ROCK_RUST : ROCK_GREY), lumpy: 0.32, craters: 9, seed });
+  }, 3);
 
 /** A small laser turret on a strut, barrel pointing up (rotate to aim). */
 export const laserTurret = () =>
@@ -1669,20 +1590,15 @@ export const meteor = () =>
       [1, 'rgba(255,90,40,0)'],
     ]);
     ctx.fillRect(0, 0, 30, 30);
-    const r = rng(77);
-    ctx.beginPath();
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * TAU;
-      const rr = 7 * (0.75 + r() * 0.25);
-      ctx.lineTo(c + Math.cos(a) * rr, c + Math.sin(a) * rr);
-    }
-    ctx.closePath();
-    ctx.fillStyle = radial(ctx, c - 2, c - 2, 10, [
-      [0, '#fff1c8'],
-      [0.4, '#ff9a4c'],
-      [1, '#7a2a1a'],
+    drawRock(ctx, c, c, 8.5, 4, { light: [150, 104, 92], dark: [44, 26, 34], lumpy: 0.3, craters: 3, molten: true, seed: 77 });
+    // Heat glare on the leading face.
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = radial(ctx, c - 3, c - 3, 7, [
+      [0, 'rgba(255,170,90,0.45)'],
+      [1, 'rgba(255,120,60,0)'],
     ]);
-    ctx.fill();
+    ctx.fillRect(0, 0, 30, 30);
+    ctx.globalCompositeOperation = 'source-over';
   }, 4);
 
 // ---------- Boss wrecks ----------
@@ -1963,3 +1879,113 @@ function drawPet(ctx: Ctx, id: 'cat' | 'pup' | 'owl' | 'blob'): void {
   ctx.arc(c, c, 13.5, Math.PI * 1.1, Math.PI * 1.4);
   ctx.stroke();
 }
+
+// ---------- Rocks ----------
+
+interface RockLook {
+  /** Light and dark albedo, as [r, g, b]. */
+  light: [number, number, number];
+  dark: [number, number, number];
+  /** How far the outline wanders from a circle (0 is round). */
+  lumpy: number;
+  craters: number;
+  /** Glowing molten cracks, for meteors. */
+  molten?: boolean;
+  seed: number;
+}
+
+/**
+ * A lit, cratered rock painted per pixel: a lumpy sphere's height, bumps and crater bowls with
+ * raised rims give a surface normal, which is lit from the upper left like the rest of the art.
+ * `size` is the canvas size in pixels; the rock fills most of it.
+ */
+function rockCanvas(size: number, look: RockLook): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  const r = rng(look.seed);
+  const R = size * 0.46;
+  const c = size / 2;
+  const outline = valueNoise(look.seed + 3, 1);
+  const bumps = valueNoise(look.seed + 5, size / 7);
+  const fine = valueNoise(look.seed + 6, size / 22);
+  const tone = valueNoise(look.seed + 7, size / 4);
+  const cracks = valueNoise(look.seed + 8, size / 9);
+  // The outline radius at an angle, smoothly wrapped round the circle.
+  const edge = (a: number) => 1 - look.lumpy * (outline(2.2 + Math.cos(a) * 1.8, 2.2 + Math.sin(a) * 1.8) * 0.8 + outline(6 + Math.cos(a) * 4.5, 6 + Math.sin(a) * 4.5) * 0.35);
+  const craters: { x: number; y: number; r: number }[] = [];
+  for (let i = 0; i < look.craters; i++) {
+    const a = r() * TAU;
+    const d = Math.sqrt(r()) * 0.75;
+    craters.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: 0.07 + r() * r() * 0.28 });
+  }
+  const height = new Float32Array(size * size);
+  const alpha = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x + 0.5 - c) / R;
+      const v = (y + 0.5 - c) / R;
+      const d = Math.hypot(u, v);
+      const rho = edge(Math.atan2(v, u));
+      const i = y * size + x;
+      alpha[i] = Math.max(0, Math.min(1, (rho - d) * R + 0.5));
+      if (d > rho + 2 / R) continue;
+      const s = Math.min(1, d / rho);
+      let h = Math.sqrt(Math.max(0, 1 - s * s)) * 0.9;
+      h += (bumps(x, y) - 0.5) * 0.16 + (fine(x, y) - 0.5) * 0.05;
+      for (const k of craters) {
+        const q = Math.hypot(u - k.x, v - k.y) / k.r;
+        if (q < 1) h -= k.r * 0.9 * (1 - q * q);
+        if (q > 0.6 && q < 1.7) h += k.r * 0.2 * Math.exp(-(((q - 1) / 0.25) ** 2));
+      }
+      height[i] = h;
+    }
+  }
+  const img = ctx.createImageData(size, size);
+  const L = [-0.55, -0.62, 0.56];
+  const scale = R * 0.5;
+  for (let y = 1; y < size - 1; y++) {
+    for (let x = 1; x < size - 1; x++) {
+      const i = y * size + x;
+      if (alpha[i] <= 0) continue;
+      const nx = -(height[i + 1] - height[i - 1]) * scale;
+      const ny = -(height[i + size] - height[i - size]) * scale;
+      const inv = 1 / Math.hypot(nx, ny, 1);
+      const lambert = Math.max(0, (nx * L[0] + ny * L[1] + L[2]) * inv);
+      // Warm bounce light from the lower right, where the station's glow comes from.
+      const bounce = Math.max(0, (nx * 0.6 + ny * 0.5) * inv) * 0.22;
+      const t = Math.max(0, Math.min(1, (tone(x, y) - 0.5) * 2.2 + 0.5 + (fine(x * 3, y * 3) - 0.5) * 0.5 + (r() - 0.5) * 0.14));
+      const lit = 0.16 + lambert * 1.05;
+      const o = i * 4;
+      let cr = (look.dark[0] + (look.light[0] - look.dark[0]) * t) * lit + bounce * 255;
+      let cg = (look.dark[1] + (look.light[1] - look.dark[1]) * t) * lit + bounce * 150;
+      let cb = (look.dark[2] + (look.light[2] - look.dark[2]) * t) * lit + bounce * 110;
+      if (look.molten) {
+        // Thin bright seams where the crack noise crosses its middle.
+        const seam = 1 - Math.min(1, Math.abs(cracks(x, y) - 0.5) * 20);
+        if (seam > 0) {
+          cr += seam * 255;
+          cg += seam * 150;
+          cb += seam * 40;
+        }
+      }
+      img.data[o] = Math.min(255, cr);
+      img.data[o + 1] = Math.min(255, cg);
+      img.data[o + 2] = Math.min(255, cb);
+      img.data[o + 3] = alpha[i] * 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+/** Draws a rock centred at (x, y) with radius `rad` in world units, painted at `res`. */
+function drawRock(ctx: Ctx, x: number, y: number, rad: number, res: number, look: RockLook): void {
+  const box = rad / 0.46;
+  ctx.drawImage(rockCanvas(Math.ceil(box * res), look), x - box / 2, y - box / 2, box, box);
+}
+
+const ROCK_GREY: Pick<RockLook, 'light' | 'dark'> = { light: [168, 160, 196], dark: [62, 56, 86] };
+const ROCK_RUST: Pick<RockLook, 'light' | 'dark'> = { light: [196, 150, 128], dark: [70, 48, 58] };

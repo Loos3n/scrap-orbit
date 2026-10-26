@@ -2,7 +2,7 @@ import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAI
 import { GENERATORS } from '../core/config';
 import * as eco from '../core/economy';
 import * as meta from '../core/meta';
-import { Decimal, formatDuration } from '../core/num';
+import { D, Decimal, format, formatDuration } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { petUrl } from '../scene/art';
@@ -305,14 +305,17 @@ export function renderBossBanner(game: Game): void {
   $('boss-edge').hidden = !b;
   if (!b) return;
   setText($('boss-name'), BOSS_NAMES[b.name % BOSS_NAMES.length]);
-  setText($('boss-time'), `${Math.max(0, Math.ceil((b.endsAt - Date.now()) / 1000))}s`);
-  $('boss-hp').style.width = `${meta.bossHealth(game.state) * 100}%`;
+  const health = meta.bossHealth(game.state);
+  setText($('boss-time'), `${Math.ceil(health * 100)}%`);
+  setText($('boss-reward'), b.reward ? format(D(b.reward)) : '');
+  $('boss-hp').style.width = `${health * 100}%`;
 }
 
 /** The big hazard-striped warning when a boss wreck arrives. */
-export function showBossAlert(name: string): void {
+export function showBossAlert(name: string, reward: string): void {
   const alert = $('boss-alert');
   setText($('boss-alert-name'), name);
+  setText($('boss-alert-reward'), reward);
   alert.hidden = false;
   // Restart the animation, then hide it when it has played.
   alert.style.animation = 'none';

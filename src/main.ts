@@ -7,7 +7,7 @@ import { CLAW, GENERATORS, UPGRADES } from './core/config';
 import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, STORY, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
-import { format } from './core/num';
+import { D, format } from './core/num';
 import { Game } from './game';
 import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
@@ -261,24 +261,20 @@ async function boot(): Promise<void> {
         sfx.tap();
         break;
       case 'boss':
-        if (e.phase === 'arrive') {
-          scene.setBoss(game.state.boss!.name);
-          showBossAlert(BOSS_NAMES[game.state.boss!.name % BOSS_NAMES.length]);
-          sfx.bossAlarm();
-          buzz(120);
-        } else {
-          scene.setBoss(null);
-          ui.toast(ICONS.warp, '<b>The wreck drifted away.</b> Another will turn up soon.');
-        }
+        scene.setBoss(game.state.boss!.name);
+        showBossAlert(BOSS_NAMES[game.state.boss!.name % BOSS_NAMES.length], format(D(game.state.boss!.reward ?? 0)));
+        sfx.bossAlarm();
+        buzz(120);
         break;
       case 'bossHit':
         scene.bossHit();
         shakeBossBanner();
+        sfx.bossHit();
         break;
       case 'bossDefeated':
         scene.setBoss(null, true);
         ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>Wreck broken!</b> +${fmt(e.scrap)} and ${e.crystals} crystals`);
-        sfx.warp();
+        sfx.bossBreak();
         buzz(80);
         break;
       case 'story': {

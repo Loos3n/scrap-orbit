@@ -39,7 +39,7 @@ export type GameEvent =
   | { type: 'streakClaim'; reward: meta.ClaimedReward }
   | { type: 'pet'; id: PetId | null; adopted: boolean }
   | { type: 'petTap'; value: Decimal }
-  | { type: 'boss'; phase: 'arrive' | 'escape' }
+  | { type: 'boss' }
   | { type: 'bossDefeated'; scrap: Decimal; crystals: number }
   | { type: 'bossHit'; value: Decimal }
   | { type: 'story'; id: string }
@@ -154,8 +154,7 @@ export class Game {
   private updateBoss(now: number, dt: number): void {
     if (dt <= 0) return;
     const r = meta.updateBoss(this.state, now, dt);
-    if (r.arrived) this.emit({ type: 'boss', phase: 'arrive' });
-    if (r.escaped) this.emit({ type: 'boss', phase: 'escape' });
+    if (r.arrived) this.emit({ type: 'boss' });
     if (r.defeated) this.emit({ type: 'bossDefeated', ...r.defeated });
   }
 

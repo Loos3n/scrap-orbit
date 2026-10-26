@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOSS, STORY } from './content';
-import { tapValue } from './economy';
+import { baseIncome, tapValue } from './economy';
 import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss, updateStory } from './meta';
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
@@ -72,14 +72,29 @@ describe('boss wrecks', () => {
     expect(s.nextBossAt).toBeGreaterThan(NOW + BOSS.gap[0] * 60_000 - 1);
   });
 
-  it('drifts away when time runs out, and waits during the tutorial', () => {
+  it('stays until broken, and waits during the tutorial', () => {
     const s = ready();
     s.tutorial = 2;
     expect(updateBoss(s, NOW, 1).arrived).toBeUndefined();
     s.tutorial = -1;
     updateBoss(s, NOW, 1);
-    expect(updateBoss(s, NOW + BOSS.seconds * 1000, 0.01).escaped).toBe(true);
+    s.owned.drone = 0;
+    updateBoss(s, NOW + 3_600_000, 0.01);
+    expect(s.boss).not.toBeNull();
     expect(s.stats.bosses).toBe(0);
+  });
+
+  it('pays a fixed reward of minutes of scrap per second, set on arrival', () => {
+    const s = ready();
+    updateBoss(s, NOW, 1);
+    const promised = D(s.boss!.reward!);
+    expect(promised.toNumber()).toBeCloseTo(Math.max(baseIncome(s).mul(BOSS.rewardIncomeSec).toNumber(), tapValue(s, NOW).mul(BOSS.rewardTaps).toNumber()));
+    s.owned.drone = 50;
+    const before = D(s.scrap);
+    let won;
+    for (let i = 0; i < 100000 && !won; i++) won = hitBoss(s, D(s.boss!.max), NOW);
+    expect(won!.scrap.toString()).toBe(promised.toString());
+    expect(D(s.scrap).sub(before).toString()).toBe(promised.toString());
   });
 
   it('survives a save', () => {

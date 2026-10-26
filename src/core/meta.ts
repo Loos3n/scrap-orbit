@@ -386,13 +386,19 @@ export function catDue(state: GameState, lastPounce: number, now: number): boole
 export interface BossUpdate {
   arrived?: boolean;
   defeated?: { scrap: Decimal; crystals: number };
-  escaped?: boolean;
 }
 
 function bossHp(state: GameState, now: number): Decimal {
   const tough = BOSS.growth ** state.stats.bosses;
   const hp = tapValue(state, now).mul(BOSS.hpTaps).add(baseIncome(state).mul(BOSS.hpIncomeSec));
   return Decimal.max(hp.mul(tough), D(60));
+}
+
+/** The scrap a wreck pays out: minutes of the station's scrap per second, set when it arrives. */
+export function bossReward(state: GameState, now: number): Decimal {
+  const a = baseIncome(state).mul(BOSS.rewardIncomeSec);
+  const t = tapValue(state, now).mul(BOSS.rewardTaps);
+  return a.gt(t) ? a : t;
 }
 
 /** Damage multiplier on boss wrecks (the Goo Blob likes to chew). */
@@ -411,18 +417,12 @@ export function updateBoss(state: GameState, now: number, dt: number, rand = Mat
     if (state.nextBossAt === 0) state.nextBossAt = now + Math.max(0, BOSS.firstSec - state.stats.playSec) * 1000;
     if (now < state.nextBossAt) return {};
     const hp = bossHp(state, now);
-    state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: now + BOSS.seconds * 1000 };
+    state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: 0, reward: bossReward(state, now).toString() };
     return { arrived: true };
   }
   const chip = baseIncome(state).mul(BOSS.machineShare * dt * bossDamageMult(state));
-  const defeated = damageBoss(state, chip, now);
-  if (defeated) return { defeated };
-  if (now >= b.endsAt) {
-    state.boss = null;
-    scheduleBoss(state, now, rand);
-    return { escaped: true };
-  }
-  return {};
+  const defeated = damageBoss(state, chip, now, rand);
+  return defeated ? { defeated } : {};
 }
 
 function scheduleBoss(state: GameState, now: number, rand: () => number): void {
@@ -430,7 +430,7 @@ function scheduleBoss(state: GameState, now: number, rand: () => number): void {
   state.nextBossAt = now + (lo + rand() * (hi - lo)) * 60_000;
 }
 
-function damageBoss(state: GameState, amount: Decimal, now: number): BossUpdate['defeated'] {
+function damageBoss(state: GameState, amount: Decimal, now: number, rand: () => number = Math.random): BossUpdate['defeated'] {
   const b = state.boss;
   if (!b) return undefined;
   const hp = D(b.hp).sub(amount);
@@ -440,10 +440,8 @@ function damageBoss(state: GameState, amount: Decimal, now: number): BossUpdate[
   }
   state.boss = null;
   state.stats.bosses++;
-  scheduleBoss(state, now, Math.random);
-  const a = income(state, now).mul(BOSS.rewardIncomeSec);
-  const t = tapValue(state, now).mul(BOSS.rewardTaps);
-  const scrap = a.gt(t) ? a : t;
+  scheduleBoss(state, now, rand);
+  const scrap = b.reward ? D(b.reward) : bossReward(state, now);
   earn(state, scrap);
   addCrystals(state, BOSS.crystals);
   return { scrap, crystals: BOSS.crystals };
