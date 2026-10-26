@@ -25,6 +25,7 @@ export class Sfx {
   private chord = 0;
   private tapStep = 0;
   private lastTap = 0;
+  private lastBuy = 0;
 
   /** Call from a user gesture. */
   unlock(): void {
@@ -84,6 +85,10 @@ export class Sfx {
 
   buy(): void {
     if (!this.ready()) return;
+    // Holding a buy button fires many buys a second; keep the blips from piling up.
+    const now = performance.now();
+    if (now - this.lastBuy < 70) return;
+    this.lastBuy = now;
     this.tone(660, 0, 0.08, 'square', 0.08);
     this.tone(990, 0.06, 0.12, 'square', 0.08);
   }

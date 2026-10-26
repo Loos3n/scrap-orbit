@@ -5,6 +5,7 @@ import { CREW, RESEARCH } from '../core/content';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
+import { holdToRepeat, makePanelDraggable } from './gestures';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -100,6 +101,7 @@ export class UI {
     this.missions = new MissionsPanel(game, this.fmt);
     this.coach = new Coach(game);
     $('boost').addEventListener('click', () => game.boost());
+    makePanelDraggable($('app'), $('panel'), $('grabber'), document.querySelector<HTMLElement>('.tabs')!, $('hud'));
   }
 
   private buildGenerators(): void {
@@ -129,7 +131,7 @@ export class UI {
         btnCount: li.querySelector('.buy-count')!,
         btnCost: li.querySelector('.buy-cost .n')!,
       };
-      row.btn.addEventListener('click', () => this.game.buy(g.id));
+      holdToRepeat(row.btn, () => this.game.buy(g.id));
       list.appendChild(li);
       this.rows.set(g.id, row);
     }

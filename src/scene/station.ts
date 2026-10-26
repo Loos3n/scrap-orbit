@@ -155,6 +155,7 @@ export class StationScene {
   private nextWeld = 0;
   private nextEmber = 0;
   private scale = 1;
+  private skyKey = '';
   private baseScale = 1;
   private zoom = 1;
   private zoomTarget = 1;
@@ -305,8 +306,15 @@ export class StationScene {
     this.world.position.set(w / 2, top + fh / 2);
     this.world.scale.set(this.scale);
 
-    this.bg.texture?.destroy(true);
-    this.bg.texture = art.backdrop(Math.ceil(w), Math.ceil(h), this.theme?.sky, this.theme?.nebula);
+    // Painting the sky and scattering stars is slow, so only redo it when the screen size or
+    // theme changes, not when the panel is dragged and only the focus band moves.
+    const skyKey = `${Math.ceil(w)}x${Math.ceil(h)}|${this.theme?.id ?? ''}`;
+    const repaint = skyKey !== this.skyKey;
+    this.skyKey = skyKey;
+    if (repaint) {
+      this.bg.texture?.destroy(true);
+      this.bg.texture = art.backdrop(Math.ceil(w), Math.ceil(h), this.theme?.sky, this.theme?.nebula);
+    }
     this.flareGlow.position.set(w * 0.08, top + fh * 0.05);
     this.flareGlow.scale.set(Math.max(w, h) / 40);
 
@@ -321,6 +329,7 @@ export class StationScene {
     this.flash.width = w;
     this.flash.height = h;
 
+    if (!repaint) return;
     for (const st of this.stars) st.s.destroy();
     this.stars = [];
     const count = Math.round((w * h) / 2600);

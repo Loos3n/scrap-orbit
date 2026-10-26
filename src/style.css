@@ -50,7 +50,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
   max-width: 540px;
   margin: 0 auto;
   display: grid;
-  grid-template-rows: auto minmax(160px, 1fr) minmax(0, 50%);
+  grid-template-rows: auto minmax(120px, 1fr) var(--panel-h, minmax(0, 50%));
   grid-template-columns: minmax(0, 1fr);
   padding-top: env(safe-area-inset-top, 0px);
   padding-left: env(safe-area-inset-left, 0px);
@@ -142,7 +142,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
   border-bottom: 0;
   box-shadow: 0 -16px 50px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.08);
 }
-.grabber { width: 40px; height: 4px; border-radius: 2px; background: var(--line); margin: 8px auto 0; }
+.grabber-zone { padding: 9px 0 5px; cursor: grab; touch-action: none; }
+.grabber-zone:active { cursor: grabbing; }
+.grabber { width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto; transition: background 0.15s, width 0.15s; }
+.grabber-zone:hover .grabber, #panel.dragging .grabber { background: var(--ink-dim); width: 56px; }
+#panel .tabs { touch-action: pan-x; }
+#app.snapping { transition: grid-template-rows 0.25s cubic-bezier(0.2, 0.9, 0.3, 1); }
+.gen .buy { -webkit-touch-callout: none; touch-action: manipulation; }
+.gen .buy.holding { animation: hold-pulse 0.35s ease-in-out infinite alternate; }
+@keyframes hold-pulse { to { filter: brightness(1.18); transform: scale(0.97); } }
 .tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 6px 8px; gap: 2px; }
 .tab {
   position: relative;
