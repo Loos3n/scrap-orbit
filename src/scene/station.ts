@@ -81,7 +81,8 @@ export class StationScene {
     wing: Texture; claw: Texture; drone: Texture; hauler: Texture; smelter: Texture; fab: Texture;
     dock: Texture; crate: Texture; debris: Texture[]; planet: Texture; antenna: Texture; moon: Texture;
     galaxy: Texture; rocks: Texture[]; turret: Texture; vortex: Texture; gate: Texture; portal: Texture;
-    sun: Texture; panel: Texture; meteor: Texture;
+    sun: Texture; panel: Texture; meteor: Texture; shadeDark: Texture; shadeLight: Texture;
+    plasma: Texture[]; rays: Texture; reactorRing: Texture; vignette: Texture;
   };
 
   private bg = new Sprite();
@@ -104,6 +105,14 @@ export class StationScene {
   private habitat!: Sprite;
   private coreGlow!: Sprite;
   private core!: Sprite;
+  private plasma: Sprite[] = [];
+  private rays!: Sprite;
+  private reactorRing!: Sprite;
+  private coreHot!: Sprite;
+  private vignette = new Sprite();
+  private keyLight = new Sprite();
+  private dustLayer = new Container();
+  private dust: { s: Sprite; depth: number; phase: number; vx: number; vy: number }[] = [];
   private claw!: Sprite;
   private podLayer = new Container();
   private lights: Sprite[] = [];
@@ -214,6 +223,12 @@ export class StationScene {
       sun: art.sun(),
       panel: art.dysonPanel(),
       meteor: art.meteor(),
+      shadeDark: art.hubShade('dark'),
+      shadeLight: art.hubShade('light'),
+      plasma: [art.plasma(3), art.plasma(8)],
+      rays: art.rays(),
+      reactorRing: art.reactorRing(),
+      vignette: art.vignette(),
     };
 
     this.buildHub();
@@ -232,6 +247,12 @@ export class StationScene {
     // Foreground rocks are drawn soft, as if close to the camera and out of focus.
     this.fgLayer.filters = [new BlurFilter({ strength: 2, quality: 2 })];
     this.flash.alpha = 0;
+    this.vignette.texture = this.tex.vignette;
+    this.keyLight.texture = this.tex.glow;
+    this.keyLight.anchor.set(0.5);
+    this.keyLight.blendMode = 'add';
+    this.keyLight.tint = 0x9fb0ff;
+    this.keyLight.alpha = 0.16;
     this.flareGlow.texture = this.tex.glow;
     this.flareGlow.anchor.set(0.5);
     this.flareGlow.blendMode = 'add';
@@ -239,7 +260,7 @@ export class StationScene {
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.flareGlow, 6], [this.world, 10], [this.fgLayer, 20], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -283,6 +304,10 @@ export class StationScene {
     this.habitat = this.sprite(t.habitat, this.hub);
     this.hullSprites.push(this.habitat);
     this.habitat.scale.set(0.82);
+    // Fixed light and shade over the turning ring, so the hub reads as lit from the upper left.
+    this.sprite(t.shadeDark, this.hub);
+    const lit = this.sprite(t.shadeLight, this.hub);
+    lit.blendMode = 'add';
     // Blinking beacon lights around the rim.
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + Math.PI / 6;
@@ -292,11 +317,27 @@ export class StationScene {
       l.tint = i % 2 ? 0xff6b9a : 0x4fe3c1;
       this.lights.push(l);
     }
+    this.rays = this.sprite(t.rays, this.hub);
+    this.rays.blendMode = 'add';
+    this.rays.alpha = 0.3;
     this.coreGlow = this.sprite(t.glow, this.hub);
     this.coreGlow.blendMode = 'add';
     this.coreGlow.scale.set(2.2);
+    this.reactorRing = this.sprite(t.reactorRing, this.hub);
+    this.reactorRing.blendMode = 'add';
+    this.reactorRing.alpha = 0.55;
     this.core = this.sprite(t.core, this.hub);
     this.core.scale.set(0.95);
+    // Plasma swirls inside the core turn against each other.
+    for (const tex of t.plasma) {
+      const p = this.sprite(tex, this.hub);
+      p.blendMode = 'add';
+      p.scale.set(0.95);
+      this.plasma.push(p);
+    }
+    this.coreHot = this.sprite(t.glow, this.hub);
+    this.coreHot.blendMode = 'add';
+    this.coreHot.scale.set(0.6);
     this.claw = this.sprite(t.claw, this.hub, 0, -60);
     this.claw.anchor.set(0.5, 1);
   }
@@ -334,8 +375,28 @@ export class StationScene {
     this.galaxy.scale.set(Math.min(w, 600) / 300);
     this.flash.width = w;
     this.flash.height = h;
+    this.vignette.width = w * 1.15;
+    this.vignette.height = h * 1.15;
+    this.vignette.position.set(-w * 0.075, -h * 0.075);
+    this.keyLight.position.set(w * 0.1, top + fh * 0.1);
+    this.keyLight.scale.set(Math.max(w, h) / 34);
 
     if (!repaint) return;
+    // Dust drifting close to the camera gives the scene depth.
+    for (const d of this.dust) d.s.destroy();
+    this.dust = [];
+    const dustCount = this.reducedMotion ? 0 : Math.round((w * h) / 16000);
+    for (let i = 0; i < dustCount; i++) {
+      const s = new Sprite(this.tex.glow);
+      s.anchor.set(0.5);
+      s.blendMode = 'add';
+      s.position.set(Math.random() * w, Math.random() * h);
+      const depth = rand(0.3, 1);
+      s.scale.set(0.05 + depth * 0.09);
+      s.tint = Math.random() < 0.5 ? 0xbfd0ff : 0xffe2c0;
+      this.dustLayer.addChild(s);
+      this.dust.push({ s, depth, phase: rand(0, TAU), vx: rand(-5, 5), vy: rand(-3, 3) });
+    }
     for (const st of this.stars) st.s.destroy();
     this.stars = [];
     const count = Math.round((w * h) / 2600);
@@ -730,6 +791,16 @@ export class StationScene {
       s.scale.set(st.base, st.base * (1 + this.warp * 10 * st.depth));
     }
     this.planet.rotation = Math.sin(this.time * 0.05) * 0.02;
+    for (const d of this.dust) {
+      const s = d.s;
+      s.x += (d.vx + 4) * d.depth * dt;
+      s.y += (d.vy + fall * 0.6) * d.depth * dt;
+      if (s.x > w + 10) s.x -= w + 20;
+      if (s.x < -10) s.x += w + 20;
+      if (s.y > h + 10) s.y -= h + 20;
+      if (s.y < -10) s.y += h + 20;
+      s.alpha = (0.25 + 0.35 * Math.sin(this.time * 0.9 + d.phase) ** 2) * d.depth;
+    }
 
     this.nextComet -= dt;
     if (!this.comet && this.nextComet <= 0 && !this.reducedMotion) {
@@ -1137,6 +1208,19 @@ export class StationScene {
     this.coreGlow.scale.set(2 + beat * 0.25 + this.squash * 0.6);
     this.coreGlow.alpha = 0.7 + beat * 0.3;
     this.claw.scale.set(1, 1 + Math.sin(this.clawSnap * Math.PI) * 0.18);
+    const spin = this.boosting ? 3 : 1;
+    this.plasma.forEach((p, i) => {
+      p.rotation = t * (i ? -0.9 : 0.6) * spin;
+      p.tint = color;
+      p.alpha = 0.55 + 0.25 * Math.sin(t * 1.7 + i * 2);
+    });
+    this.rays.rotation = t * 0.08;
+    this.rays.tint = color;
+    this.rays.alpha = 0.22 + beat * 0.12 + this.squash * 0.3;
+    this.rays.scale.set(1.25 + beat * 0.08 + this.squash * 0.25);
+    this.reactorRing.rotation = -t * 0.5 * spin;
+    this.reactorRing.tint = color;
+    this.coreHot.alpha = 0.6 + beat * 0.3 + this.squash * 0.4;
 
     this.lights.forEach((l, i) => {
       const on = Math.sin(t * 3 + i * 1.3) > 0.2;
