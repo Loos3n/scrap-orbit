@@ -4,6 +4,7 @@ import * as eco from '../core/economy';
 import { GOLDEN, LOOT, MODULES, TRIPS, TRIP_PER_LEVEL, TRIP_SLOTS, bonuses, goldenActive, moduleCost, moduleDef, moduleUnlocked, moduleYield, onTrip, tripMs, type Bonuses, type ModuleId } from '../core/expansion';
 import { formatDuration, type Decimal } from '../core/num';
 import type { Game } from '../game';
+import { pressWatch } from './gestures';
 import { ICONS } from './icons';
 import { portrait } from './portrait';
 
@@ -87,7 +88,7 @@ export class ModulePanel {
       .join('');
     const here = moduleDef(s.modules[this.selected] ?? '');
     if (here) {
-      const refund = moduleCost({ ...s, modules: s.modules.map((m, i) => (i === this.selected ? null : m)) }, here.id);
+      const refund = s.modulePaid[this.selected] ?? 0;
       $('module-detail').innerHTML = `<div class="module-here" style="--c:${hex(here.color)}">
         <div class="module-icon">${MODULE_ICONS[here.id]}</div>
         <div><b>${esc(here.name)}</b><div class="module-yield">Giving ${bonusText(moduleYield(s.modules, this.selected))}</div><div class="module-rule">${esc(here.rule)}</div></div>
@@ -116,11 +117,14 @@ export class ModulePanel {
 export class TripPanel {
   private key = '';
   private pick: CrewId | null = null;
+  /** A finger is down on the panel: hold the once-a-second redraw so the press isn't lost. */
+  private pressing: () => boolean;
 
   constructor(
     private game: Game,
     private fmt: Fmt,
   ) {
+    this.pressing = pressWatch($('trip-panel'));
     $('trip-panel').addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-pick],button[data-send],button[data-claim]');
       if (!el) return;
@@ -139,13 +143,15 @@ export class TripPanel {
   }
 
   render(): void {
+    if (this.pressing()) return;
     const s = this.game.state;
     const now = Date.now();
     const home = CREW.filter((c) => s.crew[c.id] > 0 && !onTrip(s, c.id));
     if (!this.pick || !home.some((c) => c.id === this.pick)) this.pick = home[0]?.id ?? null;
-    // Redraw when anything changes, and each second while a trip is running.
-    const key = JSON.stringify(s.trips) + home.map((c) => c.id + s.crew[c.id]).join() + this.pick + Math.floor(now / 1000) + s.blueprints.size;
-    if (key === this.key) return;
+    // Rebuild only when something real changes (a trip leaves or comes back); the countdowns
+    // tick in place, so buttons are never swapped out from under a finger.
+    const key = JSON.stringify(s.trips) + s.trips.map((t) => now >= t.endsAt).join() + home.map((c) => c.id + s.crew[c.id]).join() + this.pick + s.blueprints.size + Math.round(eco.baseIncome(s).log10() * 10);
+    if (key === this.key) return this.tick(now);
     this.key = key;
     const slots = Array.from({ length: TRIP_SLOTS }, (_, i) => {
       const t = s.trips[i];
@@ -155,7 +161,7 @@ export class TripPanel {
       const total = tripMs(s, def);
       const left = Math.max(0, t.endsAt - now);
       const done = left === 0;
-      return `<li class="trip-slot${done ? ' done' : ''}" style="--c:${hex(def.color)}">
+      return `<li class="trip-slot${done ? ' done' : ''}" data-i="${i}" style="--c:${hex(def.color)}">
         <div class="trip-face">${portrait(c, false)}</div>
         <div class="trip-info"><b>${esc(c.name)}</b> &middot; ${esc(def.name)}
           <div class="bar"><i style="width:${(100 * (1 - left / total)).toFixed(1)}%"></i></div>
@@ -183,6 +189,22 @@ export class TripPanel {
       <h3 class="section-title">Who goes?</h3><div class="trip-crew-row">${crewRow}</div>
       <p class="module-hint">While away, a crew member's machine loses their bonus. Higher levels bring back more.</p>
       <ul class="trip-dests">${dests}</ul>`;
+    this.tick(now);
+  }
+
+  /** Moves the countdown text and bars along without rebuilding anything. */
+  private tick(now: number): void {
+    const s = this.game.state;
+    $('trip-panel').querySelectorAll<HTMLElement>('.trip-slot[data-i]').forEach((li) => {
+      const t = s.trips[Number(li.dataset.i)];
+      if (!t) return;
+      const left = Math.max(0, t.endsAt - now);
+      const total = tripMs(s, TRIPS.find((x) => x.id === t.dest)!);
+      const bar = li.querySelector<HTMLElement>('.bar i');
+      if (bar) bar.style.width = `${(100 * (1 - left / total)).toFixed(1)}%`;
+      const text = li.querySelector<HTMLElement>('.trip-left');
+      if (text) setText(text, left === 0 ? 'Back with the haul!' : `${formatDuration(left / 1000)} left`);
+    });
   }
 }
 

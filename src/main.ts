@@ -334,7 +334,7 @@ async function boot(): Promise<void> {
         const c = CREW.find((x) => x.id === r.crew)!;
         ui.toast(ICONS.crystal, `<b>${c.name}'s haul:</b> +${fmt(r.scrap)} and ${r.crystals} crystals`);
         if (r.blueprint) {
-          setTimeout(() => ui.toast(ICONS.station.replace('currentColor', '#c58cff'), `<b>Blueprint found: ${moduleDef(r.blueprint!)!.name}!</b> Build it in Station, Modules`), 700);
+          setTimeout(() => ui.toast(ICONS.station.replace('currentColor', '#c58cff'), `<b>Blueprint found: ${moduleDef(r.blueprint!)!.name}!</b> Build it in Station, Rooms`), 700);
         }
         scene.celebrate(0x4fe3c1);
         sfx.coins();

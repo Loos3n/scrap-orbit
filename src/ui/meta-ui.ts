@@ -7,6 +7,7 @@ import { D, Decimal, format, formatDuration } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { petUrl } from '../scene/art';
+import { pressWatch } from './gestures';
 import { portrait } from './portrait';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -109,6 +110,7 @@ function researchIcon(r: ResearchDef): string {
 export class LabPanel {
   private selected = RESEARCH[0].id;
   private treeKey = '';
+  private rushPressed: () => boolean;
   constructor(private game: Game) {
     $('lab-tree').addEventListener('click', (e) => {
       const node = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-research]');
@@ -123,6 +125,7 @@ export class LabPanel {
     $('lab-active').addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('[data-rush]')) this.game.rushResearch();
     });
+    this.rushPressed = pressWatch($('lab-active'));
   }
 
   /** A dot on the tab when the lab is idle and something can be started. */
@@ -135,6 +138,8 @@ export class LabPanel {
     const s = this.game.state;
     const now = Date.now();
     const a = s.research.active;
+    // The countdown redraws each second; wait while the Finish button is being pressed.
+    if (a && this.rushPressed()) return;
     if (a) {
       const def = RESEARCH.find((r) => r.id === a.id)!;
       const left = Math.max(0, (a.endsAt - now) / 1000);
@@ -583,7 +588,10 @@ export class Coach {
       return;
     }
     // A target inside a closed tab: point at the tab first.
-    if (def.tab && $(`tab-${def.tab}`).hidden) def = { text: `Open the ${TAB_NAMES[def.tab]} tab.`, target: `.tab[data-tab="${def.tab}"]` };
+    const panelClosed = $('app').classList.contains('panel-closed');
+    if (def.tab && ($(`tab-${def.tab}`).hidden || panelClosed)) def = { text: `Open the ${TAB_NAMES[def.tab]} tab.`, target: `.tab[data-tab="${def.tab}"]` };
+    // A target in the hidden panel: ask for the panel back first.
+    else if (panelClosed && def.target && !def.target.startsWith('@') && $('sheet').querySelector(def.target)) def = { text: 'Tap the highlighted tab to open the panel.', target: '.tab[aria-selected="true"]' };
     if (this.game.tutorialStep === 'upgradeTab' && !$('tab-upgrades').hidden) this.game.advanceTutorial('upgradeTab');
 
     // '@crate' follows the drifting crate rather than an element.

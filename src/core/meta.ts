@@ -340,8 +340,9 @@ export function nextFreePet(state: GameState): PetId | null {
 
 /** What a scrap reward is worth right now: minutes of income, or taps if those pay more. */
 export function streakScrap(state: GameState, minutes: number, now: number): Decimal {
-  const a = income(state, now).mul(minutes * 60);
-  const b = tapValue(state, now).mul(minutes * 20);
+  // Plain values, so claiming during Overdrive or a golden rush doesn't multiply the reward.
+  const a = baseIncome(state).mul(minutes * 60);
+  const b = tapValue(state, now, true).mul(minutes * 20);
   return Decimal.max(a.gt(b) ? a : b, D(100));
 }
 
@@ -408,14 +409,15 @@ export interface BossUpdate {
 
 function bossHp(state: GameState, now: number): Decimal {
   const tough = BOSS.growth ** state.stats.bosses;
-  const hp = tapValue(state, now).mul(BOSS.hpTaps).add(baseIncome(state).mul(BOSS.hpIncomeSec));
+  const hp = tapValue(state, now, true).mul(BOSS.hpTaps).add(baseIncome(state).mul(BOSS.hpIncomeSec));
   return Decimal.max(hp.mul(tough), D(60));
 }
 
 /** The scrap a wreck pays out: minutes of the station's scrap per second, set when it arrives. */
 export function bossReward(state: GameState, now: number): Decimal {
   const a = baseIncome(state).mul(BOSS.rewardIncomeSec);
-  const t = tapValue(state, now).mul(BOSS.rewardTaps);
+  // Plain values: a wreck that turns up during Overdrive or a golden rush shouldn't pay 14x.
+  const t = tapValue(state, now, true).mul(BOSS.rewardTaps);
   return a.gt(t) ? a : t;
 }
 
@@ -515,15 +517,20 @@ export function buildModule(state: GameState, slot: number, id: ModuleId): boole
   if (state.crystals < cost) return false;
   state.crystals -= cost;
   state.modules[slot] = id;
+  state.modulePaid[slot] = cost;
   return true;
 }
 
-/** Takes a module down and refunds what the last one built would cost, so layouts are free to try. */
+/**
+ * Takes a module down and refunds exactly what it cost, so layouts are free to try. (Refunding
+ * today's price instead let players farm crystals by building and removing in a clever order.)
+ */
 export function removeModule(state: GameState, slot: number): number {
   const id = state.modules[slot] as ModuleId | null;
   if (!id) return 0;
+  const refund = state.modulePaid[slot] ?? 0;
   state.modules[slot] = null;
-  const refund = moduleCost(state, id);
+  state.modulePaid[slot] = 0;
   state.crystals += refund;
   return refund;
 }

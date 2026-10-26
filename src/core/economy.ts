@@ -14,7 +14,7 @@ import {
   type GeneratorId,
   type UpgradeDef,
 } from './config';
-import { CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
+import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, goldenActive, onTrip } from './expansion';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
@@ -180,10 +180,11 @@ export function buyClaw(state: GameState): boolean {
   return true;
 }
 
-export function tapValue(state: GameState, now: number): Decimal {
+/** What one tap earns. `plain` leaves out timed boosts (Overdrive, golden rush, solar flare). */
+export function tapValue(state: GameState, now: number, plain = false): Decimal {
   let mult = clawBase(state.claw) * researchProduct(state, 'tapMult');
   let share = researchSum(state, 'tapIncomeShare');
-  if (flareActive(state, now)) mult *= FLARE_TAP_MULT * researchProduct(state, 'flareMult');
+  if (!plain && flareActive(state, now)) mult *= FLARE_TAP_MULT * researchProduct(state, 'flareMult');
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'tapMult') mult *= e.mult;
@@ -191,6 +192,7 @@ export function tapValue(state: GameState, now: number): Decimal {
     }
   }
   const value = D(mult * globalMult(state) * (1 + bonuses(state).tap)).add(baseIncome(state).mul(share));
+  if (plain) return value;
   const boosted = boostActive(state, now) ? value.mul(BOOST.mult) : value;
   return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
@@ -301,6 +303,9 @@ export function relocate(state: GameState, now: number): number {
   state.claw = 0;
   state.boostUntil = 0;
   state.boostReadyAt = 0;
+  // A wreck sized for the old station would be unbreakable (and overpaid) in the new one.
+  state.boss = null;
+  state.nextBossAt = now + BOSS.gap[0] * 60_000;
   state.lastSeen = now;
   state.stats.runSec = 0;
   if (hasPerk(state, 'headstart')) state.owned.drone = 10;

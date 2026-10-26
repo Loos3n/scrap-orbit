@@ -1,6 +1,6 @@
 import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
 import { CREW, PETS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
-import { GRID, LOOT, MODULES, TRIPS, type Trip } from './expansion';
+import { GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Trip } from './expansion';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -48,6 +48,8 @@ export interface GameState {
   nextBossAt: number;
   /** Station module grid, row by row: a module id or null for an empty slot. */
   modules: (string | null)[];
+  /** Crystals paid for the module in each slot, refunded in full when it comes down. */
+  modulePaid: number[];
   /** Module blueprints found on expeditions. */
   blueprints: Set<string>;
   /** Crew away on expeditions. */
@@ -109,6 +111,7 @@ interface SaveData {
   boss?: GameState['boss'];
   nextBossAt?: number;
   modules?: (string | null)[];
+  modulePaid?: number[];
   blueprints?: string[];
   trips?: Trip[];
   loot?: string[];
@@ -159,6 +162,7 @@ export function newState(now: number): GameState {
     boss: null,
     nextBossAt: 0,
     modules: Array(GRID * GRID).fill(null),
+    modulePaid: Array(GRID * GRID).fill(0),
     blueprints: new Set(),
     trips: [],
     loot: new Set(),
@@ -213,6 +217,7 @@ export function serialize(state: GameState): string {
     boss: state.boss,
     nextBossAt: state.nextBossAt,
     modules: [...state.modules],
+    modulePaid: [...state.modulePaid],
     blueprints: [...state.blueprints],
     trips: state.trips.map((t) => ({ ...t })),
     loot: [...state.loot],
@@ -285,10 +290,30 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.nextBossAt = Number(data.nextBossAt) || 0;
   const moduleIds = new Set<string>(MODULES.map((m) => m.id));
   if (Array.isArray(data.modules)) state.modules = state.modules.map((_, i) => (moduleIds.has(data.modules![i] ?? '') ? data.modules![i] : null));
+  // Only one of each limited room (the reactor) survives a hand-edited or glitched save.
+  for (const m of MODULES) {
+    if (!m.max) continue;
+    let seen = 0;
+    state.modules = state.modules.map((id) => (id === m.id && ++seen > m.max! ? null : id));
+  }
+  // Saves from before refunds were tracked get back each room's base price.
+  state.modulePaid = state.modules.map((id, i) => {
+    const paid = Array.isArray(data.modulePaid) ? Number(data.modulePaid[i]) : NaN;
+    return id ? (Number.isFinite(paid) && paid >= 0 ? Math.floor(paid) : MODULES.find((m) => m.id === id)!.cost) : 0;
+  });
   for (const id of strings(data.blueprints)) if (moduleIds.has(id)) state.blueprints.add(id);
   const tripIds = new Set(TRIPS.map((t) => t.id));
   if (Array.isArray(data.trips)) {
-    state.trips = data.trips.filter((t) => t && CREW.some((c) => c.id === t.crew) && tripIds.has(t.dest) && typeof t.endsAt === 'number');
+    // Each crew member can be on one trip, only recruited crew can go, and only so many at once.
+    const going = new Set<string>();
+    state.trips = data.trips
+      .filter((t) => {
+        const ok = t && CREW.some((c) => c.id === t.crew) && state.crew[t.crew] > 0 && !going.has(t.crew) && tripIds.has(t.dest) && Number.isFinite(t.endsAt);
+        if (ok) going.add(t.crew);
+        return ok;
+      })
+      .slice(0, TRIP_SLOTS)
+      .map((t) => ({ crew: t.crew, dest: t.dest, endsAt: t.endsAt }));
   }
   const lootIds = new Set(LOOT.map((l) => l.id));
   for (const id of strings(data.loot)) if (lootIds.has(id)) state.loot.add(id);

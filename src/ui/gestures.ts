@@ -63,6 +63,17 @@ export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLEl
 }
 
 /**
+ * For panels that redraw on a timer: reports when a finger is down on `el`, so the redraw can
+ * wait. Replacing a button between press and release would swallow the tap.
+ */
+export function pressWatch(el: HTMLElement): () => boolean {
+  let down = false;
+  el.addEventListener('pointerdown', () => (down = true));
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) el.addEventListener(ev, () => setTimeout(() => (down = false), 0));
+  return () => down;
+}
+
+/**
  * Press once to act once; hold to repeat, starting after a short pause and speeding up.
  * The click that follows a hold is swallowed so it doesn't buy one extra.
  */

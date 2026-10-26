@@ -109,7 +109,8 @@ export class Game {
     this.lastFrame = now;
     if (dt > AWAY_THRESHOLD_SEC) {
       this.collectOffline(now);
-    } else {
+    } else if (dt > 0) {
+      // (A clock that jumps backwards gives a negative gap: skip that frame.)
       eco.tick(this.state, dt, now);
       this.state.lastSeen = now;
       this.state.stats.playSec += dt;
@@ -366,6 +367,9 @@ export class Game {
     this.state.settings = settings;
     storageSet(null);
     this.lastFrame = now;
+    this.tripsReady.clear();
+    this.streakShown = '';
+    this.readyMissions = 0;
     this.emit({ type: 'reset' });
   }
 

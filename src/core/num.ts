@@ -41,6 +41,8 @@ export function format(value: Decimal | number, style: NumberStyle | boolean = '
   }
   const group = Math.floor(v.e / 3);
   const mantissa = v.m * Math.pow(10, v.e - group * 3);
+  // Past "zz" the letters run out, so very large numbers fall back to scientific.
+  if (group - SHORT.length >= 26 * 26) return format(v, 'scientific');
   const suffix = group < SHORT.length ? SHORT[group] : letterSuffix(group - SHORT.length);
   const digits = mantissa >= 100 ? 0 : mantissa >= 10 ? 1 : 2;
   const factor = Math.pow(10, digits);

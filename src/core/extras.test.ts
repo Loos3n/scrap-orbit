@@ -196,3 +196,62 @@ describe('golden scrap', () => {
     expect(back.skins.cat).toBe('skin-cat');
   });
 });
+
+describe('bug fixes', () => {
+  it('refunds exactly what a room cost, so build-and-remove orders cannot farm crystals', () => {
+    const s = newState(NOW);
+    s.blueprints.add('observatory');
+    s.crystals = 1000;
+    for (let round = 0; round < 5; round++) {
+      buildModule(s, 4, 'observatory');
+      buildModule(s, 0, 'solar');
+      buildModule(s, 2, 'solar');
+      removeModule(s, 4);
+      removeModule(s, 0);
+      removeModule(s, 2);
+    }
+    expect(s.crystals).toBe(1000);
+  });
+
+  it('keeps what was paid across a save, and trims impossible trips and extra reactors', () => {
+    const s = newState(NOW);
+    s.crystals = 200;
+    buildModule(s, 0, 'solar');
+    buildModule(s, 1, 'hangar');
+    const back = deserialize(serialize(s), NOW)!;
+    expect(back.modulePaid.slice(0, 2)).toEqual(s.modulePaid.slice(0, 2));
+    const raw = JSON.parse(serialize(s));
+    raw.modules = ['reactor', 'reactor', null, null, null, null, null, null, null];
+    delete raw.modulePaid;
+    raw.crew = { mika: 1, bolt: 1, ash: 1 };
+    raw.trips = [
+      { crew: 'mika', dest: 'field', endsAt: NOW },
+      { crew: 'mika', dest: 'nebula', endsAt: NOW },
+      { crew: 'juno', dest: 'field', endsAt: NOW },
+      { crew: 'bolt', dest: 'field', endsAt: NOW },
+      { crew: 'ash', dest: 'field', endsAt: NOW },
+    ];
+    const odd = deserialize(JSON.stringify(raw), NOW)!;
+    expect(odd.modules.filter((m) => m === 'reactor')).toHaveLength(1);
+    expect(odd.modulePaid[0]).toBe(25);
+    expect(odd.trips.map((t) => t.crew)).toEqual(['mika', 'bolt']);
+  });
+
+  it('sizes and pays boss wrecks without Overdrive or golden rush inflating them', () => {
+    const plain = newState(NOW);
+    plain.owned.drone = 50;
+    plain.tutorial = -1;
+    plain.nextBossAt = NOW;
+    const rushed = newState(NOW);
+    rushed.owned.drone = 50;
+    rushed.tutorial = -1;
+    rushed.nextBossAt = NOW;
+    rushed.boostUntil = NOW + 30_000;
+    claimGolden(rushed, NOW);
+    updateBoss(plain, NOW, 0.01, () => 0.5);
+    updateBoss(rushed, NOW, 0.01, () => 0.5);
+    expect(rushed.boss!.reward).toBe(plain.boss!.reward);
+    expect(rushed.boss!.max).toBe(plain.boss!.max);
+    expect(tapValue(rushed, NOW).gt(tapValue(rushed, NOW, true))).toBe(true);
+  });
+});
