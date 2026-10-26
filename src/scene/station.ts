@@ -1,6 +1,7 @@
 import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
 import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } from '../core/content';
+import type { SkinDef } from '../core/collection';
 import * as art from './art';
 
 /** Size of the world in scene units; the scene scales this to fit the viewport. */
@@ -599,14 +600,19 @@ export class StationScene {
     this.crateRate = mult;
   }
 
-  /** Colours the sky, core and beacons, and paints the hull. */
-  setTheme(theme: ThemeDef, paint: number): void {
+  /**
+   * Colours the sky, core and beacons, and paints the hull. A station skin, when worn, takes
+   * over the hull, reactor glow and beacons, and washes every machine in its colour.
+   */
+  setTheme(theme: ThemeDef, paint: number, skin: SkinDef | null = null): void {
     if (!this.ready) return;
     const changedSky = this.theme?.id !== theme.id;
     this.theme = theme;
-    this.coreColor = theme.core;
-    this.lights.forEach((l, i) => (l.tint = theme.beacons[i % 2]));
-    for (const h of this.hullSprites) h.tint = paint;
+    this.coreColor = skin?.core ?? theme.core;
+    const beacons = skin?.beacons ?? theme.beacons;
+    this.lights.forEach((l, i) => (l.tint = beacons[i % 2]));
+    for (const h of this.hullSprites) h.tint = skin?.hull ?? paint;
+    for (const layer of [this.machineLayer, this.droneLayer, this.podLayer, this.dockLayer]) layer.tint = skin?.machines ?? 0xffffff;
     if (changedSky && this.tex) this.layout();
   }
 

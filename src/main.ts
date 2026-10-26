@@ -5,6 +5,7 @@ import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
 import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
+import { SAFE_TYPES, SETS, SKINS } from './core/collection';
 import { CHALLENGES, GOLDEN, LOOT, TRIPS, moduleDef } from './core/expansion';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
@@ -13,6 +14,7 @@ import { Game } from './game';
 import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
+import { SafeGame, safeText, setDoneText } from './ui/book-ui';
 import { tradeText } from './ui/trade-ui';
 import { UI } from './ui/ui';
 
@@ -61,6 +63,13 @@ async function boot(): Promise<void> {
   };
   const sfx = new Sfx();
   const ui = new UI(game);
+  ui.safeGame = new SafeGame(game, (kind) => {
+    if (kind === 'open') sfx.upgrade();
+    else if (kind === 'miss') sfx.bossHit();
+    else if (kind === 'done') sfx.achievement();
+    else sfx.buy();
+    buzz(kind === 'miss' ? 30 : 15);
+  });
   ui.onSoundChange = (sound, music) => {
     sfx.enabled = sound;
     sfx.setMusic(music);
@@ -92,7 +101,7 @@ async function boot(): Promise<void> {
   syncPerks();
   const syncDecor = () => {
     const s = game.state;
-    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (PAINTS.find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint);
+    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (PAINTS.find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint, SKINS.find((k) => k.id === s.skin) ?? null);
     document.documentElement.style.setProperty('--theme-core', '#' + (THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0]).core.toString(16).padStart(6, '0'));
   };
   syncDecor();
@@ -348,6 +357,27 @@ async function boot(): Promise<void> {
           sfx.event();
         } else ui.toast(ICONS.warp, 'The trader has moved on');
         scene.setTrader(e.phase === 'arrived');
+        break;
+      case 'safe':
+        ui.toast(ICONS.lock.replace('currentColor', '#9dff6b'), '<b>Locked cargo drifting by!</b> Tap the banner to crack it before it floats off');
+        sfx.event();
+        break;
+      case 'safeOpened':
+        ui.toast(ICONS.lock.replace('currentColor', hexColor(SAFE_TYPES.find((t) => t.id === e.reward.type)!.color)), safeText(e.reward, fmt));
+        if (e.reward.locks) {
+          scene.celebrate(0x9dff6b);
+          sfx.coins();
+        }
+        break;
+      case 'set':
+        ui.toast(ICONS.trophy.replace('currentColor', hexColor(SETS.find((x) => x.id === e.id)!.color)), setDoneText(e.id));
+        scene.celebrate(SETS.find((x) => x.id === e.id)!.color);
+        sfx.achievement();
+        buzz(40);
+        break;
+      case 'stationSkin':
+        syncDecor();
+        sfx.upgrade();
         break;
       case 'trade':
         ui.toast(ICONS.crystal.replace('currentColor', '#5cd6ff'), tradeText(e.result, fmt));

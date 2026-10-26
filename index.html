@@ -43,6 +43,7 @@
           </div>
           <div class="boss-hp"><i id="boss-hp"></i></div>
         </div>
+        <button id="safe-banner" class="trader-banner safe-banner" type="button" hidden><span data-icon="lock"></span>Locked cargo! <b id="safe-time"></b></button>
         <button id="trader-banner" class="trader-banner" type="button" hidden><span data-icon="crystal"></span>Trader docked <b id="trader-time"></b></button>
         <div id="golden-banner" class="golden-banner" hidden><span data-icon="star"></span>Golden rush <b id="golden-time"></b></div>
         <div id="event-banner" class="event-banner" hidden>
@@ -134,7 +135,7 @@
           <div class="segments" role="tablist" aria-label="Station sections">
             <button type="button" data-seg="modules" aria-selected="true">Rooms</button>
             <button type="button" data-seg="decor" aria-selected="false">Decor</button>
-            <button type="button" data-seg="awards" aria-selected="false">Awards</button>
+            <button type="button" data-seg="awards" aria-selected="false">Book</button>
             <button type="button" data-seg="stats" aria-selected="false">Stats</button>
             <button type="button" data-seg="settings" aria-selected="false">Settings</button>
           </div>
@@ -149,8 +150,14 @@
             <ul id="theme-list" class="decor-grid"></ul>
             <h3 class="section-title">Hull paint</h3>
             <ul id="paint-list" class="decor-grid"></ul>
+            <h3 class="section-title">Station skins</h3>
+            <p class="tab-intro">Whole new looks for the hull, reactor and every machine. Finish a set in the collection book to unlock one.</p>
+            <ul id="skin-list" class="decor-grid"></ul>
           </div>
           <div id="seg-awards" class="seg" hidden>
+            <h3 class="section-title">Collections <span id="book-sum" class="section-sub"></span></h3>
+            <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
+            <ul id="book-list" class="book-list"></ul>
             <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
             <div id="ach-grid" class="ach-grid"></div>
             <p id="ach-caption" class="ach-caption">Tap a badge to see what it's for. Each one is worth +1% income and 3 crystals.</p>
@@ -209,6 +216,27 @@
       <div class="modal-card info-card" role="dialog" aria-modal="true">
         <button id="info-close" class="close-btn" type="button" aria-label="Close">&times;</button>
         <div id="info-body"></div>
+      </div>
+    </div>
+    <div id="safe" class="modal" hidden>
+      <div class="modal-card safe-card" role="dialog" aria-modal="true" aria-labelledby="safe-name">
+        <button id="safe-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Locked cargo</div>
+        <h2 id="safe-name">Supply Crate</h2>
+        <div id="safe-locks" class="safe-locks"></div>
+        <button id="safe-dial" class="safe-dial" type="button" aria-label="Crack the lock">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <circle cx="100" cy="100" r="86" class="dial-rim"/>
+            <circle cx="100" cy="100" r="72" class="dial-track"/>
+            <path id="safe-zone" class="dial-zone" d=""/>
+            <g id="safe-ticks"></g>
+            <line id="safe-needle" class="dial-needle" x1="100" y1="100" x2="100" y2="34"/>
+            <circle cx="100" cy="100" r="13" class="dial-hub"/>
+          </svg>
+        </button>
+        <p id="safe-status" class="safe-status">Tap when the needle is in the green.</p>
+        <div id="safe-lives" class="safe-lives"></div>
+        <button id="safe-done" class="primary" type="button" hidden>Collect</button>
       </div>
     </div>
     <div id="trader" class="modal" hidden>

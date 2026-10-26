@@ -1,6 +1,7 @@
 import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
-import { CREW, PETS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
+import { BOSS_NAMES, CREW, PETS, SECTORS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
 import { CHALLENGES, GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Offer, type Trip } from './expansion';
+import { SAFE_TYPES, SETS, SKINS, skinUnlocked } from './collection';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -66,8 +67,14 @@ export interface GameState {
   /** The challenge run in progress, if any, and the ones already beaten. */
   challenge: string | null;
   challengesDone: Set<string>;
-  /** When the last event, boss, golden crate or trader began, to keep calm time between them. */
+  /** When the last event, boss, golden crate, trader or cargo pod began, to keep calm time between them. */
   lastHappening: number;
+  /** A locked cargo pod: waiting until `until`, the next due at `nextAt`, and the one being cracked. */
+  safe: { until: number; nextAt: number; type: string; open: string | null };
+  /** Collection book entries found (bosses, sectors, machines, safes), sets finished, and the station skin worn. */
+  collection: Set<string>;
+  setsDone: Set<string>;
+  skin: string | null;
   stats: {
     crates: number;
     boosts: number;
@@ -83,6 +90,7 @@ export interface GameState {
     bosses: number;
     golden?: number;
     trades?: number;
+    safes?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -130,6 +138,10 @@ interface SaveData {
   challenge?: string | null;
   challengesDone?: string[];
   lastHappening?: number;
+  safe?: GameState['safe'];
+  collection?: string[];
+  setsDone?: string[];
+  skin?: string | null;
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -185,6 +197,10 @@ export function newState(now: number): GameState {
     challenge: null,
     challengesDone: new Set(),
     lastHappening: 0,
+    safe: { until: 0, nextAt: 0, type: 'supply', open: null },
+    collection: new Set(),
+    setsDone: new Set(),
+    skin: null,
     stats: {
       crates: 0,
       boosts: 0,
@@ -244,6 +260,10 @@ export function serialize(state: GameState): string {
     challenge: state.challenge,
     challengesDone: [...state.challengesDone],
     lastHappening: state.lastHappening,
+    safe: { ...state.safe },
+    collection: [...state.collection],
+    setsDone: [...state.setsDone],
+    skin: state.skin,
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -362,7 +382,21 @@ export function deserialize(json: string | null, now: number): GameState | null 
   for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);
   state.challenge = typeof data.challenge === 'string' && challengeIds.has(data.challenge) && !state.challengesDone.has(data.challenge) ? data.challenge : null;
   state.lastHappening = Number(data.lastHappening) || 0;
+  const safeIds = new Set(SAFE_TYPES.map((t) => t.id));
+  if (data.safe && typeof data.safe === 'object') {
+    // A safe left half-cracked when the game closed is lost; the pod itself may still be waiting.
+    state.safe = { until: Number(data.safe.until) || 0, nextAt: Number(data.safe.nextAt) || 0, type: safeIds.has(data.safe.type) ? data.safe.type : 'supply', open: null };
+  }
+  for (const id of strings(data.collection)) state.collection.add(id);
+  const setIds = new Set(SETS.map((s) => s.id));
+  for (const id of strings(data.setsDone)) if (setIds.has(id)) state.setsDone.add(id);
+  state.skin = typeof data.skin === 'string' && SKINS.some((k) => k.id === data.skin) && skinUnlocked(state, data.skin) ? data.skin : null;
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
+  if (!Array.isArray(data.collection)) {
+    // Saves from before the book: credit what the save already shows.
+    for (let i = 0; i <= Math.min(state.stats.relocations, SECTORS.length - 1); i++) state.collection.add(`sector:${i}`);
+    for (let i = 0; i < Math.min(state.stats.bosses, BOSS_NAMES.length); i++) state.collection.add(`boss:${i}`);
+  }
   state.boostUntil = Number(data.boostUntil) || 0;
   state.boostReadyAt = Number(data.boostReadyAt) || 0;
   state.lastSeen = Number(data.lastSeen) || now;

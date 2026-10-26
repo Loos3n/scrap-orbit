@@ -1093,3 +1093,57 @@ button.gen-icon:active { transform: scale(0.94); }
 .challenge-line [data-icon] { width: 18px; height: 18px; color: #ffd166; }
 .challenge-line b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .challenge-line .bar i { background: #ffd166; }
+
+/* ---------- Cargo safe mini-game ---------- */
+.safe-banner { border-color: #9dff6b; background: rgb(14 40 20 / 0.88); color: #e8ffd8; box-shadow: 0 0 18px rgb(157 255 107 / 0.45); }
+.safe-banner [data-icon], .safe-banner b { color: #9dff6b; }
+#safe { --c: #4fe3c1; }
+.safe-card { text-align: center; }
+.safe-locks { display: flex; justify-content: center; gap: 10px; margin: 6px 0 4px; }
+.safe-lock { display: grid; place-items: center; width: 34px; height: 34px; padding: 7px; border-radius: 10px; background: rgb(255 255 255 / 0.06); color: var(--ink-dim); transition: background 0.2s, color 0.2s, transform 0.2s; }
+.safe-lock svg { width: 100%; height: 100%; }
+.safe-lock.open { background: color-mix(in srgb, var(--c) 25%, transparent); color: var(--c); transform: scale(1.08); }
+.safe-dial { display: block; width: min(240px, 66vw); aspect-ratio: 1; margin: 6px auto 4px; padding: 0; border: 0; border-radius: 50%; background: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.safe-dial svg { width: 100%; height: 100%; overflow: visible; }
+.dial-rim { fill: #141838; stroke: color-mix(in srgb, var(--c) 45%, #2e346b); stroke-width: 6; }
+.dial-track { fill: none; stroke: rgb(0 0 0 / 0.45); stroke-width: 14; }
+.dial-zone { fill: none; stroke: #6dff8a; stroke-width: 14; stroke-linecap: round; filter: drop-shadow(0 0 6px #6dff8a); }
+#safe-ticks line { stroke: rgb(255 255 255 / 0.25); stroke-width: 1.5; }
+.dial-needle { stroke: #fff; stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 0 4px rgb(255 255 255 / 0.8)); }
+.dial-hub { fill: color-mix(in srgb, var(--c) 70%, #fff); stroke: #0b0d26; stroke-width: 3; }
+.safe-dial.hit { animation: dial-hit 0.35s ease-out; }
+.safe-dial.miss { animation: dial-miss 0.35s ease-out; }
+.safe-dial.miss .dial-rim { stroke: var(--danger); }
+@keyframes dial-hit { 40% { transform: scale(1.06); filter: drop-shadow(0 0 18px #6dff8a); } }
+@keyframes dial-miss { 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
+#safe.won .dial-rim { stroke: #6dff8a; }
+#safe.jammed .dial-needle { stroke: var(--danger); }
+.safe-status { margin: 4px 0 8px; color: var(--ink-dim); min-height: 2.6em; line-height: 1.35; }
+.safe-lives { display: flex; justify-content: center; gap: 6px; margin-bottom: 12px; }
+.safe-lives i { width: 10px; height: 10px; border-radius: 50%; background: rgb(255 255 255 / 0.12); }
+.safe-lives i.on { background: var(--boost); box-shadow: 0 0 8px var(--boost); }
+
+/* ---------- Collection book ---------- */
+.book-list { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 8px; }
+.book-set { padding: 12px; border-radius: 16px; background: rgb(6 8 24 / 0.45); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
+.book-set.done { background: color-mix(in srgb, var(--c) 10%, rgb(6 8 24 / 0.45)); box-shadow: 0 0 16px color-mix(in srgb, var(--c) 20%, transparent); }
+.book-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.book-head b { color: var(--c); font-family: var(--font-display); font-size: 16px; }
+.book-count { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.book-count svg { width: 15px; height: 15px; color: var(--go); }
+.book-desc { font-size: 13px; color: var(--ink-dim); margin: 2px 0 8px; }
+.book-bar { height: 5px; border-radius: 3px; background: rgb(0 0 0 / 0.4); overflow: hidden; margin-bottom: 8px; }
+.book-bar i { display: block; height: 100%; background: var(--c); border-radius: 3px; }
+.book-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.book-chip { padding: 3px 8px; border-radius: 99px; font-size: 12px; background: rgb(255 255 255 / 0.05); color: rgb(154 160 208 / 0.6); border: 1px dashed rgb(154 160 208 / 0.25); }
+.book-chip.got { color: var(--ink); background: color-mix(in srgb, var(--c) 18%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); }
+.book-reward { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 8px; font-size: 12.5px; color: var(--ink-dim); }
+.book-reward svg { width: 14px; height: 14px; color: #a8ecff; }
+.book-reward b { color: var(--ink); }
+
+/* ---------- Station skins ---------- */
+.decor-swatch .hull.skin { position: relative; background: radial-gradient(circle, color-mix(in srgb, var(--g) 30%, #1c2150), #0d1030); }
+.decor-swatch .hull.skin i { box-shadow: inset 0 0 0 5px rgb(0 0 0 / 0.25), 0 0 0 3px color-mix(in srgb, var(--t) 60%, #333), 0 0 14px var(--g); }
+.decor-swatch .hull.skin b { position: absolute; right: 18%; top: 22%; width: 12px; height: 12px; border-radius: 3px; background: var(--m); transform: rotate(20deg); box-shadow: 0 0 6px var(--m); }
+.decor-tag svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px; }
+.skin-card:disabled .decor-swatch { filter: grayscale(0.7) brightness(0.7); }

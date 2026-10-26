@@ -15,6 +15,7 @@ import {
   PAINTS,
   PETS,
   RESEARCH,
+  SECTORS,
   STREAK_REWARDS,
   THEMES,
   WEEKLY_REWARD,
@@ -53,6 +54,8 @@ import {
   type Offer,
   type OfferKind,
 } from './expansion';
+import { SAFE, SAFE_TYPES, SETS, setComplete, skinUnlocked, type CollectionSet } from './collection';
+import { GENERATORS } from './config';
 import { D, Decimal } from './num';
 import type { GameState, Mission } from './state';
 
@@ -276,7 +279,15 @@ export function claimableMissions(state: GameState): number {
  * started at least CALM_SEC ago. Anything due waits for this, so they never pile up.
  */
 export function calm(state: GameState, now: number): boolean {
-  return !eventActive(state, now) && !state.boss && now >= state.trader.until && now >= state.golden.until && now - state.lastHappening >= CALM_SEC * 1000;
+  return (
+    !eventActive(state, now) &&
+    !state.boss &&
+    now >= state.trader.until &&
+    now >= state.golden.until &&
+    now >= state.safe.until &&
+    !state.safe.open &&
+    now - state.lastHappening >= CALM_SEC * 1000
+  );
 }
 
 export function eventActive(state: GameState, now: number): EventKind | null {
@@ -505,6 +516,7 @@ function damageBoss(state: GameState, amount: Decimal, now: number, rand: () => 
   }
   state.boss = null;
   state.stats.bosses++;
+  state.collection.add(`boss:${b.name}`);
   scheduleBoss(state, now, rand);
   const scrap = b.reward ? D(b.reward) : bossReward(state, now);
   earn(state, scrap);
@@ -760,4 +772,92 @@ export function checkChallenge(state: GameState): ChallengeDef | null {
   state.challengesDone.add(def.id);
   state.challenge = null;
   return def;
+}
+
+// ---------- Cargo safes ----------
+
+export function safeWaiting(state: GameState, now: number): boolean {
+  return now < state.safe.until;
+}
+
+/** Brings in a locked cargo pod now and then, when things are calm. Returns true when one arrives. */
+export function updateSafe(state: GameState, now: number, rand = Math.random): boolean {
+  const s = state.safe;
+  if (state.tutorial >= 0) return false;
+  if (s.nextAt === 0) {
+    s.nextAt = now + SAFE.firstMin * 60_000;
+    return false;
+  }
+  if (s.until || s.open || now < s.nextAt || !calm(state, now)) {
+    // A pod nobody cracked drifts off.
+    if (s.until && now >= s.until) s.until = 0;
+    return false;
+  }
+  state.lastHappening = now;
+  s.until = now + SAFE.stayMin * 60_000;
+  s.type = SAFE_TYPES[Math.floor(rand() * SAFE_TYPES.length)].id;
+  const [lo, hi] = SAFE.gap;
+  s.nextAt = s.until + (lo + rand() * (hi - lo)) * 60_000;
+  return true;
+}
+
+/** Starts cracking the waiting pod. Returns its type, or null if there is none. */
+export function openSafe(state: GameState, now: number): string | null {
+  if (!safeWaiting(state, now) || state.safe.open) return null;
+  state.safe.until = 0;
+  state.safe.open = state.safe.type;
+  return state.safe.type;
+}
+
+export interface SafeReward {
+  type: string;
+  locks: number;
+  scrap: Decimal;
+  crystals: number;
+  /** First time this kind was fully cracked: a new collection book entry. */
+  newEntry: boolean;
+}
+
+/** Pays out for the locks opened (0 to 3) on the pod being cracked. */
+export function finishSafe(state: GameState, locks: number): SafeReward | null {
+  const type = state.safe.open;
+  if (!type) return null;
+  state.safe.open = null;
+  const n = Math.max(0, Math.min(SAFE.locks, Math.floor(locks)));
+  const scrap = baseIncome(state).mul(SAFE.scrapMin[n] * 60);
+  const crystals = SAFE.crystals[n];
+  earn(state, scrap);
+  addCrystals(state, crystals);
+  const key = `safe:${type}`;
+  const newEntry = n === SAFE.locks && !state.collection.has(key);
+  if (n === SAFE.locks) state.collection.add(key);
+  state.stats.safes = (state.stats.safes ?? 0) + 1;
+  return { type, locks: n, scrap, crystals, newEntry };
+}
+
+// ---------- Collection book and skins ----------
+
+/** Notes what the player has now seen: every machine built, and the sector they're in. */
+export function noteCollection(state: GameState): void {
+  for (const g of GENERATORS) if (state.owned[g.id] > 0) state.collection.add(`gen:${g.id}`);
+  state.collection.add(`sector:${state.stats.relocations % SECTORS.length}`);
+}
+
+/** Pays out any set just finished: crystals, and its station skin. Returns the sets completed. */
+export function checkSets(state: GameState): CollectionSet[] {
+  const done: CollectionSet[] = [];
+  for (const set of SETS) {
+    if (state.setsDone.has(set.id) || !setComplete(state, set)) continue;
+    state.setsDone.add(set.id);
+    addCrystals(state, set.crystals);
+    done.push(set);
+  }
+  return done;
+}
+
+/** Puts on a station skin the player has unlocked, or null for the plain look. */
+export function chooseStationSkin(state: GameState, id: string | null): boolean {
+  if (id !== null && !skinUnlocked(state, id)) return false;
+  state.skin = id;
+  return true;
 }

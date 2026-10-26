@@ -9,6 +9,8 @@ import { GEN_ICONS, ICONS } from './icons';
 import { holdToRepeat, makePanelToggle, type PanelToggle } from './gestures';
 import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
+import { SETS } from '../core/collection';
+import { BookPanel, SafeGame, SkinPanel } from './book-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
 import type { OfflineReport } from '../game';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
@@ -98,6 +100,9 @@ export class UI {
   private lootShelf: LootShelf;
   private info: InfoSheet;
   private trader: TraderPanel;
+  private book: BookPanel;
+  private skins: SkinPanel;
+  safeGame!: SafeGame;
   private challenges: ChallengePanel;
   private panel!: PanelToggle;
   readonly streak: StreakModal;
@@ -128,6 +133,8 @@ export class UI {
     this.lootShelf = new LootShelf(game);
     this.info = new InfoSheet(game, this.fmt);
     this.trader = new TraderPanel(game, this.fmt);
+    this.book = new BookPanel(game);
+    this.skins = new SkinPanel(game);
     this.challenges = new ChallengePanel(game, this.fmt);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
@@ -366,9 +373,15 @@ export class UI {
     }
     if (!$('tab-lab').hidden) this.lab.render();
     if (!$('tab-station').hidden) {
-      if (!$('seg-decor').hidden) this.decor.render();
+      if (!$('seg-decor').hidden) {
+        this.decor.render();
+        this.skins.render();
+      }
       if (!$('seg-modules').hidden) this.modules.render();
-      if (!$('seg-awards').hidden) this.lootShelf.render();
+      if (!$('seg-awards').hidden) {
+        this.lootShelf.render();
+        this.book.render();
+      }
       this.renderStats(now);
     }
     this.missions.render();
@@ -376,6 +389,7 @@ export class UI {
     renderBossBanner(this.game);
     renderGoldenBanner(this.game);
     this.trader.render();
+    this.safeGame?.render();
     this.challenges.render();
     this.coach.render();
     this.info.render();
@@ -581,12 +595,14 @@ export class UI {
         ['Boss loot found', `${s.loot.size} of ${LOOT.length}`],
         ['Station rooms built', `${s.modules.filter(Boolean).length} of ${s.modules.length}`],
         ['Blueprints found', `${s.blueprints.size} of ${MODULES.filter((m) => m.blueprint).length}`],
+        ['Collections finished', `${s.setsDone.size} of ${SETS.length}`],
         ['Pets adopted', `${s.pets.owned.size} of ${PETS.length}`],
       ]],
       ['Adventures', [
         ['Boss wrecks broken', n(s.stats.bosses)],
         ['Golden rushes', n(s.stats.golden ?? 0)],
         ['Trader deals', n(s.stats.trades ?? 0)],
+        ['Cargo safes tried', n(s.stats.safes ?? 0)],
         ['Challenges beaten', `${s.challengesDone.size} of ${CHALLENGES.length}`],
         ['Crew on trips now', n(s.trips.length)],
         ['Login streak', `${n(s.login.streak)} days (best ${n(s.login.best)})`],

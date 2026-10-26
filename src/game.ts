@@ -52,6 +52,10 @@ export type GameEvent =
   | { type: 'skin'; pet: PetId }
   | { type: 'bossHit'; value: Decimal }
   | { type: 'trader'; phase: 'arrived' | 'left' }
+  | { type: 'safe' }
+  | { type: 'safeOpened'; reward: meta.SafeReward }
+  | { type: 'set'; id: string }
+  | { type: 'stationSkin' }
   | { type: 'trade'; result: meta.TradeResult }
   | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
   | { type: 'reset' };
@@ -167,6 +171,9 @@ export class Game {
     if (meta.goldenDue(s, now)) this.emit({ type: 'goldenSpawn' });
     const trader = meta.updateTrader(s, now);
     if (trader) this.emit({ type: 'trader', phase: trader });
+    if (meta.updateSafe(s, now)) this.emit({ type: 'safe' });
+    meta.noteCollection(s);
+    for (const set of meta.checkSets(s)) this.emit({ type: 'set', id: set.id });
     const beaten = meta.checkChallenge(s);
     if (beaten) this.emit({ type: 'challenge', id: beaten.id, phase: 'done' });
     for (const t of s.trips) {
@@ -235,6 +242,20 @@ export class Game {
     if (!reward) return;
     this.tripsReady.delete(reward.crew);
     this.emit({ type: 'tripHome', reward });
+  }
+
+  /** Starts cracking the waiting cargo pod; returns its type, or null. */
+  openSafe(): string | null {
+    return meta.openSafe(this.state, Date.now());
+  }
+
+  finishSafe(locks: number): void {
+    const reward = meta.finishSafe(this.state, locks);
+    if (reward) this.emit({ type: 'safeOpened', reward });
+  }
+
+  chooseStationSkin(id: string | null): void {
+    if (meta.chooseStationSkin(this.state, id)) this.emit({ type: 'stationSkin' });
   }
 
   trade(index: number): void {
