@@ -1,73 +1,62 @@
 /**
- * Touch helpers for the HTML UI: sizing the bottom panel, and holding a buy button to keep
+ * Touch helpers for the HTML UI: opening and hiding the bottom panel, and holding a buy button to keep
  * buying.
  */
 
 const PANEL_KEY = 'scrap-orbit-panel';
-export type PanelSize = 'closed' | 'half' | 'tall';
-/** Open heights as fractions of the space between the HUD and the bottom of the screen. */
-const OPEN: Record<Exclude<PanelSize, 'closed'>, number> = { half: 0.5, tall: 0.82 };
+/** The open panel's height, as a fraction of the space between the HUD and the bottom of the screen. */
+const OPEN = 0.58;
 
-function load(): PanelSize {
+function loadOpen(): boolean {
   try {
-    const raw = localStorage.getItem(PANEL_KEY);
-    return raw === 'closed' || raw === 'tall' ? raw : 'half';
+    return localStorage.getItem(PANEL_KEY) !== 'closed';
   } catch {
-    return 'half';
+    return true;
   }
 }
 
-function store(v: PanelSize): void {
+function storeOpen(open: boolean): void {
   try {
-    localStorage.setItem(PANEL_KEY, v);
+    localStorage.setItem(PANEL_KEY, open ? 'open' : 'closed');
   } catch {
-    // Storage can be blocked; the panel just won't remember its size.
+    // Storage can be blocked; the panel just won't remember whether it was open.
   }
 }
 
-export interface PanelSizer {
-  readonly size: PanelSize;
-  /** The size to reopen at: whichever open size was used last. */
-  readonly lastOpen: PanelSize;
-  set(size: PanelSize): void;
+export interface PanelToggle {
+  readonly open: boolean;
+  set(open: boolean): void;
 }
 
 /**
- * Sizes the panel with taps only, no dragging: the tab bar sits at the bottom like an app's
- * menu bar. The panel is closed (tab bar only), half or tall. Dragging was dropped because the
- * apps that host the game grab vertical swipes for themselves.
+ * The panel is either open at one size or hidden, and only the tabs change it: no dragging (the
+ * apps that host the game grab vertical swipes) and no extra buttons.
  */
-export function makePanelSizer(app: HTMLElement, tabs: HTMLElement, hud: HTMLElement, head: HTMLElement): PanelSizer {
-  let size = load();
-  let lastOpen: PanelSize = size === 'tall' ? 'tall' : 'half';
-  const heightFor = (s: PanelSize) => {
+export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLElement): PanelToggle {
+  let open = loadOpen();
+  const height = () => {
     const min = tabs.offsetHeight + 2;
-    if (s === 'closed') return min;
+    if (!open) return min;
     const max = Math.max(min, app.clientHeight - hud.offsetHeight - 120);
-    return min + head.offsetHeight + 10 + (max - min - head.offsetHeight - 10) * OPEN[s];
+    return min + (max - min) * OPEN;
   };
   // Set the row sizes directly: some web views mishandle var() fallbacks inside grid templates.
   const apply = (animate: boolean) => {
     app.classList.toggle('snapping', animate);
-    app.classList.toggle('panel-closed', size === 'closed');
-    app.dataset.panel = size;
-    app.style.gridTemplateRows = `auto minmax(120px, 1fr) ${Math.round(heightFor(size))}px`;
+    app.classList.toggle('panel-closed', !open);
+    app.style.gridTemplateRows = `auto minmax(120px, 1fr) ${Math.round(height())}px`;
     if (animate) setTimeout(() => app.classList.remove('snapping'), 260);
   };
   apply(false);
   window.addEventListener('resize', () => apply(false));
   return {
-    get size() {
-      return size;
+    get open() {
+      return open;
     },
-    get lastOpen() {
-      return lastOpen;
-    },
-    set(next: PanelSize) {
-      if (next === size) return;
-      size = next;
-      if (size !== 'closed') lastOpen = size;
-      store(size);
+    set(next: boolean) {
+      if (next === open) return;
+      open = next;
+      storeOpen(open);
       apply(true);
     },
   };

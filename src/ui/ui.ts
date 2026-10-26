@@ -6,7 +6,7 @@ import { LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
-import { holdToRepeat, makePanelSizer, type PanelSizer } from './gestures';
+import { holdToRepeat, makePanelToggle, type PanelToggle } from './gestures';
 import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
@@ -14,14 +14,14 @@ import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, Streak
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
-/** Each tab's accent colour and the line under its title. */
-const TAB_LOOK: Record<string, { accent: string; sub: string }> = {
-  build: { accent: '#4fe3c1', sub: 'Machines that make scrap' },
-  upgrades: { accent: '#ffd166', sub: 'Make your machines stronger' },
-  crew: { accent: '#ff8a4c', sub: 'Specialists, trips and pets' },
-  lab: { accent: '#7aa7ff', sub: 'Research that never resets' },
-  cores: { accent: '#c58cff', sub: 'Jump sectors for Star Cores' },
-  station: { accent: '#ff7bb0', sub: 'Rooms, looks, records and settings' },
+/** Each tab's accent colour, worn by the open panel and the dock marker. */
+const TAB_ACCENT: Record<string, string> = {
+  build: '#4fe3c1',
+  upgrades: '#ffd166',
+  crew: '#ff8a4c',
+  lab: '#7aa7ff',
+  cores: '#c58cff',
+  station: '#ff7bb0',
 };
 
 /** Fills every `data-icon="name"` placeholder in the static HTML. */
@@ -95,7 +95,7 @@ export class UI {
   private trips: TripPanel;
   private lootShelf: LootShelf;
   private info: InfoSheet;
-  private panel!: PanelSizer;
+  private panel!: PanelToggle;
   readonly streak: StreakModal;
 
   /** Called when the sound or music setting changes, so main can update the synth. */
@@ -172,19 +172,16 @@ export class UI {
   }
 
   private bindTabs(): void {
-    this.panel = makePanelSizer($('app'), document.querySelector<HTMLElement>('.tabs')!, $('hud'), $('panel-head'));
+    this.panel = makePanelToggle($('app'), document.querySelector<HTMLElement>('.tabs')!, $('hud'));
     document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) =>
       tab.addEventListener('click', () => {
-        // Tapping the open tab again hides the panel; any tab opens it.
-        if (tab.getAttribute('aria-selected') === 'true' && this.panel.size !== 'closed') this.panel.set('closed');
-        else this.openTab(tab.dataset.tab!);
+        // One tap does it all: the open tab hides the panel, any other tab opens it.
+        if (tab.getAttribute('aria-selected') === 'true' && this.panel.open) {
+          this.panel.set(false);
+          this.coach.panelHidden();
+        } else this.openTab(tab.dataset.tab!);
       }),
     );
-    $('panel-size').addEventListener('click', () => {
-      this.panel.set(this.panel.size === 'tall' ? 'half' : 'tall');
-      this.coach.panelResized();
-    });
-    $('panel-close').addEventListener('click', () => this.panel.set('closed'));
   }
 
   private openTab(name: string): void {
@@ -192,18 +189,9 @@ export class UI {
       const on = t.dataset.tab === name;
       t.setAttribute('aria-selected', String(on));
       $(`tab-${t.dataset.tab}`).hidden = !on;
-      if (on) {
-        $('panel-title').textContent = t.textContent;
-        const icon = t.querySelector<HTMLElement>('[data-icon]');
-        $('panel-icon').innerHTML = icon?.innerHTML ?? '';
-      }
     });
-    const look = TAB_LOOK[name];
-    if (look) {
-      $('app').style.setProperty('--accent', look.accent);
-      $('panel-sub').textContent = look.sub;
-    }
-    if (this.panel.size === 'closed') this.panel.set(this.panel.lastOpen);
+    if (TAB_ACCENT[name]) $('app').style.setProperty('--accent', TAB_ACCENT[name]);
+    this.panel.set(true);
     this.coach.tabOpened(name);
     this.render();
   }

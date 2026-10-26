@@ -499,8 +499,8 @@ export class Coach {
     $('missions-btn').addEventListener('click', () => this.game.advanceTutorial('missions'));
   }
 
-  /** Called when the player makes the panel bigger or smaller. */
-  panelResized(): void {
+  /** Called when the player hides the panel. */
+  panelHidden(): void {
     this.game.advanceTutorial('panel');
   }
 
@@ -557,8 +557,7 @@ export class Coach {
       case 'missions':
         return { text: 'Your mission board has daily goals that pay crystals. Have a look.', target: '#missions-btn' };
       case 'panel':
-        if ($('app').classList.contains('panel-closed')) return { text: 'Tap any tab to open the panel again.', target: '.tab[data-tab="build"]' };
-        return { text: 'Tap this arrow to make the panel bigger or smaller. Tap the open tab again to hide it.', target: '#panel-size' };
+        return { text: 'Tap the open tab again to hide this panel and see your whole station. Any tab brings it back.', target: '.tab[aria-selected="true"]' };
       case 'done':
         return {
           text: "That's the basics, captain! Crew, research and new sectors open up as you go. I'll pop by when there's something new.",

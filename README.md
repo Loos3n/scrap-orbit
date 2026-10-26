@@ -31,7 +31,7 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
 - Ambient generative music, three number formats and a full stats screen (collection and adventure records too)
-- No dragging: a dock of tabs sits at the bottom; tap a tab to open its card above the dock (tinted in that tab's colour), tap it again to hide it, and use the arrow to make it taller
+- One-tap panel: a dock of tabs sits at the bottom; tap a tab to open its card (tinted in that tab's colour) and tap the same tab again to hide it. No dragging, no extra buttons
 - Info sheets: tap a machine's icon for its story, output, share of income and every multiplier; tap the income line for a full breakdown of where scrap comes from
 - Scene life: smelters vent heat, fabricators weld, and far-off ships cross the sky with blinking nav lights
 - A hands-on first-run tutorial with Mika, the drone wrangler: every step waits for the player to do it, with a spotlight and progress bar, plus one-time tips as the crew, lab and relocation unlock
