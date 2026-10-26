@@ -875,3 +875,35 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .log-head b { font-family: var(--font-display); font-weight: 600; font-size: 15.5px; }
 .log-head small { font-size: 11.5px; color: var(--ink-dim); }
 .log-entry p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: #d4d8ff; }
+
+.boss-tag { display: inline-block; padding: 1px 7px; margin-right: 2px; border-radius: 6px; background: #ff3d5a; color: #fff; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; vertical-align: 2px; box-shadow: 0 0 10px rgb(255 61 90 / 0.7); }
+/* A red pulse round the screen's edge for as long as a boss wreck is in the fight. */
+.boss-edge { position: fixed; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 60px 6px rgb(255 40 70 / 0.45); animation: boss-pulse 1.4s ease-in-out infinite; }
+@keyframes boss-pulse { 50% { box-shadow: inset 0 0 26px 2px rgb(255 40 70 / 0.2); } }
+/* The arrival warning: a hazard-striped band across the middle of the screen. */
+.boss-alert { position: fixed; left: 0; right: 0; top: 32%; z-index: 18; display: grid; pointer-events: none; animation: boss-alert-in 2.8s ease-in-out forwards; }
+.boss-alert-stripes { height: 12px; background: repeating-linear-gradient(-45deg, #ffcf5a 0 12px, #2a1e10 12px 24px); animation: stripes 0.6s linear infinite; }
+@keyframes stripes { to { background-position: 34px 0; } }
+.boss-alert-text { display: grid; justify-items: center; gap: 2px; padding: 12px 16px 14px; background: linear-gradient(rgb(60 6 20 / 0.94), rgb(30 4 14 / 0.94)); text-align: center; }
+.boss-alert-text small { font-size: 12px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; color: #ff9aa6; animation: blink 0.5s steps(2) infinite; }
+.boss-alert-text b { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 8vw, 36px); color: #fff; text-shadow: 0 0 18px rgb(255 61 90 / 0.9), 0 3px 0 #8a1024; }
+.boss-alert-text span { font-family: var(--font-display); font-weight: 600; font-size: 17px; color: #ffd6dc; }
+.boss-alert-text em { font-style: normal; font-size: 12.5px; color: #ffb3bd; }
+@keyframes boss-alert-in {
+  0% { transform: scaleY(0); opacity: 0; }
+  8% { transform: scaleY(1.08); opacity: 1; }
+  12%, 85% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(0.6); opacity: 0; }
+}
+
+/* The title card after a relocation names the new sector. */
+.sector-card { position: fixed; left: 16px; right: 16px; top: 28%; z-index: 18; display: grid; justify-items: center; gap: 2px; padding: 16px; border-radius: 18px; background: radial-gradient(ellipse at center, rgb(8 10 34 / 0.82), rgb(8 10 34 / 0.55) 70%, transparent); text-align: center; pointer-events: none; animation: sector-in 4s ease-in-out forwards; }
+.sector-card small { font-size: 12px; font-weight: 700; letter-spacing: 0.35em; text-transform: uppercase; color: #a8b4ff; }
+.sector-card b { font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 10vw, 46px); color: #fff; text-shadow: 0 0 24px rgb(140 150 255 / 0.9), 0 3px 0 rgb(30 30 90 / 0.8); }
+.sector-card span { font-size: 13px; color: #d6dcff; }
+.sector-card::before, .sector-card::after { content: ''; height: 1px; width: 70%; background: linear-gradient(90deg, transparent, rgb(170 180 255 / 0.8), transparent); }
+@keyframes sector-in {
+  0% { opacity: 0; transform: translateY(14px) scale(0.96); letter-spacing: 0.1em; }
+  15%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}

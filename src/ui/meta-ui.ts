@@ -302,10 +302,23 @@ export function renderBossBanner(game: Game): void {
   const b = game.state.boss;
   const banner = $('boss-banner');
   banner.hidden = !b;
+  $('boss-edge').hidden = !b;
   if (!b) return;
   setText($('boss-name'), BOSS_NAMES[b.name % BOSS_NAMES.length]);
   setText($('boss-time'), `${Math.max(0, Math.ceil((b.endsAt - Date.now()) / 1000))}s`);
   $('boss-hp').style.width = `${meta.bossHealth(game.state) * 100}%`;
+}
+
+/** The big hazard-striped warning when a boss wreck arrives. */
+export function showBossAlert(name: string): void {
+  const alert = $('boss-alert');
+  setText($('boss-alert-name'), name);
+  alert.hidden = false;
+  // Restart the animation, then hide it when it has played.
+  alert.style.animation = 'none';
+  void alert.offsetWidth;
+  alert.style.animation = '';
+  window.setTimeout(() => (alert.hidden = true), 2800);
 }
 
 /** Jolts the boss banner when a hit lands. */

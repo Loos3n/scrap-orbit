@@ -93,9 +93,9 @@ export const RESEARCH: readonly ResearchDef[] = [
   { id: 'cmd4', branch: 3, name: 'Core Resonance', desc: 'Each Star Core gives +12% income instead of +10%.', seconds: 8 * HOUR, requires: 'cmd3', effect: { kind: 'corePerCore', add: 0.02 } },
 ];
 
-/** Crystals to finish a running research now: one per started 5 minutes left. */
+/** Crystals to finish a running research now: one per started minute left, at least 5. */
 export function rushCost(secondsLeft: number): number {
-  return Math.max(1, Math.ceil(secondsLeft / 300));
+  return Math.max(5, Math.ceil(secondsLeft / 60));
 }
 
 // ---------- Decorations ----------
@@ -115,7 +115,7 @@ export interface ThemeDef {
 }
 
 export const THEMES: readonly ThemeDef[] = [
-  { id: 'classic', name: 'Classic', cost: 0, core: 0xffb547, beacons: [0x4fe3c1, 0xff6b9a], nebula: ['#6b3fc2', '#c23f8f', '#1f7fa8', '#3f4fc2', '#2a8f9c'], sky: ['#0a0b22', '#12123a', '#0b0d26'] },
+  { id: 'classic', name: 'Sector sky', cost: 0, core: 0xffb547, beacons: [0x4fe3c1, 0xff6b9a], nebula: ['#6b3fc2', '#c23f8f', '#1f7fa8', '#3f4fc2', '#2a8f9c'], sky: ['#0a0b22', '#12123a', '#0b0d26'] },
   { id: 'aurora', name: 'Aurora', cost: 25, core: 0x6bffd0, beacons: [0x9dff6b, 0x5ce1ff], nebula: ['#1fa87a', '#2ac2b0', '#3f6fc2', '#1f8fa8', '#6bdf8f'], sky: ['#04161a', '#0a2430', '#06121c'] },
   { id: 'ember', name: 'Ember', cost: 25, core: 0xff6b3d, beacons: [0xffd166, 0xff3d5a], nebula: ['#c2402a', '#e07a2a', '#8f1f3f', '#c23f5a', '#a8601f'], sky: ['#1a0806', '#2a0f10', '#160608'] },
   { id: 'royal', name: 'Royal', cost: 40, core: 0xffe08a, beacons: [0xffe08a, 0x8fa8ff], nebula: ['#2a3fc2', '#4a2ac2', '#1f4fa8', '#6b5fd0', '#c2a03f'], sky: ['#060a24', '#0c1440', '#070a20'] },
@@ -234,9 +234,9 @@ export const CAT_TAP_SEC = 4;
 export const BOSS_NAMES = ['Derelict Freighter', 'Shattered Cruiser', 'Ghost Dreadnought', 'Hollow Ark'] as const;
 export const BOSS = {
   /** Seconds of play before the first wreck shows up. */
-  firstSec: 4 * 60,
+  firstSec: 12 * 60,
   /** Minutes between wrecks. */
-  gap: [9, 15] as [number, number],
+  gap: [25, 40] as [number, number],
   /** Seconds to break it before it drifts away. */
   seconds: 60,
   /** Health, as taps-worth plus seconds-of-income-worth at the moment it arrives. */
@@ -279,3 +279,31 @@ export const STORY: readonly StoryEntry[] = [
   { id: 'signal', who: 'orin', title: 'A voice in the gate', text: "The Warp Gate caught a signal from the empty patch. It's a voice, very faint, reading out our station's call sign. Captain... it sounds like you." },
   { id: 'backwards', who: 'nova', title: 'Running backwards', text: "I lined up all ten black boxes by timestamp. They don't run forwards. The newest wreck is the oldest. Whatever the Hollow Fleet is, it hasn't happened yet. To be continued." },
 ];
+
+// ---------- Sectors ----------
+
+export interface SectorDef {
+  name: string;
+  sky: [string, string, string];
+  nebula: [string, string, string, string, string];
+  /** The gas giant's bands, top to bottom, and its glow. */
+  planet: [string, string, string, string];
+  atmosphere: string;
+}
+
+/**
+ * Each relocation lands in a new sector with its own sky and planet, cycling after the last.
+ * A bought sky theme overrides the sector's sky; the planet always belongs to the sector.
+ */
+export const SECTORS: readonly SectorDef[] = [
+  { name: 'Scrapyard Belt', sky: ['#0a0b22', '#12123a', '#0b0d26'], nebula: ['#6b3fc2', '#c23f8f', '#1f7fa8', '#3f4fc2', '#2a8f9c'], planet: ['#e8a37a', '#b0627a', '#6a3d8a', '#3d2a6a'], atmosphere: '#ffaa78' },
+  { name: 'Ember Reach', sky: ['#1a0806', '#2a0f12', '#140608'], nebula: ['#c2402a', '#e07a2a', '#8f1f3f', '#c23f5a', '#a8601f'], planet: ['#d8f4ff', '#7ac8f0', '#3a7ac0', '#1f3a7a'], atmosphere: '#9fe0ff' },
+  { name: 'Verdant Drift', sky: ['#04161a', '#0a2430', '#06121c'], nebula: ['#1fa87a', '#2ac2b0', '#3f6fc2', '#1f8fa8', '#6bdf8f'], planet: ['#f0c8ff', '#b07ae0', '#6a3fa8', '#3a1f6a'], atmosphere: '#d6a8ff' },
+  { name: 'Glass Sea', sky: ['#020a20', '#06183a', '#030c22'], nebula: ['#1f5fc2', '#2ab0e0', '#3f3fc2', '#1f8fd0', '#6bc0ff'], planet: ['#fff0b0', '#f0c050', '#c07a2a', '#6a3a1a'], atmosphere: '#ffd88a' },
+  { name: 'Rose Nebula', sky: ['#18041a', '#2a0a2c', '#120416'], nebula: ['#e02a8f', '#ff6bb0', '#8f2ac2', '#c23f8f', '#ff8fa8'], planet: ['#c8fff0', '#5ce0b0', '#1f9a7a', '#0f4a4a'], atmosphere: '#8fffd8' },
+  { name: 'Hollow Expanse', sky: ['#030306', '#0a0a14', '#040408'], nebula: ['#4a4a6a', '#6a5a8a', '#3a3a5a', '#5a5a7a', '#2a2a4a'], planet: ['#f4f4ff', '#b8b8d0', '#70708a', '#3a3a4a'], atmosphere: '#e0e0ff' },
+];
+
+export function sectorFor(relocations: number): SectorDef {
+  return SECTORS[relocations % SECTORS.length];
+}

@@ -70,6 +70,9 @@ describe('research', () => {
     const s = newState(NOW);
     startResearch(s, 'ind1', NOW);
     expect(rushResearch(s, NOW)).toBe(null);
+    // One crystal per minute left; ind1 takes 5 minutes.
+    addCrystals(s, 4);
+    expect(rushResearch(s, NOW)).toBe(null);
     addCrystals(s, 1);
     expect(rushResearch(s, NOW)).toBe('ind1');
     expect(s.crystals).toBe(0);

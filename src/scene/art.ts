@@ -160,7 +160,7 @@ export function backdrop(
 }
 
 /** A banded gas giant with a thin ring, lit from the upper left. */
-export function planet(size: number): Texture {
+export function planet(size: number, bands = ['#e8a37a', '#b0627a', '#6a3d8a', '#3d2a6a'], atmosphere = '#ffaa78'): Texture {
   const pad = size * 0.35;
   const S = size + pad * 2;
   return paint(S, S, (ctx) => {
@@ -168,8 +168,8 @@ export function planet(size: number): Texture {
     const r = size / 2;
     // Atmosphere glow.
     ctx.fillStyle = radial(ctx, c, c, r * 1.25, [
-      [0.75, 'rgba(255,170,120,0.35)'],
-      [1, 'rgba(255,170,120,0)'],
+      [0.75, rgba(atmosphere, 0.35)],
+      [1, rgba(atmosphere, 0)],
     ]);
     ctx.fillRect(0, 0, S, S);
     // Back half of the ring.
@@ -197,10 +197,10 @@ export function planet(size: number): Texture {
     ctx.arc(c, c, r, 0, TAU);
     ctx.clip();
     ctx.fillStyle = linear(ctx, c, c - r, c, c + r, [
-      [0, '#e8a37a'],
-      [0.35, '#b0627a'],
-      [0.7, '#6a3d8a'],
-      [1, '#3d2a6a'],
+      [0, bands[0]],
+      [0.35, bands[1]],
+      [0.7, bands[2]],
+      [1, bands[3]],
     ]);
     ctx.fillRect(c - r, c - r, size, size);
     const rr = rng(3);
@@ -231,7 +231,7 @@ export function planet(size: number): Texture {
     ctx.fillRect(c - r, c - r, size, size);
     ctx.restore();
     // Rim light.
-    ctx.strokeStyle = 'rgba(255,200,160,0.5)';
+    ctx.strokeStyle = rgba(atmosphere, 0.5);
     ctx.lineWidth = r * 0.02;
     ctx.beginPath();
     ctx.arc(c, c, r, Math.PI * 0.95, Math.PI * 1.75);

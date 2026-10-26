@@ -15,7 +15,7 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Milestones at 10, 25, 50, 100, ... owned that double a machine's output
 - A Salvage Claw levelled with scrap (+1 per tap per level, doubling every 10 levels)
 - 29 upgrades: tap power, per-tier multipliers, global multipliers, and taps that scale with income
-- Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition
+- Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition. Six sectors cycle, each with its own sky, nebula and planet, announced by a title card
 - 6 core perks unlocked by how many cores you hold, including an Auto-Builder
 - 27 achievements, each worth +1% income
 - Crew: 10 collectible crew members with their own portraits, each one multiplying a machine's output, levelled up with crystals
@@ -23,7 +23,7 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
 - Decorations: six sky themes and five hull paints
-- Boss wrecks: every 9 to 15 minutes a giant derelict drifts in; break it with taps (the claw fires a bolt) and machine fire within 60 seconds for 5 minutes of income and crystals
+- Boss wrecks: the first after 12 minutes of play, then one every 25 to 40 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in; break it with taps (the claw fires a bolt) and machine fire within 60 seconds for 5 minutes of income and crystals
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
 - Story log: 12 entries from the crew, unlocked as the station grows, telling the mystery of the Hollow Fleet
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7

@@ -1,6 +1,6 @@
 import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
-import type { EventKind, PetId, ThemeDef } from '../core/content';
+import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } from '../core/content';
 import * as art from './art';
 
 /** Size of the world in scene units; the scene scales this to fit the viewport. */
@@ -182,6 +182,7 @@ export class StationScene {
   private flareGlow = new Sprite();
   private flare = 0;
   private theme: ThemeDef | null = null;
+  private sector: SectorDef = SECTORS[0];
   private coreColor: number = COLORS.scrap;
   private hullSprites: Sprite[] = [];
   private jump = 0;
@@ -366,12 +367,14 @@ export class StationScene {
 
     // Painting the sky and scattering stars is slow, so only redo it when the screen size or
     // theme changes, not when the panel is dragged and only the focus band moves.
-    const skyKey = `${Math.ceil(w)}x${Math.ceil(h)}|${this.theme?.id ?? ''}`;
+    const skyKey = `${Math.ceil(w)}x${Math.ceil(h)}|${this.theme?.id ?? ''}|${this.sector.name}`;
     const repaint = skyKey !== this.skyKey;
     this.skyKey = skyKey;
     if (repaint) {
       this.bg.texture?.destroy(true);
-      this.bg.texture = art.backdrop(Math.ceil(w), Math.ceil(h), this.theme?.sky, this.theme?.nebula);
+      // The classic theme means "use the sector's own sky".
+      const own = !this.theme || this.theme.id === 'classic';
+      this.bg.texture = art.backdrop(Math.ceil(w), Math.ceil(h), own ? this.sector.sky : this.theme!.sky, own ? this.sector.nebula : this.theme!.nebula);
     }
     this.flareGlow.position.set(w * 0.08, top + fh * 0.05);
     this.flareGlow.scale.set(Math.max(w, h) / 40);
@@ -610,6 +613,17 @@ export class StationScene {
   }
 
   /** The big jump when the station relocates: a warp, a flash, and a fresh start. */
+  /** Moves the scene to a sector: its own sky (unless a theme overrides it) and planet. */
+  setSector(sector: SectorDef): void {
+    if (!this.ready || sector === this.sector) return;
+    this.sector = sector;
+    const old = this.tex.planet;
+    this.tex.planet = art.planet(260, sector.planet, sector.atmosphere);
+    this.planet.texture = this.tex.planet;
+    old.destroy(true);
+    this.layout();
+  }
+
   warpJump(): void {
     if (!this.ready) return;
     this.jump = 2.4;

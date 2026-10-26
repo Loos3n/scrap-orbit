@@ -38,7 +38,7 @@
         <div id="boss-banner" class="boss-banner" hidden>
           <div class="boss-row">
             <svg class="boss-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>
-            <div class="event-text"><b id="boss-name"></b><span>Tap anywhere to break it apart!</span></div>
+            <div class="event-text"><b><span class="boss-tag">Boss</span> <span id="boss-name"></span></b><span>Tap anywhere to break it apart!</span></div>
             <span id="boss-time" class="event-time"></span>
           </div>
           <div class="boss-hp"><i id="boss-hp"></i></div>
@@ -198,6 +198,22 @@
         <h3 class="section-title">Weekly challenge</h3>
         <ul id="weekly-list" class="mission-list"></ul>
       </div>
+    </div>
+    <div id="sector-card" class="sector-card" hidden>
+      <small id="sector-num"></small>
+      <b id="sector-name"></b>
+      <span>New sector reached</span>
+    </div>
+    <div id="boss-edge" class="boss-edge" hidden></div>
+    <div id="boss-alert" class="boss-alert" hidden>
+      <div class="boss-alert-stripes"></div>
+      <div class="boss-alert-text">
+        <small>Warning</small>
+        <b>Boss wreck incoming!</b>
+        <span id="boss-alert-name"></span>
+        <em>Break it in 60 seconds for a huge payout</em>
+      </div>
+      <div class="boss-alert-stripes"></div>
     </div>
     <div id="streak" class="modal" hidden>
       <div class="modal-card streak-card" role="dialog" aria-modal="true" aria-labelledby="streak-title">

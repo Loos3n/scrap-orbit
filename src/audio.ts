@@ -144,6 +144,15 @@ export class Sfx {
     [659, 988, 659, 988].forEach((f, i) => this.tone(f, i * 0.12, 0.14, 'triangle', 0.16));
   }
 
+  /** A two-tone alarm for a boss wreck arriving. */
+  bossAlarm(): void {
+    if (!this.ready()) return;
+    for (let i = 0; i < 3; i++) {
+      this.tone(330, i * 0.42, 0.2, 'sawtooth', 0.12);
+      this.tone(440, i * 0.42 + 0.21, 0.2, 'sawtooth', 0.12);
+    }
+  }
+
   research(): void {
     if (!this.ready()) return;
     [523, 784, 1047].forEach((f, i) => this.tone(f, i * 0.08, 0.4, 'sine', 0.2));

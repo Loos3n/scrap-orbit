@@ -4,14 +4,14 @@ import 'pixi.js/unsafe-eval';
 import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
-import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, STORY, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS } from './core/content';
+import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, STORY, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { format } from './core/num';
 import { Game } from './game';
 import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
-import { shakeBossBanner } from './ui/meta-ui';
+import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { UI } from './ui/ui';
 
 /**
@@ -34,6 +34,18 @@ window.addEventListener('unhandledrejection', (e) => showCrash(String((e.reason 
 /** Waits for `p`, but gives up after `ms` so a stuck graphics driver can't hang the game. */
 function within<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timed out')), ms))]);
+}
+
+/** Names the sector the station just warped into. */
+function showSectorCard(relocations: number): void {
+  const card = document.getElementById('sector-card')!;
+  document.getElementById('sector-num')!.textContent = `Sector ${relocations + 1}`;
+  document.getElementById('sector-name')!.textContent = sectorFor(relocations).name;
+  card.hidden = false;
+  card.style.animation = 'none';
+  void card.offsetWidth;
+  card.style.animation = '';
+  window.setTimeout(() => (card.hidden = true), 4000);
 }
 
 async function boot(): Promise<void> {
@@ -138,8 +150,12 @@ async function boot(): Promise<void> {
         break;
       case 'relocate':
         scene.warpJump();
-        // Swap the station over at the brightest moment of the flash.
-        setTimeout(() => scene.setOwned(game.state.owned), 1500);
+        // Swap the station and the sector over at the brightest moment of the flash.
+        setTimeout(() => {
+          scene.setOwned(game.state.owned);
+          scene.setSector(sectorFor(game.state.stats.relocations));
+          showSectorCard(game.state.stats.relocations);
+        }, 1500);
         syncPerks();
         ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores, +${e.crystals} crystals`);
         sfx.warp();
@@ -159,6 +175,7 @@ async function boot(): Promise<void> {
         scene.setOwned(game.state.owned);
         scene.setPet(null);
         scene.setBoss(null);
+        scene.setSector(sectorFor(0));
         syncPerks();
         syncDecor();
         break;
@@ -246,9 +263,9 @@ async function boot(): Promise<void> {
       case 'boss':
         if (e.phase === 'arrive') {
           scene.setBoss(game.state.boss!.name);
-          ui.toast(ICONS.warp.replace('currentColor', '#ff5d6c'), `<b>${BOSS_NAMES[game.state.boss!.name % BOSS_NAMES.length]}!</b> Tap to break it before it drifts away`);
-          sfx.event();
-          buzz(40);
+          showBossAlert(BOSS_NAMES[game.state.boss!.name % BOSS_NAMES.length]);
+          sfx.bossAlarm();
+          buzz(120);
         } else {
           scene.setBoss(null);
           ui.toast(ICONS.warp, '<b>The wreck drifted away.</b> Another will turn up soon.');
@@ -308,6 +325,7 @@ async function boot(): Promise<void> {
     buzz(8);
   });
 
+  scene.setSector(sectorFor(game.state.stats.relocations));
   game.start();
   scene.setEvent(meta.eventActive(game.state, Date.now()));
   scene.setPet(game.state.pets.active);

@@ -1,7 +1,7 @@
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
-import { CREW, RESEARCH } from '../core/content';
+import { CREW, RESEARCH, sectorFor } from '../core/content';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
@@ -537,6 +537,7 @@ export class UI {
         ['Events seen', n(s.stats.events)],
         ['Overdrives fired', n(s.stats.boosts)],
         ['Relocations', n(s.stats.relocations)],
+        ['Current sector', `${s.stats.relocations + 1}: ${sectorFor(s.stats.relocations).name}`],
       ]],
       ['Collection', [
         ['Crystals earned', n(s.stats.crystalsEarned)],
