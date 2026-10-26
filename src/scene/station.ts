@@ -86,7 +86,7 @@ export class StationScene {
     galaxy: Texture; rocks: Texture[]; turret: Texture; vortex: Texture; gate: Texture; portal: Texture;
     sun: Texture; panel: Texture; meteor: Texture; shadeDark: Texture; shadeLight: Texture;
     plasma: Texture[]; rays: Texture; reactorRing: Texture; vignette: Texture;
-    bosses: Texture[]; cracks: Texture[]; pets: Record<PetId, Texture>;
+    bosses: (Texture | undefined)[]; cracks: Texture[]; pets: Record<PetId, Texture>;
   };
 
   private bg = new Sprite();
@@ -196,7 +196,8 @@ export class StationScene {
       resizeTo: el,
       backgroundAlpha: 0,
       antialias: true,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      // Full sharpness on 3x phone screens.
+      resolution: Math.min(window.devicePixelRatio || 1, 3),
       autoDensity: true,
       // Skip WebGPU: when WebGL is unavailable, probing for WebGPU can hang some phone web
       // views. Canvas is a slower but dependable fallback.
@@ -238,7 +239,8 @@ export class StationScene {
       rays: art.rays(),
       reactorRing: art.reactorRing(),
       vignette: art.vignette(),
-      bosses: [0, 1, 2, 3].map((n) => art.bossWreck(n)),
+      // Boss hulls are big and slow to paint, so each is painted the first time it shows up.
+      bosses: [undefined, undefined, undefined, undefined],
       cracks: [0, 1].map((n) => art.bossCracks(n)),
       pets: { cat: art.pet('cat'), pup: art.pet('pup'), owl: art.pet('owl'), blob: art.pet('blob') },
     };
@@ -777,7 +779,8 @@ export class StationScene {
     glow.tint = 0xff5d6c;
     glow.scale.set(7, 4);
     glow.alpha = 0.25;
-    const hull = this.sprite(this.tex.bosses[kind % this.tex.bosses.length], c);
+    const slot = kind % this.tex.bosses.length;
+    const hull = this.sprite((this.tex.bosses[slot] ??= art.bossWreck(slot)), c);
     const cracks = this.sprite(this.tex.cracks[kind % this.tex.cracks.length], c);
     cracks.blendMode = 'add';
     cracks.alpha = 0;

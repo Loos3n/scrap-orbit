@@ -5,22 +5,141 @@ import { CanvasSource, Texture } from 'pixi.js';
  * panel detail) and uploaded as textures. Sprites then just move, spin and fade them.
  * Sizes are in world units; textures are painted at RES pixels per unit so they stay sharp.
  */
-const RES = 3;
+const RES = 4;
 
 type Ctx = CanvasRenderingContext2D;
 
-function paintCanvas(w: number, h: number, draw: (ctx: Ctx) => void, res: number): HTMLCanvasElement {
+/**
+ * A material pass laid over a finished painting, using only its alpha as a height map:
+ * a bevel lit from the upper left, a soft inner shadow, fine grain and patchy grime.
+ * This gives every hard-surface sprite the same light and a painted, worn-in feel.
+ */
+export interface Finish {
+  /** Width of the bevel in world units. */
+  bevel?: number;
+  /** How strongly the bevel lights and shades the edges (0 to 1). */
+  light?: number;
+  /** Per-pixel grain (0 to 1). */
+  grain?: number;
+  /** Large soft patches of wear and grime (0 to 1). */
+  grime?: number;
+  seed?: number;
+}
+
+/** Separable box blur of a single channel, in place. */
+function boxBlur(src: Float32Array, w: number, h: number, r: number): void {
+  if (r < 1) return;
+  const tmp = new Float32Array(src.length);
+  const span = r * 2 + 1;
+  for (let y = 0; y < h; y++) {
+    let acc = 0;
+    const row = y * w;
+    for (let x = -r; x <= r; x++) acc += src[row + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = acc / span;
+      acc += src[row + Math.min(w - 1, x + r + 1)] - src[row + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      src[y * w + x] = acc / span;
+      acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+}
+
+/** Smooth value noise in 0..1, tiled on a grid of `cell` pixels. */
+function valueNoise(seed: number, cell: number) {
+  const hash = (x: number, y: number) => {
+    let n = (x * 374761393 + y * 668265263 + seed * 2147483647) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  };
+  return (px: number, py: number) => {
+    const x = px / cell;
+    const y = py / cell;
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const fx = x - x0;
+    const fy = y - y0;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const a = hash(x0, y0) + (hash(x0 + 1, y0) - hash(x0, y0)) * sx;
+    const b = hash(x0, y0 + 1) + (hash(x0 + 1, y0 + 1) - hash(x0, y0 + 1)) * sx;
+    return a + (b - a) * sy;
+  };
+}
+
+function applyFinish(canvas: HTMLCanvasElement, res: number, f: Finish): void {
+  const ctx = canvas.getContext('2d')!;
+  const w = canvas.width;
+  const h = canvas.height;
+  let img: ImageData;
+  try {
+    img = ctx.getImageData(0, 0, w, h);
+  } catch {
+    return;
+  }
+  const d = img.data;
+  const n = w * h;
+  const height = new Float32Array(n);
+  for (let i = 0; i < n; i++) height[i] = d[i * 4 + 3] / 255;
+  const deep = height.slice();
+  const bevelPx = Math.max(1, Math.round((f.bevel ?? 1.2) * res));
+  boxBlur(height, w, h, bevelPx);
+  boxBlur(height, w, h, Math.max(1, bevelPx >> 1));
+  boxBlur(deep, w, h, bevelPx * 3);
+  const light = (f.light ?? 0.6) * bevelPx * 1.6;
+  const grain = (f.grain ?? 0.35) * 26;
+  const grime = (f.grime ?? 0.35) * 0.32;
+  const rand = rng(f.seed ?? 7);
+  // Wear changes slowly across a sprite, so it is worked out on a coarse grid and looked up.
+  const big = valueNoise(f.seed ?? 7, 9 * res);
+  const mid = valueNoise((f.seed ?? 7) + 1, 3 * res);
+  const cw = (w >> 2) + 1;
+  const wearMap = new Float32Array(cw * ((h >> 2) + 1));
+  for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) wearMap[(y >> 2) * cw + (x >> 2)] = big(x, y) * 0.65 + mid(x, y) * 0.35;
+  const lx = -0.62;
+  const ly = -0.78;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const a = d[i * 4 + 3];
+      if (a === 0) continue;
+      // Slope of the blurred alpha: it rises inward, so the upper-left edge faces the light.
+      const gx = height[i + 1] - height[i - 1];
+      const gy = height[i + w] - height[i - w];
+      let shade = -(gx * lx + gy * ly) * light;
+      // Deep inside a shape stays a touch brighter than near its edges (soft occlusion).
+      shade += (deep[i] - 0.85) * 0.18;
+      const wear = wearMap[(y >> 2) * cw + (x >> 2)];
+      const g = (rand() - 0.5) * grain;
+      const dirt = 1 - Math.max(0, wear - 0.45) * grime * 2.2;
+      for (let k = 0; k < 3; k++) {
+        let v = d[i * 4 + k];
+        v = shade > 0 ? v + (255 - v) * Math.min(0.85, shade) : v * (1 + Math.max(-0.75, shade));
+        d[i * 4 + k] = Math.max(0, Math.min(255, v * dirt + g));
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function paintCanvas(w: number, h: number, draw: (ctx: Ctx) => void, res: number, finish?: Finish): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(w * res);
   canvas.height = Math.ceil(h * res);
-  const ctx = canvas.getContext('2d')!;
+  const ctx = canvas.getContext('2d', finish ? { willReadFrequently: true } : undefined)!;
   ctx.scale(res, res);
   draw(ctx);
+  if (finish) applyFinish(canvas, res, finish);
   return canvas;
 }
 
-export function paint(w: number, h: number, draw: (ctx: Ctx) => void, res = RES): Texture {
-  return new Texture({ source: new CanvasSource({ resource: paintCanvas(w, h, draw, res), resolution: res, autoGenerateMipmaps: true }) });
+export function paint(w: number, h: number, draw: (ctx: Ctx) => void, res = RES, finish?: Finish): Texture {
+  return new Texture({ source: new CanvasSource({ resource: paintCanvas(w, h, draw, res, finish), resolution: res, autoGenerateMipmaps: true }) });
 }
 
 /** The same painting as a PNG data URL, for the menus. Empty if the canvas can't be read. */
@@ -156,7 +275,7 @@ export function backdrop(
       ctx.fillStyle = `rgba(220,225,255,${0.15 + r() * 0.35})`;
       ctx.fillRect(r() * w, r() * h, 0.6, 0.6);
     }
-  }, 1);
+  }, Math.min(2, window.devicePixelRatio || 1));
 }
 
 /** A banded gas giant with a thin ring, lit from the upper left. */
@@ -212,6 +331,37 @@ export function planet(size: number, bands = ['#e8a37a', '#b0627a', '#6a3d8a', '
       ctx.ellipse(c, y, r * 1.2, bh, (rr() - 0.5) * 0.08, 0, TAU);
       ctx.fill();
     }
+    // Turbulent cloud bands: stretched noise, warped sideways, laid over the colour bands.
+    const px = Math.ceil(size * 1.3);
+    const tex = document.createElement('canvas');
+    tex.width = px;
+    tex.height = px;
+    const tctx = tex.getContext('2d');
+    if (tctx) {
+      const img = tctx.createImageData(px, px);
+      const n1 = valueNoise(21, px / 5);
+      const n2 = valueNoise(22, px / 14);
+      const n3 = valueNoise(23, px / 40);
+      for (let y = 0; y < px; y++) {
+        for (let x = 0; x < px; x++) {
+          const warp = (n1(x, y * 3) - 0.5) * px * 0.08;
+          const band = Math.sin((y + warp) / px * 38 + n2(x * 0.25, y) * 4);
+          const v = 0.5 + band * 0.22 + (n2(x * 0.3, y * 2) - 0.5) * 0.35 + (n3(x * 0.5, y * 1.5) - 0.5) * 0.25;
+          const i = (y * px + x) * 4;
+          const g = Math.max(0, Math.min(255, v * 255));
+          img.data[i] = g;
+          img.data[i + 1] = g;
+          img.data[i + 2] = g;
+          img.data[i + 3] = 255;
+        }
+      }
+      tctx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.globalCompositeOperation = 'overlay';
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(tex, c - r, c - r, size, size);
+      ctx.restore();
+    }
     // A storm.
     ctx.fillStyle = radial(ctx, c + r * 0.25, c + r * 0.2, r * 0.16, [
       [0, 'rgba(255,230,210,0.55)'],
@@ -237,7 +387,7 @@ export function planet(size: number, bands = ['#e8a37a', '#b0627a', '#6a3d8a', '
     ctx.arc(c, c, r, Math.PI * 0.95, Math.PI * 1.75);
     ctx.stroke();
     ring(true);
-  }, 1.5);
+  }, 2.5);
 }
 
 // ---------- The station ----------
@@ -418,7 +568,7 @@ export const hull = () =>
     ctx.beginPath();
     ctx.arc(c, c, 37.4, 0, TAU);
     ctx.stroke();
-  }, 4);
+  }, 4, { bevel: 1.4, light: 0.45, grain: 0.3, grime: 0.3, seed: 2 });
 
 /**
  * Light and shade laid over the hub after the rotating parts, so the light stays put while
@@ -505,7 +655,7 @@ export const habitatRing = () =>
       ctx.lineTo(c + Math.cos(a) * 52.5, c + Math.sin(a) * 52.5);
       ctx.stroke();
     }
-  }, 4);
+  }, 4, { bevel: 1, light: 0.5, grain: 0.3, grime: 0.25, seed: 3 });
 
 /** The reactor core: a glossy sphere. Painted white so it can be tinted for Overdrive. */
 export const core = () =>
@@ -662,7 +812,7 @@ export const solarWing = () =>
     // Hinge between the panels.
     ctx.fillStyle = '#5b63b0';
     ctx.fillRect(40, 12, 2, 6);
-  }, 4);
+  }, 4, { bevel: 0.6, light: 0.5, grain: 0.25, grime: 0.2, seed: 4 });
 
 /** The salvage claw that sits on top of the station. Anchored at its base. */
 export const claw = () =>
@@ -701,68 +851,140 @@ export const claw = () =>
       ctx.lineTo(20 + s * 12.5, 7.5);
       ctx.stroke();
     }
-  });
+  }, RES, { bevel: 0.8, light: 0.7, grain: 0.3, grime: 0.3, seed: 5 });
 
 // ---------- Machines ----------
+
+/** Thin dark seam with a lit lip below it, like a panel join catching light from above. */
+function seam(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, w = 0.35) {
+  ctx.lineCap = 'round';
+  ctx.lineWidth = w;
+  ctx.strokeStyle = 'rgba(8,12,40,0.55)';
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+  ctx.beginPath();
+  ctx.moveTo(x0 + w * 0.7, y0 + w * 0.7);
+  ctx.lineTo(x1 + w * 0.7, y1 + w * 0.7);
+  ctx.stroke();
+}
+
+/** A small status light with a soft halo. */
+function lamp(ctx: Ctx, x: number, y: number, r: number, color: string) {
+  ctx.fillStyle = radial(ctx, x, y, r * 3, [
+    [0, rgba(color, 0.55)],
+    [1, rgba(color, 0)],
+  ]);
+  ctx.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.4, 0, TAU);
+  ctx.fill();
+}
 
 /** Small salvage drone, pointing right: a rounded pod with a glass dome, fins and a grabber. */
 export const drone = () =>
   paint(18, 14, (ctx) => {
-    // Fins.
-    ctx.fillStyle = '#1a8f78';
+    // Fins, with a darker trailing edge.
     for (const s of [-1, 1]) {
+      ctx.fillStyle = linear(ctx, 2, 7, 9, 7, [
+        [0, '#0f5e50'],
+        [1, '#22a98d'],
+      ]);
       ctx.beginPath();
       ctx.moveTo(6, 7 + s * 2);
       ctx.lineTo(2, 7 + s * 6.2);
       ctx.lineTo(4.5, 7 + s * 6.2);
       ctx.lineTo(9, 7 + s * 2.5);
       ctx.fill();
+      ctx.fillStyle = '#ffcf5a';
+      ctx.fillRect(2.4, 7 + s * 6.2 - (s > 0 ? 0.7 : 0), 1.8, 0.7);
     }
     // Body.
     ctx.fillStyle = linear(ctx, 0, 2, 0, 12, [
-      [0, '#d6fff5'],
-      [0.45, '#4fe3c1'],
-      [1, '#167a66'],
+      [0, '#e2fff8'],
+      [0.35, '#5ff0cd'],
+      [0.7, '#22a98d'],
+      [1, '#0f5e50'],
     ]);
     ctx.beginPath();
     ctx.ellipse(9, 7, 6.5, 4.2, 0, 0, TAU);
     ctx.fill();
-    // Grabber prongs at the nose.
-    ctx.strokeStyle = '#c8d0ff';
-    ctx.lineWidth = 0.8;
+    // Panel seams and a belly plate.
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(9, 7, 6.5, 4.2, 0, 0, TAU);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(6,40,40,0.28)';
+    ctx.fillRect(2, 8.6, 14, 3);
+    seam(ctx, 5.6, 3, 5.6, 11, 0.25);
+    seam(ctx, 13.2, 3.5, 13.2, 10.5, 0.25);
+    ctx.restore();
+    // Grabber arms at the nose, with jointed tips.
     ctx.lineCap = 'round';
     for (const s of [-1, 1]) {
+      ctx.strokeStyle = '#3a4380';
+      ctx.lineWidth = 0.9;
       ctx.beginPath();
-      ctx.moveTo(15, 7 + s * 1.2);
-      ctx.lineTo(17.2, 7 + s * 2.2);
+      ctx.moveTo(14.6, 7 + s * 1.1);
+      ctx.lineTo(16.4, 7 + s * 2.3);
+      ctx.lineTo(17.5, 7 + s * 1.3);
+      ctx.stroke();
+      ctx.strokeStyle = '#dfe4ff';
+      ctx.lineWidth = 0.45;
+      ctx.beginPath();
+      ctx.moveTo(14.6, 7 + s * 1.1);
+      ctx.lineTo(16.4, 7 + s * 2.3);
+      ctx.lineTo(17.5, 7 + s * 1.3);
       ctx.stroke();
     }
-    // Glass dome.
-    ctx.fillStyle = radial(ctx, 10.4, 5.6, 3.2, [
-      [0, '#e8fbff'],
-      [0.4, '#5cd6ff'],
-      [1, '#0b3a52'],
+    // Glass dome with a frame and a reflected window glint.
+    ctx.fillStyle = '#163a4a';
+    ctx.beginPath();
+    ctx.ellipse(10.5, 6.6, 3, 2.6, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = radial(ctx, 10, 5.4, 3.4, [
+      [0, '#f2fdff'],
+      [0.35, '#6fdcff'],
+      [1, '#0a3046'],
     ]);
     ctx.beginPath();
-    ctx.ellipse(10.5, 6.6, 2.6, 2.2, 0, 0, TAU);
+    ctx.ellipse(10.5, 6.6, 2.5, 2.1, 0, 0, TAU);
     ctx.fill();
-    // Engine nozzle.
-    ctx.fillStyle = '#20264f';
-    ctx.fillRect(1.8, 5.6, 1.6, 2.8);
-    // Specular highlight.
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(9.7, 5.6, 0.9, 0.45, -0.5, 0, TAU);
+    ctx.fill();
+    // Engine nozzle with a hot core.
+    ctx.fillStyle = linear(ctx, 0, 5.4, 0, 8.6, [
+      [0, '#8c96d8'],
+      [1, '#1a1f48'],
+    ]);
+    ctx.fillRect(1.6, 5.4, 1.9, 3.2);
+    ctx.fillStyle = '#ffb36a';
+    ctx.fillRect(1.6, 6.4, 0.6, 1.2);
+    // Specular highlight along the top.
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.beginPath();
-    ctx.ellipse(7, 4.4, 2.4, 0.8, -0.1, 0, TAU);
+    ctx.ellipse(7, 4.2, 2.6, 0.7, -0.1, 0, TAU);
     ctx.fill();
-  }, 6);
+    lamp(ctx, 12.8, 9.4, 0.45, '#ff6a7a');
+  }, 6, { bevel: 0.6, light: 0.6, grain: 0.18, grime: 0.12, seed: 6 });
 
 /** Cargo hauler, pointing right: a cab, a spine of containers and a big engine. */
 export const hauler = () =>
   paint(32, 16, (ctx) => {
-    // Engine bell.
-    ctx.fillStyle = linear(ctx, 0, 4, 0, 12, [
-      [0, '#8f98e0'],
-      [1, '#2b3170'],
+    // Engine bell with cooling rings and a glowing throat.
+    ctx.fillStyle = linear(ctx, 0, 3.5, 0, 12.5, [
+      [0, '#b8c0f4'],
+      [0.4, '#6670c4'],
+      [1, '#1f2460'],
     ]);
     ctx.beginPath();
     ctx.moveTo(4.5, 5);
@@ -770,33 +992,62 @@ export const hauler = () =>
     ctx.lineTo(1, 12.5);
     ctx.lineTo(4.5, 11);
     ctx.fill();
-    // Spine.
-    ctx.fillStyle = '#4a52a0';
-    ctx.fillRect(4, 7, 20, 2);
-    // Containers, two stacks, with ridges.
+    ctx.strokeStyle = 'rgba(10,12,40,0.5)';
+    ctx.lineWidth = 0.3;
+    for (const x of [2.2, 3.4]) {
+      ctx.beginPath();
+      ctx.moveTo(x, 4.1 + (x - 1) * 0.3);
+      ctx.lineTo(x, 11.9 - (x - 1) * 0.3);
+      ctx.stroke();
+    }
+    ctx.fillStyle = radial(ctx, 1, 8, 2.4, [
+      [0, '#fff1c8'],
+      [0.5, '#ff9a4c'],
+      [1, 'rgba(255,90,40,0)'],
+    ]);
+    ctx.fillRect(0, 5, 3, 6);
+    // Spine truss.
+    ctx.fillStyle = linear(ctx, 0, 6.8, 0, 9.2, [
+      [0, '#8a92dc'],
+      [1, '#2c3274'],
+    ]);
+    ctx.fillRect(4, 6.8, 20, 2.4);
+    ctx.strokeStyle = 'rgba(12,14,46,0.6)';
+    ctx.lineWidth = 0.25;
+    for (let x = 4.5; x < 24; x += 1.5) {
+      ctx.beginPath();
+      ctx.moveTo(x, 6.8);
+      ctx.lineTo(x + 1.5, 9.2);
+      ctx.stroke();
+    }
+    // Containers, two stacks, with ridges, a stencilled band and corner castings.
     const colors = ['#ff8a4c', '#ffd166', '#4fe3c1', '#c58cff'];
     for (let i = 0; i < 4; i++) {
-      for (const y of [2.5, 9]) {
+      for (const y of [2.3, 9.2]) {
         const x = 5 + i * 4.6;
         const col = colors[(i + (y > 5 ? 2 : 0)) % 4];
         ctx.fillStyle = linear(ctx, 0, y, 0, y + 4.5, [
-          [0, col],
+          [0, '#ffffff'],
+          [0.12, col],
+          [0.7, col],
           [1, 'rgba(40,20,60,1)'],
         ]);
         ctx.fillRect(x, y, 4.2, 4.5);
-        ctx.fillStyle = col;
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(x, y, 4.2, 2.6);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        for (let k = 1; k < 4; k++) ctx.fillRect(x + k * 1.05, y + 0.4, 0.3, 3.7);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        for (let k = 1; k < 5; k++) ctx.fillRect(x + k * 0.84 - 0.12, y + 0.5, 0.24, 3.5);
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        for (let k = 1; k < 5; k++) ctx.fillRect(x + k * 0.84 + 0.12, y + 0.5, 0.18, 3.5);
+        ctx.fillStyle = 'rgba(20,14,40,0.45)';
+        ctx.fillRect(x, y + 2, 4.2, 0.6);
+        ctx.fillStyle = 'rgba(30,24,60,0.9)';
+        for (const [cx, cy] of [[x, y], [x + 3.7, y], [x, y + 4], [x + 3.7, y + 4]]) ctx.fillRect(cx, cy, 0.5, 0.5);
       }
     }
-    // Cab.
+    // Cab with a window frame, seams and a nose light.
     ctx.fillStyle = linear(ctx, 0, 3, 0, 13, [
-      [0, '#eef3ff'],
-      [0.5, '#7aa7ff'],
-      [1, '#2f4ca8'],
+      [0, '#f4f7ff'],
+      [0.4, '#86b0ff'],
+      [1, '#26408f'],
     ]);
     ctx.beginPath();
     ctx.moveTo(23.5, 3.5);
@@ -805,73 +1056,156 @@ export const hauler = () =>
     ctx.lineTo(23.5, 12.5);
     ctx.closePath();
     ctx.fill();
-    // Cockpit glass.
-    ctx.fillStyle = radial(ctx, 28, 6.5, 3, [
-      [0, '#e8fbff'],
-      [1, '#2a8fbf'],
+    seam(ctx, 25.2, 3.8, 25.2, 12.2, 0.25);
+    ctx.fillStyle = '#16224a';
+    ctx.beginPath();
+    ctx.ellipse(28, 7.2, 2.1, 2.5, 0, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = radial(ctx, 27.6, 6.2, 3, [
+      [0, '#f2fdff'],
+      [0.4, '#6fd2ff'],
+      [1, '#1a6a9a'],
     ]);
     ctx.beginPath();
-    ctx.ellipse(28, 7.2, 1.8, 2.2, 0, 0, TAU);
+    ctx.ellipse(28, 7.2, 1.7, 2.1, 0, 0, TAU);
     ctx.fill();
-  }, 5);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(27.2, 5.6, 0.5, 1.3);
+    lamp(ctx, 30.6, 8, 0.4, '#ffe08a');
+    lamp(ctx, 23.9, 12.1, 0.35, '#ff6a7a');
+  }, 5, { bevel: 0.5, light: 0.6, grain: 0.25, grime: 0.3, seed: 8 });
 
-/** Smelter pod: a squat furnace with a glowing grill. Points outward (right). */
+/** Smelter pod: a squat furnace with a glowing grill, a chimney and side vents. Points outward (right). */
 export const smelter = () =>
   paint(22, 22, (ctx) => {
-    ctx.fillStyle = linear(ctx, 0, 0, 22, 22, [
-      [0, '#ffd0b0'],
-      [0.5, '#c4602a'],
-      [1, '#6a2a14'],
+    // Chimney stacks behind the body.
+    for (const y of [2.2, 16.6]) {
+      ctx.fillStyle = linear(ctx, 0, y, 0, y + 3.2, [
+        [0, '#8a8fb8'],
+        [1, '#33365c'],
+      ]);
+      ctx.fillRect(2.5, y, 5, 3.2);
+      ctx.fillStyle = '#1a1b30';
+      ctx.fillRect(3.2, y + (y < 10 ? 0 : 2.4), 3.6, 0.8);
+    }
+    // Furnace body.
+    ctx.fillStyle = linear(ctx, 0, 3, 0, 19, [
+      [0, '#ffd9bd'],
+      [0.25, '#e07a3e'],
+      [0.7, '#9a4220'],
+      [1, '#4a1c0e'],
     ]);
     ctx.beginPath();
     ctx.roundRect(1, 3, 20, 16, 5);
     ctx.fill();
+    // Heat-scorched band around the grill.
+    ctx.fillStyle = radial(ctx, 11, 11, 10, [
+      [0.4, 'rgba(40,10,0,0.45)'],
+      [1, 'rgba(40,10,0,0)'],
+    ]);
+    ctx.fillRect(1, 3, 20, 16);
+    // Bolted frame around the firebox.
+    ctx.fillStyle = '#3a1a10';
+    ctx.beginPath();
+    ctx.roundRect(4, 6, 14, 10, 2.5);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,220,190,0.75)';
+    for (const [x, y] of [[5, 7], [17, 7], [5, 15], [17, 15]]) {
+      ctx.beginPath();
+      ctx.arc(x, y, 0.45, 0, TAU);
+      ctx.fill();
+    }
+    // Molten glow.
     ctx.fillStyle = radial(ctx, 11, 11, 7, [
-      [0, '#fff4c2'],
-      [0.5, '#ffb547'],
-      [1, '#ff6a2a'],
+      [0, '#fffbe0'],
+      [0.35, '#ffd36a'],
+      [0.75, '#ff7a2a'],
+      [1, '#c4301a'],
     ]);
     ctx.beginPath();
-    ctx.roundRect(5, 7, 12, 8, 2);
+    ctx.roundRect(5.4, 7.4, 11.2, 7.2, 1.6);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(80,20,10,0.7)';
-    ctx.lineWidth = 1;
-    for (let x = 8; x < 17; x += 3) {
-      ctx.beginPath();
-      ctx.moveTo(x, 7);
-      ctx.lineTo(x, 15);
-      ctx.stroke();
+    // Grill bars with a lit top edge.
+    for (let x = 7.6; x < 16; x += 2.4) {
+      ctx.fillStyle = '#4a160c';
+      ctx.fillRect(x - 0.5, 7.4, 1, 7.2);
+      ctx.fillStyle = 'rgba(255,190,120,0.7)';
+      ctx.fillRect(x - 0.5, 7.4, 0.3, 7.2);
     }
-    ctx.strokeStyle = 'rgba(255,230,210,0.6)';
+    // Vent slits on the outer face.
+    ctx.fillStyle = 'rgba(40,12,4,0.7)';
+    for (let k = 0; k < 4; k++) ctx.fillRect(19, 6.5 + k * 2.6, 1.2, 1.4);
+    // Outline glint.
+    ctx.strokeStyle = 'rgba(255,236,220,0.55)';
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.roundRect(1.5, 3.5, 19, 15, 5);
+    ctx.roundRect(1.5, 3.5, 19, 15, 4.6);
     ctx.stroke();
-  }, 5);
+    lamp(ctx, 3, 5.4, 0.45, '#7dffb0');
+  }, 5, { bevel: 0.9, light: 0.6, grain: 0.3, grime: 0.4, seed: 9 });
 
-/** Fabricator module: a hex block with status lights. */
+/** Fabricator module: a hex block with a working printer eye, panel facets and status lights. */
 export const fabricator = () =>
   paint(20, 20, (ctx) => {
+    const hex = (r: number) => {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + Math.PI / 6;
+        ctx.lineTo(10 + Math.cos(a) * r, 10 + Math.sin(a) * r);
+      }
+      ctx.closePath();
+    };
     ctx.fillStyle = linear(ctx, 0, 0, 20, 20, [
-      [0, '#ecd6ff'],
-      [0.5, '#a66ae8'],
-      [1, '#4e2a8a'],
+      [0, '#f4e6ff'],
+      [0.4, '#b27cf0'],
+      [1, '#3e1f72'],
+    ]);
+    hex(9.5);
+    ctx.fill();
+    // Facets: each of the six faces gets its own tone from the light.
+    for (let i = 0; i < 6; i++) {
+      const a0 = (i / 6) * TAU + Math.PI / 6;
+      const a1 = a0 + TAU / 6;
+      const mid = (a0 + a1) / 2;
+      const lit = -(Math.cos(mid) * -0.62 + Math.sin(mid) * -0.78);
+      ctx.fillStyle = lit < 0 ? `rgba(255,255,255,${(-lit * 0.22).toFixed(3)})` : `rgba(20,6,50,${(lit * 0.3).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(10 + Math.cos(a0) * 9.5, 10 + Math.sin(a0) * 9.5);
+      ctx.lineTo(10 + Math.cos(a1) * 9.5, 10 + Math.sin(a1) * 9.5);
+      ctx.lineTo(10 + Math.cos(a1) * 6.2, 10 + Math.sin(a1) * 6.2);
+      ctx.lineTo(10 + Math.cos(a0) * 6.2, 10 + Math.sin(a0) * 6.2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(30,10,60,0.5)';
+    ctx.lineWidth = 0.35;
+    hex(6.2);
+    ctx.stroke();
+    // Printer eye.
+    ctx.fillStyle = '#1c0e38';
+    ctx.beginPath();
+    ctx.arc(10, 10, 4.6, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = linear(ctx, 6, 6, 14, 14, [
+      [0, 'rgba(0,0,0,0.6)'],
+      [1, 'rgba(230,200,255,0.7)'],
+    ]);
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.arc(10, 10, 4.3, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = radial(ctx, 10, 10, 3.2, [
+      [0, '#ffffff'],
+      [0.3, '#f0d8ff'],
+      [0.7, '#b46cff'],
+      [1, 'rgba(120,50,220,0)'],
     ]);
     ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * TAU + Math.PI / 6;
-      ctx.lineTo(10 + Math.cos(a) * 9.5, 10 + Math.sin(a) * 9.5);
-    }
-    ctx.closePath();
+    ctx.arc(10, 10, 3.2, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = '#241245';
-    ctx.beginPath();
-    ctx.arc(10, 10, 4.5, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = '#f2e3ff';
-    ctx.beginPath();
-    ctx.arc(10, 10, 2, 0, TAU);
-    ctx.fill();
-  }, 6);
+    lamp(ctx, 15.4, 6.6, 0.45, '#7dffb0');
+    lamp(ctx, 15.4, 13.4, 0.45, '#ffcf5a');
+  }, 6, { bevel: 0.8, light: 0.6, grain: 0.2, grime: 0.15, seed: 10 });
 
 /** One 30-degree section of the gold orbital dock ring, centred on a canvas the size of the ring. */
 export const dockSegment = (radius: number) =>
@@ -972,7 +1306,7 @@ export function debris(seed: number): Texture {
         ctx.fill();
       }
     }
-  }, 4);
+  }, 4, { bevel: 0.8, light: 0.6, grain: 0.45, grime: 0.5, seed });
 }
 
 /** The golden salvage crate. */
@@ -1000,7 +1334,7 @@ export const crate = () =>
     ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.fillRect(5, 5, 6, 2);
-  }, 4);
+  }, 4, { bevel: 1, light: 0.7, grain: 0.4, grime: 0.4, seed: 12 });
 
 // ---------- Extra detail ----------
 
@@ -1047,7 +1381,7 @@ export const antenna = () =>
     ctx.arc(0, 9.5, 1.4, 0, TAU);
     ctx.fill();
     ctx.restore();
-  }, 5);
+  }, 5, { bevel: 0.6, light: 0.6, grain: 0.25, grime: 0.25, seed: 13 });
 
 /** A cratered grey moon, lit from the upper left. */
 export const moon = () =>
@@ -1084,7 +1418,7 @@ export const moon = () =>
     ctx.beginPath();
     ctx.arc(c, c, 18, 0, TAU);
     ctx.fill();
-  }, 3);
+  }, 4, { bevel: 1.5, light: 0.35, grain: 0.5, grime: 0.6, seed: 17 });
 
 /** A distant spiral galaxy. */
 export const galaxy = () =>
@@ -1148,7 +1482,7 @@ export const bigRock = (seed: number) =>
     ctx.beginPath();
     ctx.arc(c, c, 26, Math.PI * 1.1, Math.PI * 1.6);
     ctx.stroke();
-  }, 2);
+  }, 3, { bevel: 2, light: 0.4, grain: 0.6, grime: 0.6, seed });
 
 /** A small laser turret on a strut, barrel pointing up (rotate to aim). */
 export const laserTurret = () =>
@@ -1187,7 +1521,7 @@ export const laserTurret = () =>
     ctx.beginPath();
     ctx.arc(14, 3, 5, 0, TAU);
     ctx.fill();
-  }, 4);
+  }, 4, { bevel: 0.8, light: 0.7, grain: 0.3, grime: 0.3, seed: 14 });
 
 /** A swirling gravity vortex: a dark eye with bright spiral arms. Spin it. */
 export const vortex = () =>
@@ -1260,7 +1594,7 @@ export const warpGate = () =>
       ctx.fill();
       ctx.restore();
     }
-  }, 3);
+  }, 4, { bevel: 1.2, light: 0.5, grain: 0.3, grime: 0.3, seed: 15 });
 
 /** The shimmering inside of a warp gate. Spin and pulse it with additive blending. */
 export const portal = () =>
@@ -1323,7 +1657,7 @@ export const dysonPanel = () =>
       ctx.lineTo(x, 11 - Math.sin((x / 30) * Math.PI) * 5);
       ctx.stroke();
     }
-  }, 4);
+  }, 4, { bevel: 0.5, light: 0.5, grain: 0.2, grime: 0.15, seed: 16 });
 
 /** A glowing meteor head: molten rock with a hot rim. The tail is a stretched streak. */
 export const meteor = () =>
@@ -1471,7 +1805,7 @@ export const bossWreck = (seed: number) =>
       ]);
       ctx.fillRect(x - 5, y - 5, 10, 10);
     }
-  }, 2.5);
+  }, 3, { bevel: 1.6, light: 0.5, grain: 0.45, grime: 0.6, seed: seed + 40 });
 
 /** Glowing cracks, faded in over a wreck as it takes damage. Drawn additively. */
 export const bossCracks = (seed: number) =>
