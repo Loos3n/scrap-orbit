@@ -43,6 +43,7 @@
           </div>
           <div class="boss-hp"><i id="boss-hp"></i></div>
         </div>
+        <div id="golden-banner" class="golden-banner" hidden><span data-icon="star"></span>Golden rush <b id="golden-time"></b></div>
         <div id="event-banner" class="event-banner" hidden>
           <span id="event-icon" class="event-icon"></span>
           <div class="event-text"><b id="event-name"></b><span id="event-desc"></span></div>
@@ -86,13 +87,18 @@
           <ul id="upgrade-list" class="list"></ul>
         </div>
         <div id="tab-crew" class="tab-body" hidden>
-          <div class="segments two" role="tablist" aria-label="Crew sections">
+          <div class="segments three" role="tablist" aria-label="Crew sections">
             <button type="button" data-seg="crewlist" aria-selected="true">Crew</button>
+            <button type="button" data-seg="trips" aria-selected="false">Trips<span id="trips-dot" class="dot" hidden></span></button>
             <button type="button" data-seg="pets" aria-selected="false">Pets<span id="pets-dot" class="dot" hidden></span></button>
           </div>
           <div id="seg-crewlist" class="seg">
             <p class="tab-intro">Each crew member supercharges one machine. Recruit them and train them up with crystals from missions, events and achievements.</p>
             <ul id="crew-list" class="crew-grid"></ul>
+          </div>
+          <div id="seg-trips" class="seg" hidden>
+            <p class="tab-intro">Send crew on expeditions. They come back with crystals, scrap and sometimes a blueprint for a new station module.</p>
+            <div id="trip-panel"></div>
           </div>
           <div id="seg-pets" class="seg" hidden>
             <p class="tab-intro">Pets float around the station and lend a paw. One can come along at a time; tap an adopted pet to bring it out.</p>
@@ -130,13 +136,20 @@
         </div>
         <div id="tab-station" class="tab-body" hidden>
           <div class="segments" role="tablist" aria-label="Station sections">
-            <button type="button" data-seg="decor" aria-selected="true">Decor</button>
+            <button type="button" data-seg="modules" aria-selected="true">Rooms</button>
+            <button type="button" data-seg="decor" aria-selected="false">Decor</button>
             <button type="button" data-seg="log" aria-selected="false">Log<span id="log-dot" class="dot" hidden></span></button>
             <button type="button" data-seg="awards" aria-selected="false">Awards</button>
             <button type="button" data-seg="stats" aria-selected="false">Stats</button>
             <button type="button" data-seg="settings" aria-selected="false">Settings</button>
           </div>
-          <div id="seg-decor" class="seg">
+          <div id="seg-modules" class="seg">
+            <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
+            <div id="module-total" class="module-total"></div>
+            <div id="module-grid" class="module-grid"></div>
+            <div id="module-detail" class="module-detail"></div>
+          </div>
+          <div id="seg-decor" class="seg" hidden>
             <h3 class="section-title">Sky themes</h3>
             <ul id="theme-list" class="decor-grid"></ul>
             <h3 class="section-title">Hull paint</h3>
@@ -150,6 +163,9 @@
             <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
             <div id="ach-grid" class="ach-grid"></div>
             <p id="ach-caption" class="ach-caption">Tap a badge to see what it's for. Each one is worth +1% income and 3 crystals.</p>
+            <h3 class="section-title">Boss loot <span id="loot-sum" class="section-sub"></span></h3>
+            <p class="tab-intro">Boss wrecks sometimes drop a rare part or pet skin. Parts work for good; skins are worn from the Pets list.</p>
+            <ul id="loot-grid" class="loot-grid"></ul>
           </div>
           <div id="seg-stats" class="seg" hidden>
             <dl id="stats" class="stats"></dl>

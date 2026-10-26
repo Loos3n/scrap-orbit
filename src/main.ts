@@ -5,6 +5,7 @@ import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
 import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, STORY, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
+import { GOLDEN, LOOT, TRIPS, moduleDef } from './core/expansion';
 import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { D, format } from './core/num';
@@ -48,8 +49,15 @@ function showSectorCard(relocations: number): void {
   window.setTimeout(() => (card.hidden = true), 4000);
 }
 
+const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
+
 async function boot(): Promise<void> {
   const game = new Game();
+  /** The tint of the skin the active pet wears, if any. */
+  const petTint = () => {
+    const pet = game.state.pets.active;
+    return LOOT.find((l) => l.id === (pet && game.state.skins[pet]))?.tint ?? 0xffffff;
+  };
   const sfx = new Sfx();
   const ui = new UI(game);
   ui.onSoundChange = (sound, music) => {
@@ -235,7 +243,7 @@ async function boot(): Promise<void> {
         if (r.kind === 'pet') {
           const p = PETS.find((x) => x.id === r.pet)!;
           ui.toast(ICONS.crew.replace('currentColor', '#c58cff'), `<b>${p.name}</b> joined the station!`);
-          scene.setPet(game.state.pets.active);
+          scene.setPet(game.state.pets.active, petTint());
           syncPerks();
         } else {
           ui.toast(r.kind === 'crystals' ? ICONS.crystal : ICONS.scrap, `<b>Day ${game.state.login.streak} reward!</b> +${r.kind === 'crystals' ? `${r.amount} crystals` : fmt(r.amount)}`);
@@ -246,7 +254,7 @@ async function boot(): Promise<void> {
         break;
       }
       case 'pet':
-        scene.setPet(game.state.pets.active);
+        scene.setPet(game.state.pets.active, petTint());
         syncPerks();
         if (e.adopted) {
           const p = PETS.find((x) => x.id === e.id)!;
@@ -271,11 +279,71 @@ async function boot(): Promise<void> {
         shakeBossBanner();
         sfx.bossHit();
         break;
-      case 'bossDefeated':
+      case 'bossDefeated': {
         scene.setBoss(null, true);
         ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>Wreck broken!</b> +${fmt(e.scrap)} and ${e.crystals} crystals`);
         sfx.bossBreak();
         buzz(80);
+        const loot = LOOT.find((l) => l.id === e.loot);
+        if (loot) {
+          setTimeout(() => {
+            ui.toast(ICONS.star.replace('currentColor', hexColor(loot.color)), `<b>Boss loot: ${loot.name}!</b> ${loot.desc}`);
+            scene.celebrate(loot.color);
+            sfx.achievement();
+          }, 900);
+        }
+        break;
+      }
+      case 'bossEscape':
+        scene.setBoss(null);
+        ui.toast(ICONS.warp, '<b>The wreck flew away!</b> Break the next one within a minute.');
+        sfx.event();
+        break;
+      case 'goldenSpawn':
+        scene.spawnGolden();
+        break;
+      case 'golden':
+        ui.toast(ICONS.star.replace('currentColor', '#ffd166'), `<b>Golden rush!</b> Everything earns ${GOLDEN.mult}x for ${GOLDEN.seconds} seconds`);
+        scene.celebrate(0xffd166);
+        sfx.milestone();
+        buzz(60);
+        break;
+      case 'module':
+        if (e.id) {
+          ui.toast(ICONS.station.replace('currentColor', '#4fe3c1'), `<b>${moduleDef(e.id)!.name}</b> built`);
+          sfx.upgrade();
+          buzz(15);
+        } else {
+          sfx.buy();
+        }
+        break;
+      case 'trip': {
+        const c = CREW.find((x) => x.id === e.crew)!;
+        ui.toast(ICONS.warp, `<b>${c.name}</b> set off for the ${TRIPS.find((t) => t.id === e.dest)!.name}`);
+        sfx.boost();
+        break;
+      }
+      case 'tripReady': {
+        const c = CREW.find((x) => x.id === e.crew)!;
+        ui.toast(ICONS.crew.replace('currentColor', '#4fe3c1'), `<b>${c.name} is back!</b> Open Crew, Trips to see the haul`);
+        sfx.event();
+        break;
+      }
+      case 'tripHome': {
+        const r = e.reward;
+        const c = CREW.find((x) => x.id === r.crew)!;
+        ui.toast(ICONS.crystal, `<b>${c.name}'s haul:</b> +${fmt(r.scrap)} and ${r.crystals} crystals`);
+        if (r.blueprint) {
+          setTimeout(() => ui.toast(ICONS.station.replace('currentColor', '#c58cff'), `<b>Blueprint found: ${moduleDef(r.blueprint!)!.name}!</b> Build it in Station, Modules`), 700);
+        }
+        scene.celebrate(0x4fe3c1);
+        sfx.coins();
+        buzz(25);
+        break;
+      }
+      case 'skin':
+        scene.setPet(game.state.pets.active, petTint());
+        sfx.upgrade();
         break;
       case 'story': {
         const entry = STORY.find((x) => x.id === e.id)!;
@@ -307,6 +375,11 @@ async function boot(): Promise<void> {
       buzz(15);
       return;
     }
+    if (hit === 'golden') {
+      game.collectGolden();
+      buzz(40);
+      return;
+    }
     if (hit === 'convoy') {
       const n = game.boardConvoy();
       scene.floatText(scene.lastHit.x, scene.lastHit.y, `+${n} crystals`, true);
@@ -324,7 +397,7 @@ async function boot(): Promise<void> {
   scene.setSector(sectorFor(game.state.stats.relocations));
   game.start();
   scene.setEvent(meta.eventActive(game.state, Date.now()));
-  scene.setPet(game.state.pets.active);
+  scene.setPet(game.state.pets.active, petTint());
   if (game.state.boss) scene.setBoss(game.state.boss.name);
 
   let lastUi = 0;

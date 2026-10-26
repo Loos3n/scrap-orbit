@@ -23,7 +23,11 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals)
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
 - Decorations: six sky themes and five hull paints
-- Boss wrecks: the first after 12 minutes of play, then one every 25 to 40 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in and stays until it is broken, with a health bar over it; break it with taps (the claw fires a bolt) and machine fire for a fixed payout of 5 minutes of scrap per second (shown when it arrives) and crystals
+- Boss wrecks: the first after 12 minutes of play, then one every 25 to 40 minutes, announced by a hazard-striped warning, an alarm and a red screen pulse. A giant derelict drifts in with a health bar; break it with taps (the claw fires a bolt) and machine fire within 60 seconds or it flies away. The payout is fixed when it arrives (5 minutes of scrap per second) plus crystals
+- Boss loot: each broken wreck has a 20% chance (guaranteed after four dry runs) to drop a rare part with a permanent bonus or a pet skin
+- Golden scrap: every 5 to 10 minutes a glittering golden crate drifts past; tap it for a 30-second golden rush where everything earns 7x
+- Expeditions: send recruited crew on 15-minute to 8-hour trips for crystals, scrap and module blueprints (their machine loses their bonus while they are away)
+- Station rooms: build modules on a 3x3 grid with crystals (reactor, hangars, solar arrays and blueprint rooms); layout matters, since the reactor powers its neighbours and rooms like hangars, corners or the centre get extra. Rooms survive relocation and refund in full when taken down
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
 - Story log: 12 entries from the crew, unlocked as the station grows, telling the mystery of the Hollow Fleet
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7

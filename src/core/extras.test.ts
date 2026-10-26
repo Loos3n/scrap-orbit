@@ -4,6 +4,9 @@ import { baseIncome, tapValue } from './economy';
 import { bossHealth, buyPet, checkLogin, choosePet, claimLogin, hitBoss, streakSlot, updateBoss, updateStory } from './meta';
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
+import { GOLDEN, LOOT_PITY, TRIPS, bonuses, moduleYield, tripMs } from './expansion';
+import { buildModule, claimGolden, claimTrip, goldenDue, removeModule, startTrip } from './meta';
+import { income } from './economy';
 
 const DAY = 86_400_000;
 const NOW = new Date(2026, 9, 21, 12).getTime();
@@ -72,16 +75,30 @@ describe('boss wrecks', () => {
     expect(s.nextBossAt).toBeGreaterThan(NOW + BOSS.gap[0] * 60_000 - 1);
   });
 
-  it('stays until broken, and waits during the tutorial', () => {
+  it('flies off after a minute, and waits during the tutorial', () => {
     const s = ready();
     s.tutorial = 2;
     expect(updateBoss(s, NOW, 1).arrived).toBeUndefined();
     s.tutorial = -1;
     updateBoss(s, NOW, 1);
     s.owned.drone = 0;
-    updateBoss(s, NOW + 3_600_000, 0.01);
-    expect(s.boss).not.toBeNull();
+    expect(updateBoss(s, NOW + 59_000, 0.01).escaped).toBeUndefined();
+    expect(updateBoss(s, NOW + BOSS.seconds * 1000, 0.01).escaped).toBe(true);
+    expect(s.boss).toBeNull();
     expect(s.stats.bosses).toBe(0);
+  });
+
+  it('drops loot sometimes, and always after a dry spell', () => {
+    const s = ready();
+    const never = () => 0.99;
+    for (let i = 0; i < LOOT_PITY + 1; i++) {
+      s.nextBossAt = 0;
+      s.stats.playSec = BOSS.firstSec;
+      updateBoss(s, NOW + i * 1e9, 1, never);
+      const won = hitBoss(s, D(s.boss!.max).mul(10), NOW + i * 1e9, never);
+      if (i < LOOT_PITY) expect(won!.loot).toBeUndefined();
+      else expect(s.loot.has(won!.loot!)).toBe(true);
+    }
   });
 
   it('pays a fixed reward of minutes of scrap per second, set on arrival', () => {
@@ -118,5 +135,79 @@ describe('story log', () => {
     const back = deserialize(serialize(s), NOW)!;
     expect(back.story).toEqual(['arrival', 'stamp', 'cargo']);
     expect(STORY.length).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe('station modules', () => {
+  it('adds up layout bonuses: reactor power, hangar clusters and corners', () => {
+    const grid: (string | null)[] = ['solar', 'hangar', null, 'reactor', 'hangar', null, null, null, 'observatory'];
+    expect(moduleYield(grid, 0)).toEqual([['income', 0.04 * 2 * 1.5]]);
+    // Hangar at 4 touches the reactor and one hangar.
+    expect(moduleYield(grid, 4)[0][1]).toBeCloseTo((0.06 + 0.02) * 1.5);
+    expect(moduleYield(grid, 8)).toEqual([['golden', 0.2]]);
+  });
+
+  it('costs crystals, needs blueprints, and refunds when taken down', () => {
+    const s = newState(NOW);
+    s.crystals = 100;
+    expect(buildModule(s, 4, 'workshop')).toBe(false);
+    expect(buildModule(s, 4, 'reactor')).toBe(true);
+    expect(buildModule(s, 0, 'reactor')).toBe(false);
+    expect(s.crystals).toBe(75);
+    const before = income(s, NOW).toNumber();
+    s.owned.drone = 10;
+    expect(bonuses(s).income).toBeCloseTo(0.05);
+    expect(removeModule(s, 4)).toBe(25);
+    expect(s.crystals).toBe(100);
+    expect(before).toBe(0);
+  });
+});
+
+describe('expeditions', () => {
+  it('takes crew away from their machine and brings back crystals, scrap and blueprints', () => {
+    const s = newState(NOW);
+    s.owned.drone = 10;
+    s.crew.mika = 1;
+    const full = income(s, NOW);
+    expect(startTrip(s, 'bolt', 'field', NOW)).toBe(false);
+    expect(startTrip(s, 'mika', 'field', NOW)).toBe(true);
+    expect(startTrip(s, 'mika', 'nebula', NOW)).toBe(false);
+    expect(income(s, NOW).lt(full)).toBe(true);
+    expect(claimTrip(s, 0, NOW + 1000)).toBeNull();
+    const end = NOW + tripMs(s, TRIPS[0]);
+    const got = claimTrip(s, 0, end, () => 0)!;
+    expect(got.crystals).toBe(TRIPS[0].crystals[0]);
+    expect(got.blueprint).toBeDefined();
+    expect(s.blueprints.has(got.blueprint!)).toBe(true);
+    expect(s.trips.length).toBe(0);
+  });
+});
+
+describe('golden scrap', () => {
+  it('turns up on a timer and multiplies income during the rush', () => {
+    const s = newState(NOW);
+    s.tutorial = -1;
+    s.owned.drone = 10;
+    expect(goldenDue(s, NOW)).toBe(false);
+    expect(goldenDue(s, NOW + GOLDEN.firstMin * 60_000)).toBe(true);
+    const base = income(s, NOW).toNumber();
+    claimGolden(s, NOW);
+    expect(income(s, NOW + 1000).toNumber()).toBeCloseTo(base * GOLDEN.mult);
+    expect(income(s, NOW + GOLDEN.seconds * 1000).toNumber()).toBeCloseTo(base);
+  });
+
+  it('survives a save with modules, trips and loot', () => {
+    const s = newState(NOW);
+    s.modules[0] = 'hangar';
+    s.blueprints.add('armory');
+    s.crew.mika = 2;
+    startTrip(s, 'mika', 'deep', NOW);
+    s.loot.add('skin-cat');
+    s.skins.cat = 'skin-cat';
+    const back = deserialize(serialize(s), NOW)!;
+    expect(back.modules[0]).toBe('hangar');
+    expect(back.blueprints.has('armory')).toBe(true);
+    expect(back.trips[0].crew).toBe('mika');
+    expect(back.skins.cat).toBe('skin-cat');
   });
 });

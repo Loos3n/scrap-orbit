@@ -28,6 +28,24 @@ import {
   type StreakReward,
 } from './content';
 import { baseIncome, earn, income, researchProduct, tapValue } from './economy';
+import {
+  GOLDEN,
+  GRID,
+  LOOT,
+  LOOT_CHANCE,
+  LOOT_PITY,
+  MODULES,
+  TRIPS,
+  TRIP_PER_LEVEL,
+  TRIP_SLOTS,
+  bonuses,
+  moduleCost,
+  moduleDef,
+  moduleUnlocked,
+  onTrip,
+  tripMs,
+  type ModuleId,
+} from './expansion';
 import { D, Decimal } from './num';
 import type { GameState, Mission } from './state';
 
@@ -385,7 +403,8 @@ export function catDue(state: GameState, lastPounce: number, now: number): boole
 
 export interface BossUpdate {
   arrived?: boolean;
-  defeated?: { scrap: Decimal; crystals: number };
+  escaped?: boolean;
+  defeated?: { scrap: Decimal; crystals: number; loot?: string };
 }
 
 function bossHp(state: GameState, now: number): Decimal {
@@ -403,7 +422,7 @@ export function bossReward(state: GameState, now: number): Decimal {
 
 /** Damage multiplier on boss wrecks (the Goo Blob likes to chew). */
 export function bossDamageMult(state: GameState): number {
-  return petActive(state, 'blob') ? 1.5 : 1;
+  return (petActive(state, 'blob') ? 1.5 : 1) * (1 + bonuses(state).boss);
 }
 
 /**
@@ -417,12 +436,39 @@ export function updateBoss(state: GameState, now: number, dt: number, rand = Mat
     if (state.nextBossAt === 0) state.nextBossAt = now + Math.max(0, BOSS.firstSec - state.stats.playSec) * 1000;
     if (now < state.nextBossAt) return {};
     const hp = bossHp(state, now);
-    state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: 0, reward: bossReward(state, now).toString() };
+    state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: now + BOSS.seconds * 1000, reward: bossReward(state, now).toString() };
     return { arrived: true };
   }
+  // Wrecks from saves made while bosses had no time limit get a fresh minute.
+  if (!b.endsAt) b.endsAt = now + BOSS.seconds * 1000;
   const chip = baseIncome(state).mul(BOSS.machineShare * dt * bossDamageMult(state));
   const defeated = damageBoss(state, chip, now, rand);
-  return defeated ? { defeated } : {};
+  if (defeated) return { defeated };
+  if (now >= b.endsAt) {
+    state.boss = null;
+    scheduleBoss(state, now, rand);
+    return { escaped: true };
+  }
+  return {};
+}
+
+/** Seconds before the wreck flies off. */
+export function bossTimeLeft(state: GameState, now: number): number {
+  return state.boss ? Math.max(0, (state.boss.endsAt - now) / 1000) : 0;
+}
+
+/** Rolls for boss loot: a part or pet skin not yet found, sometimes, and always after a dry spell. */
+function rollLoot(state: GameState, rand: () => number): string | undefined {
+  const left = LOOT.filter((l) => !state.loot.has(l.id));
+  if (left.length === 0) return undefined;
+  if (state.lootMiss < LOOT_PITY && rand() >= LOOT_CHANCE) {
+    state.lootMiss++;
+    return undefined;
+  }
+  state.lootMiss = 0;
+  const pick = left[Math.floor(rand() * left.length)];
+  state.loot.add(pick.id);
+  return pick.id;
 }
 
 function scheduleBoss(state: GameState, now: number, rand: () => number): void {
@@ -444,12 +490,12 @@ function damageBoss(state: GameState, amount: Decimal, now: number, rand: () => 
   const scrap = b.reward ? D(b.reward) : bossReward(state, now);
   earn(state, scrap);
   addCrystals(state, BOSS.crystals);
-  return { scrap, crystals: BOSS.crystals };
+  return { scrap, crystals: BOSS.crystals, loot: rollLoot(state, rand) };
 }
 
 /** A tap on the scene while a wreck is in range: the claw's tap value lands on it too. */
-export function hitBoss(state: GameState, tap: Decimal, now: number): BossUpdate['defeated'] {
-  return damageBoss(state, tap.mul(bossDamageMult(state)), now);
+export function hitBoss(state: GameState, tap: Decimal, now: number, rand = Math.random): BossUpdate['defeated'] {
+  return damageBoss(state, tap.mul(bossDamageMult(state)), now, rand);
 }
 
 /** Health left, 0 to 1. */
@@ -488,4 +534,100 @@ export function updateStory(state: GameState): string[] {
 
 export function storyUnread(state: GameState): number {
   return state.story.length - state.storySeen;
+}
+
+// ---------- Station modules ----------
+
+/** Builds a module in an empty grid slot, for crystals. */
+export function buildModule(state: GameState, slot: number, id: ModuleId): boolean {
+  const def = moduleDef(id);
+  if (!def || slot < 0 || slot >= GRID * GRID || state.modules[slot] || !moduleUnlocked(state, id)) return false;
+  if (def.max && state.modules.filter((m) => m === id).length >= def.max) return false;
+  const cost = moduleCost(state, id);
+  if (state.crystals < cost) return false;
+  state.crystals -= cost;
+  state.modules[slot] = id;
+  return true;
+}
+
+/** Takes a module down and refunds what the last one built would cost, so layouts are free to try. */
+export function removeModule(state: GameState, slot: number): number {
+  const id = state.modules[slot] as ModuleId | null;
+  if (!id) return 0;
+  state.modules[slot] = null;
+  const refund = moduleCost(state, id);
+  state.crystals += refund;
+  return refund;
+}
+
+// ---------- Expeditions ----------
+
+/** Sends a recruited crew member off on a trip, if a slot is free. */
+export function startTrip(state: GameState, crew: CrewId, dest: string, now: number): boolean {
+  const def = TRIPS.find((t) => t.id === dest);
+  if (!def || state.crew[crew] < 1 || onTrip(state, crew) || state.trips.length >= TRIP_SLOTS) return false;
+  state.trips.push({ crew, dest, endsAt: now + tripMs(state, def) });
+  return true;
+}
+
+export interface TripReward {
+  crew: CrewId;
+  dest: string;
+  scrap: Decimal;
+  crystals: number;
+  blueprint?: string;
+}
+
+/** Brings a finished trip home and hands out what the crew found. */
+export function claimTrip(state: GameState, index: number, now: number, rand = Math.random): TripReward | null {
+  const trip = state.trips[index];
+  if (!trip || now < trip.endsAt) return null;
+  const def = TRIPS.find((t) => t.id === trip.dest)!;
+  state.trips.splice(index, 1);
+  const skill = 1 + (state.crew[trip.crew] - 1) * TRIP_PER_LEVEL;
+  const [lo, hi] = def.crystals;
+  const crystals = Math.round((lo + rand() * (hi - lo)) * skill);
+  const scrap = baseIncome(state).mul(def.scrapMin * 60 * skill);
+  earn(state, scrap);
+  addCrystals(state, crystals);
+  let blueprint: string | undefined;
+  const missing = MODULES.filter((m) => m.blueprint && !state.blueprints.has(m.id));
+  if (missing.length > 0 && rand() < def.blueprint) {
+    blueprint = missing[Math.floor(rand() * missing.length)].id;
+    state.blueprints.add(blueprint);
+  }
+  return { crew: trip.crew, dest: trip.dest, scrap, crystals, blueprint };
+}
+
+// ---------- Golden scrap ----------
+
+/** True when a golden crate should drift in now (and books the one after). */
+export function goldenDue(state: GameState, now: number, rand = Math.random): boolean {
+  if (state.tutorial >= 0) return false;
+  if (state.golden.nextAt === 0) {
+    state.golden.nextAt = now + GOLDEN.firstMin * 60_000;
+    return false;
+  }
+  if (now < state.golden.nextAt) return false;
+  const [lo, hi] = GOLDEN.gap;
+  state.golden.nextAt = now + ((lo + rand() * (hi - lo)) * 60_000) / (1 + bonuses(state).golden);
+  return true;
+}
+
+/** Tapping a golden crate starts the rush. */
+export function claimGolden(state: GameState, now: number): void {
+  state.golden.until = now + GOLDEN.seconds * 1000;
+  state.stats.golden = (state.stats.golden ?? 0) + 1;
+}
+
+/** Picks the skin a pet wears (a loot id the player has found), or null for its own coat. */
+export function chooseSkin(state: GameState, pet: PetId, skin: string | null): boolean {
+  if (skin === null) {
+    delete state.skins[pet];
+    return true;
+  }
+  const def = LOOT.find((l) => l.id === skin);
+  if (!def || def.pet !== pet || !state.loot.has(skin)) return false;
+  state.skins[pet] = skin;
+  return true;
 }

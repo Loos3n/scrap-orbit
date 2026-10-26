@@ -1,5 +1,6 @@
 import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
 import { CREW, PETS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
+import { GRID, LOOT, MODULES, TRIPS, type Trip } from './expansion';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -45,6 +46,19 @@ export interface GameState {
   /** The boss wreck on screen, if any. `name` indexes BOSS_NAMES; hp values are Decimal strings. */
   boss: { name: number; hp: string; max: string; endsAt: number; reward?: string } | null;
   nextBossAt: number;
+  /** Station module grid, row by row: a module id or null for an empty slot. */
+  modules: (string | null)[];
+  /** Module blueprints found on expeditions. */
+  blueprints: Set<string>;
+  /** Crew away on expeditions. */
+  trips: Trip[];
+  /** Boss loot found, and bosses beaten since the last drop. */
+  loot: Set<string>;
+  lootMiss: number;
+  /** The skin each pet wears (a loot id), if any. */
+  skins: Partial<Record<PetId, string>>;
+  /** Golden scrap: the rush ends at `until`; the next crate is due at `nextAt`. */
+  golden: { until: number; nextAt: number };
   /** Story log entries unlocked, in order, and how many of them have been read. */
   story: string[];
   storySeen: number;
@@ -61,6 +75,7 @@ export interface GameState {
     bestIncome: string;
     events: number;
     bosses: number;
+    golden?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -96,6 +111,13 @@ interface SaveData {
   pets?: { owned?: string[]; active?: string | null };
   boss?: GameState['boss'];
   nextBossAt?: number;
+  modules?: (string | null)[];
+  blueprints?: string[];
+  trips?: Trip[];
+  loot?: string[];
+  lootMiss?: number;
+  skins?: Partial<Record<PetId, string>>;
+  golden?: GameState['golden'];
   story?: string[];
   storySeen?: number;
   stats?: Partial<GameState['stats']>;
@@ -141,6 +163,13 @@ export function newState(now: number): GameState {
     pets: { owned: new Set(), active: null },
     boss: null,
     nextBossAt: 0,
+    modules: Array(GRID * GRID).fill(null),
+    blueprints: new Set(),
+    trips: [],
+    loot: new Set(),
+    lootMiss: 0,
+    skins: {},
+    golden: { until: 0, nextAt: 0 },
     story: [],
     storySeen: 0,
     stats: {
@@ -190,6 +219,13 @@ export function serialize(state: GameState): string {
     pets: { owned: [...state.pets.owned], active: state.pets.active },
     boss: state.boss,
     nextBossAt: state.nextBossAt,
+    modules: [...state.modules],
+    blueprints: [...state.blueprints],
+    trips: state.trips.map((t) => ({ ...t })),
+    loot: [...state.loot],
+    lootMiss: state.lootMiss,
+    skins: { ...state.skins },
+    golden: { ...state.golden },
     story: [...state.story],
     storySeen: state.storySeen,
     stats: { ...state.stats },
@@ -256,6 +292,21 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.pets.active = typeof pet === 'string' && state.pets.owned.has(pet as PetId) ? (pet as PetId) : null;
   state.boss = data.boss && typeof data.boss.endsAt === 'number' ? data.boss : null;
   state.nextBossAt = Number(data.nextBossAt) || 0;
+  const moduleIds = new Set<string>(MODULES.map((m) => m.id));
+  if (Array.isArray(data.modules)) state.modules = state.modules.map((_, i) => (moduleIds.has(data.modules![i] ?? '') ? data.modules![i] : null));
+  for (const id of strings(data.blueprints)) if (moduleIds.has(id)) state.blueprints.add(id);
+  const tripIds = new Set(TRIPS.map((t) => t.id));
+  if (Array.isArray(data.trips)) {
+    state.trips = data.trips.filter((t) => t && CREW.some((c) => c.id === t.crew) && tripIds.has(t.dest) && typeof t.endsAt === 'number');
+  }
+  const lootIds = new Set(LOOT.map((l) => l.id));
+  for (const id of strings(data.loot)) if (lootIds.has(id)) state.loot.add(id);
+  state.lootMiss = int(data.lootMiss);
+  for (const p of PETS) {
+    const skin = data.skins?.[p.id];
+    if (typeof skin === 'string' && state.loot.has(skin)) state.skins[p.id] = skin;
+  }
+  if (data.golden) state.golden = { until: Number(data.golden.until) || 0, nextAt: Number(data.golden.nextAt) || 0 };
   state.story = strings(data.story);
   state.storySeen = Math.min(int(data.storySeen), state.story.length);
   state.stats = { ...state.stats, ...(data.stats ?? {}) };

@@ -6,6 +6,7 @@ import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/nu
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { holdToRepeat, makePanelDraggable } from './gestures';
+import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
 import { Coach, CrewPanel, DecorPanel, LabPanel, LogPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -79,6 +80,9 @@ export class UI {
   readonly coach: Coach;
   private pets: PetPanel;
   private log: LogPanel;
+  private modules: ModulePanel;
+  private trips: TripPanel;
+  private lootShelf: LootShelf;
   readonly streak: StreakModal;
   private logSince: number | null = null;
 
@@ -104,6 +108,9 @@ export class UI {
     this.coach = new Coach(game);
     this.pets = new PetPanel(game);
     this.log = new LogPanel(game);
+    this.modules = new ModulePanel(game);
+    this.trips = new TripPanel(game, this.fmt);
+    this.lootShelf = new LootShelf(game);
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
@@ -319,18 +326,23 @@ export class UI {
     setText($('crystals'), s.crystals.toLocaleString('en-US'));
     const petsReady = this.pets.anyAffordable();
     $('pets-dot').hidden = !petsReady;
-    $('crew-dot').hidden = !this.crew.anyAffordable() && !petsReady;
+    const tripsReady = this.trips.anyReady();
+    $('trips-dot').hidden = !tripsReady;
+    $('crew-dot').hidden = !this.crew.anyAffordable() && !petsReady && !tripsReady;
     const unread = s.storySeen < s.story.length;
     $('log-dot').hidden = !unread;
     $('station-dot').hidden = !unread;
     $('lab-dot').hidden = !this.lab.idle();
     if (!$('tab-crew').hidden) {
       if (!$('seg-crewlist').hidden) this.crew.render();
+      else if (!$('seg-trips').hidden) this.trips.render();
       else this.pets.render();
     }
     if (!$('tab-lab').hidden) this.lab.render();
     if (!$('tab-station').hidden) {
       if (!$('seg-decor').hidden) this.decor.render();
+      if (!$('seg-modules').hidden) this.modules.render();
+      if (!$('seg-awards').hidden) this.lootShelf.render();
       if (!$('seg-log').hidden) {
         // New entries stay highlighted for as long as the log stays open.
         if (this.logSince === null) this.logSince = s.storySeen;
@@ -345,6 +357,7 @@ export class UI {
     this.missions.render();
     renderEventBanner(this.game);
     renderBossBanner(this.game);
+    renderGoldenBanner(this.game);
     this.coach.render();
   }
 

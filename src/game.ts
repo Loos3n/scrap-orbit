@@ -2,6 +2,7 @@ import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { checkAchievements, type AchievementDef } from './core/achievements';
 import { ACHIEVEMENT_CRYSTALS, TUTORIAL, type CrewId, type EventKind, type PetId, type TutorialStep } from './core/content';
 import * as eco from './core/economy';
+import type { ModuleId } from './core/expansion';
 import * as meta from './core/meta';
 import type { Decimal } from './core/num';
 import { deserialize, newState, serialize, type GameState } from './core/state';
@@ -40,7 +41,15 @@ export type GameEvent =
   | { type: 'pet'; id: PetId | null; adopted: boolean }
   | { type: 'petTap'; value: Decimal }
   | { type: 'boss' }
-  | { type: 'bossDefeated'; scrap: Decimal; crystals: number }
+  | { type: 'bossDefeated'; scrap: Decimal; crystals: number; loot?: string }
+  | { type: 'bossEscape' }
+  | { type: 'goldenSpawn' }
+  | { type: 'golden' }
+  | { type: 'module'; id: string | null; slot: number }
+  | { type: 'trip'; crew: CrewId; dest: string }
+  | { type: 'tripReady'; crew: CrewId }
+  | { type: 'tripHome'; reward: meta.TripReward }
+  | { type: 'skin'; pet: PetId }
   | { type: 'bossHit'; value: Decimal }
   | { type: 'story'; id: string }
   | { type: 'reset' };
@@ -73,6 +82,7 @@ export class Game {
   private readyMissions = 0;
   private lastPounce = Date.now();
   private streakShown = '';
+  private tripsReady = new Set<CrewId>();
 
   constructor() {
     const now = Date.now();
@@ -141,6 +151,13 @@ export class Game {
     const ev = meta.updateEvents(s, now);
     if (ev.started) this.emit({ type: 'event', kind: ev.started, phase: 'start' });
     if (ev.ended) this.emit({ type: 'event', kind: ev.ended, phase: 'end' });
+    if (meta.goldenDue(s, now)) this.emit({ type: 'goldenSpawn' });
+    for (const t of s.trips) {
+      if (now >= t.endsAt && !this.tripsReady.has(t.crew)) {
+        this.tripsReady.add(t.crew);
+        this.emit({ type: 'tripReady', crew: t.crew });
+      }
+    }
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
     for (const id of meta.updateStory(s)) this.emit({ type: 'story', id });
@@ -155,6 +172,7 @@ export class Game {
     if (dt <= 0) return;
     const r = meta.updateBoss(this.state, now, dt);
     if (r.arrived) this.emit({ type: 'boss' });
+    if (r.escaped) this.emit({ type: 'bossEscape' });
     if (r.defeated) this.emit({ type: 'bossDefeated', ...r.defeated });
   }
 
@@ -176,6 +194,35 @@ export class Game {
 
   choosePet(id: PetId | null): void {
     if (meta.choosePet(this.state, id)) this.emit({ type: 'pet', id, adopted: false });
+  }
+
+  /** Tapping the golden crate starts a golden rush. */
+  collectGolden(): void {
+    meta.claimGolden(this.state, Date.now());
+    this.emit({ type: 'golden' });
+  }
+
+  buildModule(slot: number, id: ModuleId): void {
+    if (meta.buildModule(this.state, slot, id)) this.emit({ type: 'module', id, slot });
+  }
+
+  removeModule(slot: number): void {
+    if (meta.removeModule(this.state, slot) > 0) this.emit({ type: 'module', id: null, slot });
+  }
+
+  startTrip(crew: CrewId, dest: string): void {
+    if (meta.startTrip(this.state, crew, dest, Date.now())) this.emit({ type: 'trip', crew, dest });
+  }
+
+  claimTrip(index: number): void {
+    const reward = meta.claimTrip(this.state, index, Date.now());
+    if (!reward) return;
+    this.tripsReady.delete(reward.crew);
+    this.emit({ type: 'tripHome', reward });
+  }
+
+  chooseSkin(pet: PetId, skin: string | null): void {
+    if (meta.chooseSkin(this.state, pet, skin)) this.emit({ type: 'skin', pet });
   }
 
   readStory(): void {

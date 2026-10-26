@@ -1,5 +1,6 @@
 import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STORY, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
 import { GENERATORS } from '../core/config';
+import { LOOT } from '../core/expansion';
 import * as eco from '../core/economy';
 import * as meta from '../core/meta';
 import { D, Decimal, format, formatDuration } from '../core/num';
@@ -306,7 +307,7 @@ export function renderBossBanner(game: Game): void {
   if (!b) return;
   setText($('boss-name'), BOSS_NAMES[b.name % BOSS_NAMES.length]);
   const health = meta.bossHealth(game.state);
-  setText($('boss-time'), `${Math.ceil(health * 100)}%`);
+  setText($('boss-time'), `${Math.ceil(meta.bossTimeLeft(game.state, Date.now()))}s`);
   setText($('boss-reward'), b.reward ? format(D(b.reward)) : '');
   $('boss-hp').style.width = `${health * 100}%`;
 }
@@ -341,6 +342,14 @@ const petImg = (id: PetId) => {
   return url ? `<img src="${url}" alt="" />` : '';
 };
 
+/** A toggle for a pet's boss-loot skin, once it has been found. */
+function skinButton(s: Game['state'], pet: PetId): string {
+  const skin = LOOT.find((l) => l.pet === pet && s.loot.has(l.id));
+  if (!skin) return '';
+  const wearing = s.skins[pet] === skin.id;
+  return `<button class="skin-btn${wearing ? ' on' : ''}" type="button" data-pet="${pet}" data-skin="${wearing ? '' : skin.id}" style="--s:${hex(skin.tint!)}">${wearing ? 'Wearing' : 'Wear'} ${esc(skin.name)}</button>`;
+}
+
 export class PetPanel {
   private key = '';
   constructor(private game: Game) {
@@ -349,6 +358,11 @@ export class PetPanel {
       if (!btn) return;
       const id = btn.dataset.pet as PetId;
       const s = this.game.state;
+      if (btn.dataset.skin !== undefined) {
+        this.game.chooseSkin(id, btn.dataset.skin || null);
+        this.key = '';
+        return;
+      }
       if (!s.pets.owned.has(id)) this.game.buyPet(id);
       else this.game.choosePet(s.pets.active === id ? null : id);
     });
@@ -362,7 +376,7 @@ export class PetPanel {
 
   render(): void {
     const s = this.game.state;
-    const key = PETS.map((p) => (s.pets.owned.has(p.id) ? 1 : 0)).join('') + (s.pets.active ?? '') + s.crystals;
+    const key = PETS.map((p) => (s.pets.owned.has(p.id) ? 1 : 0)).join('') + (s.pets.active ?? '') + s.crystals + [...s.loot].join() + JSON.stringify(s.skins);
     if (key === this.key) return;
     this.key = key;
     $('pet-list').innerHTML = PETS.map((p) => {
@@ -377,6 +391,7 @@ export class PetPanel {
         <div class="crew-effect">${esc(p.desc)}</div>
         ${active ? '<div class="pet-status">Following you</div>' : ''}
         ${action}
+        ${owned ? skinButton(s, p.id) : ''}
       </li>`;
     }).join('');
   }

@@ -15,6 +15,7 @@ import {
   type UpgradeDef,
 } from './config';
 import { CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
+import { GOLDEN, bonuses, goldenActive, onTrip } from './expansion';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
 
@@ -100,7 +101,8 @@ function researchSum(state: GameState, kind: 'offlineSec' | 'boostSec' | 'corePe
 /** Output multiplier a machine gets from its crew member. */
 export function crewMult(state: GameState, gen: GeneratorId): number {
   const def = CREW.find((c) => c.gen === gen);
-  const level = def ? state.crew[def.id] : 0;
+  // Crew away on an expedition can't tend their machine.
+  const level = def && !onTrip(state, def.id) ? state.crew[def.id] : 0;
   return 1 + level * CREW_PER_LEVEL * researchProduct(state, 'crewMult');
 }
 
@@ -139,7 +141,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id);
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;
@@ -156,7 +158,8 @@ export function baseIncome(state: GameState): Decimal {
 
 export function income(state: GameState, now: number): Decimal {
   const base = baseIncome(state);
-  return boostActive(state, now) ? base.mul(BOOST.mult) : base;
+  const boosted = boostActive(state, now) ? base.mul(BOOST.mult) : base;
+  return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 
 /** What a tap is worth before multipliers, from the Salvage Claw's level. */
@@ -187,8 +190,9 @@ export function tapValue(state: GameState, now: number): Decimal {
       if (e.kind === 'tapIncomeShare') share += e.share;
     }
   }
-  const value = D(mult * globalMult(state)).add(baseIncome(state).mul(share));
-  return boostActive(state, now) ? value.mul(BOOST.mult) : value;
+  const value = D(mult * globalMult(state) * (1 + bonuses(state).tap)).add(baseIncome(state).mul(share));
+  const boosted = boostActive(state, now) ? value.mul(BOOST.mult) : value;
+  return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 
 export function earn(state: GameState, amount: Decimal): void {
@@ -256,7 +260,7 @@ export function applyOffline(state: GameState, now: number): { seconds: number; 
   const seconds = Math.min(away, offlineCapSec(state));
   // The Star Owl keeps watch while the player is away.
   const owl = state.pets.active === 'owl' ? 1.5 : 1;
-  const earned = baseIncome(state).mul(seconds).mul(researchProduct(state, 'offlineMult') * owl);
+  const earned = baseIncome(state).mul(seconds).mul(researchProduct(state, 'offlineMult') * owl * (1 + bonuses(state).offline));
   earn(state, earned);
   state.lastSeen = now;
   return { seconds, earned };

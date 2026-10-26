@@ -1291,6 +1291,60 @@ export function debris(seed: number): Texture {
   }, 4, metal ? { bevel: 0.8, light: 0.6, grain: 0.45, grime: 0.5, seed } : undefined);
 }
 
+/** The rare golden scrap crate: polished gold with a star emblem and bright edges. */
+export const goldenCrate = () =>
+  paint(32, 32, (ctx) => {
+    ctx.fillStyle = linear(ctx, 0, 2, 0, 30, [
+      [0, '#fffbe6'],
+      [0.25, '#ffe27a'],
+      [0.6, '#f0a818'],
+      [1, '#8a5404'],
+    ]);
+    ctx.beginPath();
+    ctx.roundRect(3, 3, 26, 26, 6);
+    ctx.fill();
+    // Bevelled inner panel.
+    ctx.strokeStyle = 'rgba(255,255,230,0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(5.5, 5.5, 21, 21, 4);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,70,0,0.6)';
+    ctx.beginPath();
+    ctx.roundRect(6.6, 6.6, 18.8, 18.8, 3.4);
+    ctx.stroke();
+    // Star emblem.
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * TAU - Math.PI / 2;
+      const rr = i % 2 ? 3.2 : 7.4;
+      ctx.lineTo(16 + Math.cos(a) * rr, 16.4 + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = radial(ctx, 14.5, 14, 8, [
+      [0, '#ffffff'],
+      [0.5, '#fff1b0'],
+      [1, '#ffbf2e'],
+    ]);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(140,80,0,0.7)';
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+    // Specular streak across the top-left corner.
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(3, 3, 26, 26, 6);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.moveTo(3, 12);
+    ctx.lineTo(12, 3);
+    ctx.lineTo(16, 3);
+    ctx.lineTo(3, 16);
+    ctx.fill();
+    ctx.restore();
+  }, 4, { bevel: 1, light: 0.6, grain: 0.15, grime: 0.05, seed: 31 });
+
 /** The golden salvage crate. */
 export const crate = () =>
   paint(28, 28, (ctx) => {
