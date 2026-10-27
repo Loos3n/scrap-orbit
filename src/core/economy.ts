@@ -221,7 +221,7 @@ export function tap(state: GameState, now: number): Decimal {
   return value;
 }
 
-export function buyGenerator(state: GameState, id: GeneratorId, mode: BuyMode): number {
+export function buyGenerator(state: GameState, id: GeneratorId, mode: BuyMode | number): number {
   const gen = genById(id);
   const owned = state.owned[id];
   const discount = costDiscount(state);

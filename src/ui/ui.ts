@@ -1,6 +1,7 @@
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
+import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
@@ -149,6 +150,14 @@ export class UI {
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
+    holdToRepeat($('best-buy') as HTMLButtonElement, () => {
+      game.buyBest();
+      this.renderBest();
+    });
+    $('goal').addEventListener('click', () => {
+      const goal = this.goalKey ? goalByKey(game.state, this.goalKey) : null;
+      if (goal) this.openPane(goal.pane);
+    });
   }
 
   private buildGenerators(): void {
@@ -486,6 +495,7 @@ export class UI {
     const now = Date.now();
     setText($('rate'), this.fmt(eco.income(s, now)));
     this.renderBoost(now);
+    this.renderGoal();
     if (!$('tab-build').hidden) this.renderGenerators();
     this.renderUpgrades();
     this.renderCores();
@@ -610,8 +620,56 @@ export class UI {
     setText($('claw-cost'), this.fmt(cost));
   }
 
+  private goalKey = '';
+
+  /** The Next goal line: holds on to one goal until it is done, then picks the cheapest one left. */
+  private renderGoal(): void {
+    const s = this.game.state;
+    const line = $('goal');
+    line.hidden = s.tutorial >= 0;
+    if (line.hidden) return;
+    let goal = this.goalKey ? goalByKey(s, this.goalKey) : null;
+    if (!goal) {
+      if (this.goalKey) {
+        line.classList.remove('done');
+        void line.offsetWidth;
+        line.classList.add('done');
+      }
+      goal = pickGoal(s);
+      this.goalKey = goal?.key ?? '';
+    }
+    if (!goal) {
+      line.hidden = true;
+      return;
+    }
+    const p = goalProgress(s, goal);
+    setText($('goal-text'), goal.text);
+    $('goal-bar').style.width = `${p * 100}%`;
+    $('goal-ready').hidden = p < 1 || goal.pane === 'cores';
+  }
+
+  /** The Buy best button: what it would buy, and whether it can yet. */
+  private renderBest(): void {
+    const s = this.game.state;
+    const btn = $('best-buy') as HTMLButtonElement;
+    btn.hidden = s.tutorial >= 0;
+    if (btn.hidden) return;
+    const p = bestPurchase(s);
+    btn.disabled = !p || p.cost.gt(s.scrap);
+    const what = !p ? 'Nothing left to buy' : p.gain.gt(0) ? `${this.purchaseText(p)} · +${this.fmt(p.gain)} / sec` : this.purchaseText(p);
+    setText($('best-what'), what);
+    setText($('best-cost'), p ? this.fmt(p.cost) : '-');
+  }
+
+  private purchaseText(p: Purchase): string {
+    if (p.kind === 'upgrade') return UPGRADES.find((u) => u.id === p.id)!.name;
+    const name = GENERATORS.find((g) => g.id === p.id)!.name;
+    return p.count === 1 ? `1 ${name}` : `${p.count} ${name}s`;
+  }
+
   private renderGenerators(): void {
     this.renderClaw();
+    this.renderBest();
     const s = this.game.state;
     let revealNext = true;
     let hidden = 0;

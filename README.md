@@ -40,6 +40,8 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
 - Ambient generative music, three number formats and a full stats screen (collection and adventure records too)
 - Menu square: a small square in the bottom corner opens the menu edge to edge across the bottom half of the screen, with four tabs along its top (Build, Crew, Progress, Station). The square moves to the end of the tab row; tap it again to hide the menu and see the whole station. Build holds Machines and Upgrades, Progress holds the Lab, Star Cores and the Galaxy, and each tab reopens where you left it
+- Next goal: a line under the scrap counter always names one thing to work towards (a new machine, a milestone, an upgrade, or the next Star Core) with a progress bar. It holds on to that goal until it is done, and tapping it opens the right tab
+- Buy best: a button at the top of Machines buys whatever pays for itself soonest, counting both the wait to afford it and how fast its extra income earns back its price. It weighs single machines, buying up to the next milestone, and upgrades. Hold it to keep buying
 - On the station: press and hold any machine to open its sheet and build more right there; tap the docked trader's ship for its deals
 - Settings (gear button): separate effects and music volume, plus comfort options to reduce flashing and screen shake
 - Info sheets: tap a machine's icon for its story, output, share of income and every multiplier; tap the income line for a full breakdown of where scrap comes from

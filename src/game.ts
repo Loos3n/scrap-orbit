@@ -1,4 +1,5 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
+import { bestPurchase } from './core/advisor';
 import { checkAchievements, type AchievementDef } from './core/achievements';
 import { ACHIEVEMENT_CRYSTALS, RESEARCH, TUTORIAL, type CrewId, type EventKind, type PetId, type TutorialStep } from './core/content';
 import * as eco from './core/economy';
@@ -390,15 +391,24 @@ export class Game {
     return value;
   }
 
-  buy(id: GeneratorId): void {
+  buy(id: GeneratorId, mode: eco.BuyMode | number = this.buyMode): void {
     const before = this.state.owned[id];
-    const count = eco.buyGenerator(this.state, id, this.buyMode);
+    const count = eco.buyGenerator(this.state, id, mode);
     if (count === 0) return;
     this.emit({ type: 'bought', gen: id, count });
     const after = this.state.owned[id];
     for (const m of MILESTONES) {
       if (before < m && after >= m) this.emit({ type: 'milestone', gen: id, at: m });
     }
+  }
+
+  /** Buys whatever pays for itself soonest, if it is affordable. */
+  buyBest(): boolean {
+    const p = bestPurchase(this.state);
+    if (!p || p.cost.gt(this.state.scrap)) return false;
+    if (p.kind === 'upgrade') this.buyUpgrade(p.id);
+    else this.buy(p.id, p.count);
+    return true;
   }
 
   levelClaw(): void {
