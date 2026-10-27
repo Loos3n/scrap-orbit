@@ -2,6 +2,7 @@ import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
 import { BOSS_NAMES, CREW, PETS, SECTORS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
 import { CHALLENGES, GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Offer, type Trip } from './expansion';
 import { SAFE_TYPES, SETS, SKINS, skinUnlocked } from './collection';
+import { STAR_NODES } from './galaxy';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -66,6 +67,12 @@ export interface GameState {
   trader: { until: number; nextAt: number; name: number; offers: Offer[] };
   /** The challenge run in progress, if any, and the ones already beaten. */
   challenge: string | null;
+  /**
+   * Galaxy Shift: stars ever earned and still to spend, shifts made, all-time scrap when the
+   * current galaxy began (cores count from there), the most cores held before a shift, and the
+   * Star Map nodes bought.
+   */
+  galaxy: { earned: number; stars: number; shifts: number; base: Decimal; bestCores: number; map: Set<string>; forge: number };
   /** The running challenge's goal, fixed when it started. */
   challengeGoal: Decimal;
   challengesDone: Set<string>;
@@ -139,6 +146,7 @@ interface SaveData {
   trader?: GameState['trader'];
   challenge?: string | null;
   challengeGoal?: string;
+  galaxy?: { earned?: number; stars?: number; shifts?: number; base?: string; bestCores?: number; map?: string[]; forge?: number };
   challengesDone?: string[];
   lastHappening?: number;
   safe?: GameState['safe'];
@@ -199,6 +207,7 @@ export function newState(now: number): GameState {
     trader: { until: 0, nextAt: 0, name: 0, offers: [] },
     challenge: null,
     challengeGoal: D(0),
+    galaxy: { earned: 0, stars: 0, shifts: 0, base: D(0), bestCores: 0, map: new Set(), forge: 0 },
     challengesDone: new Set(),
     lastHappening: 0,
     safe: { until: 0, nextAt: 0, type: 'supply', open: null },
@@ -263,6 +272,7 @@ export function serialize(state: GameState): string {
     trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
     challenge: state.challenge,
     challengeGoal: state.challengeGoal.toString(),
+    galaxy: { ...state.galaxy, base: state.galaxy.base.toString(), map: [...state.galaxy.map] },
     challengesDone: [...state.challengesDone],
     lastHappening: state.lastHappening,
     safe: { ...state.safe },
@@ -386,6 +396,21 @@ export function deserialize(json: string | null, now: number): GameState | null 
   const challengeIds = new Set(CHALLENGES.map((c) => c.id));
   for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);
   state.challenge = typeof data.challenge === 'string' && challengeIds.has(data.challenge) && !state.challengesDone.has(data.challenge) ? data.challenge : null;
+  if (data.galaxy && typeof data.galaxy === 'object') {
+    const g = data.galaxy;
+    const count = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+    const nodeIds = new Set(STAR_NODES.map((n) => n.id));
+    state.galaxy = {
+      earned: count(g.earned),
+      stars: Math.min(count(g.stars), count(g.earned)),
+      shifts: count(g.shifts),
+      base: g.base ? num(g.base) : D(0),
+      bestCores: count(g.bestCores),
+      map: new Set(strings(g.map).filter((id) => nodeIds.has(id))),
+      forge: Math.min(count(g.forge), 40),
+    };
+    if (state.galaxy.base.gt(state.allTime)) state.galaxy.base = state.allTime;
+  }
   // Saves from before goals scaled keep the old fixed goal.
   const savedGoal = state.challenge && data.challengeGoal ? num(data.challengeGoal) : null;
   state.challengeGoal = savedGoal && savedGoal.gt(0) ? savedGoal : D(CHALLENGES.find((c) => c.id === state.challenge)?.goal ?? 0);

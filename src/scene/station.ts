@@ -639,9 +639,27 @@ export class StationScene {
 
   warpJump(): void {
     if (!this.ready) return;
+    this.flash.tint = 0xffffff;
     this.jump = 2.4;
     this.shake = Math.max(this.shake, 9);
     this.celebrate(COLORS.gate);
+  }
+
+  /** The Galaxy Shift: a longer, golden jump with rings of starlight. */
+  galaxyJump(): void {
+    if (!this.ready) return;
+    this.warpJump();
+    this.flash.tint = 0xffe9a8;
+    this.shake = Math.max(this.shake, 14);
+    for (let i = 0; i < 4; i++) this.rings.push({ x: 0, y: 0, r: 30 + i * 30, life: 1.2 + i * 0.25, color: i % 2 ? 0x8f7bff : 0xffe9a8, width: 5 - i });
+    window.setTimeout(() => this.celebrate(0xffe9a8), 1700);
+    window.setTimeout(() => this.celebrate(0x8f7bff), 2100);
+  }
+
+  /** Each galaxy paints the distant spiral its own colour. */
+  setGalaxy(n: number): void {
+    const tints = [0xffffff, 0xffd7a0, 0xa8f0ff, 0xffb8e0, 0xc8ffb0, 0xd0c0ff];
+    this.galaxy.tint = tints[n % tints.length];
   }
 
   setFocus(top: number, bottom: number): void {
@@ -656,6 +674,20 @@ export class StationScene {
 
   /** While the tutorial asks for a crate, a slow one is always drifting past. */
   holdCrate = false;
+
+  /** The station's middle on screen, where bought machines fly in. */
+  hubOnScreen(): { x: number; y: number } | null {
+    if (!this.ready) return null;
+    return { x: this.world.x, y: this.world.y };
+  }
+
+  /** A bought machine arriving: a small pop of its colour and a squash of the hub. */
+  arrive(color: number): void {
+    if (!this.ready) return;
+    this.rings.push({ x: 0, y: 0, r: 24, life: 0.6, color, width: 3 });
+    this.burst(0, 0, color, 10, 0.9);
+    this.squash = Math.max(this.squash, 0.5);
+  }
 
   /** Where the crate is on screen, so the tutorial can point at it. */
   crateOnScreen(): { x: number; y: number } | null {

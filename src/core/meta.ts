@@ -28,7 +28,7 @@ import {
   type PetId,
   type StreakReward,
 } from './content';
-import { baseIncome, claimableCores, earn, globalMult, income, researchProduct, resetRun, tapValue } from './economy';
+import { baseIncome, claimableCores, earn, giveStarterKit, globalMult, income, researchProduct, resetRun, tapValue } from './economy';
 import {
   CHALLENGES,
   CHALLENGE_BASE_POWER,
@@ -58,6 +58,7 @@ import {
 } from './expansion';
 import { SAFE, SAFE_TYPES, SETS, setComplete, skinUnlocked, type CollectionSet } from './collection';
 import { GENERATORS } from './config';
+import { GALAXY, STAR_NODES, forgeCost, starsForCores } from './galaxy';
 import { D, Decimal } from './num';
 import type { GameState, Mission } from './state';
 
@@ -882,5 +883,57 @@ export function checkSets(state: GameState): CollectionSet[] {
 export function chooseStationSkin(state: GameState, id: string | null): boolean {
   if (id !== null && !skinUnlocked(state, id)) return false;
   state.skin = id;
+  return true;
+}
+
+// ---------- Galaxy Shift ----------
+
+/** The shift opens once this run has built a Dyson Collector (and stays open while in one). */
+export function galaxyOpen(state: GameState): boolean {
+  return state.owned[GALAXY.unlockGen] > 0;
+}
+
+/** Galaxy Stars a shift would give now, counting cores still waiting to be banked. */
+export function starsOnShift(state: GameState): number {
+  return starsForCores(state.cores + claimableCores(state), state.galaxy.shifts);
+}
+
+/**
+ * Shifts to a new galaxy: Star Cores (held and waiting) become Galaxy Stars, and a fresh run
+ * starts with no cores. Everything else permanent stays. Returns the stars gained, or 0.
+ */
+export function shiftGalaxy(state: GameState, now: number): number {
+  const gained = starsOnShift(state);
+  if (!galaxyOpen(state) || gained <= 0) return 0;
+  const g = state.galaxy;
+  g.bestCores = Math.max(g.bestCores, state.cores + claimableCores(state));
+  g.earned += gained;
+  g.stars += gained;
+  g.shifts++;
+  g.base = state.allTime;
+  state.cores = 0;
+  state.challenge = null;
+  state.stats.relocations++;
+  resetRun(state, now);
+  return gained;
+}
+
+/** Buys the next Star Forge level with Galaxy Stars. */
+export function buyForge(state: GameState): boolean {
+  const cost = forgeCost(state.galaxy.forge);
+  if (state.galaxy.stars < cost) return false;
+  state.galaxy.stars -= cost;
+  state.galaxy.forge++;
+  return true;
+}
+
+/** Buys a Star Map node with Galaxy Stars. */
+export function buyStarNode(state: GameState, id: string): boolean {
+  const node = STAR_NODES.find((n) => n.id === id);
+  if (!node || state.galaxy.map.has(id) || state.galaxy.stars < node.cost) return false;
+  state.galaxy.stars -= node.cost;
+  state.galaxy.map.add(id);
+  // The kit lands straight away, not just from the next run.
+  if (id === 'kit') giveStarterKit(state);
   return true;
 }

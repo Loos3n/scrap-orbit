@@ -16,6 +16,7 @@ import {
 } from './config';
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
+import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
 
@@ -74,8 +75,10 @@ function upgradeDefs(state: GameState): UpgradeDef[] {
   return UPGRADES.filter((u) => state.upgrades.has(u.id));
 }
 
+/** Finished research, plus the Star Map nodes that work the same way. */
 function researchEffects(state: GameState): ResearchEffect[] {
-  return RESEARCH.filter((r) => state.research.done.has(r.id)).map((r) => r.effect);
+  const fromStars = starEffects(state).filter((e): e is ResearchEffect => e.kind !== 'startKit' && e.kind !== 'coreGain' && e.kind !== 'keepPerks');
+  return [...RESEARCH.filter((r) => state.research.done.has(r.id)).map((r) => r.effect), ...fromStars];
 }
 
 type MultKind = 'tapMult' | 'allMult' | 'costMult' | 'crateRate' | 'offlineMult' | 'eventRate' | 'flareMult' | 'crewMult' | 'missionMult';
@@ -111,13 +114,14 @@ export function flareActive(state: GameState, now: number): boolean {
 }
 
 export function hasPerk(state: GameState, id: PerkId): boolean {
-  return state.cores >= CORE_PERKS.find((p) => p.id === id)!.at;
+  const at = CORE_PERKS.find((p) => p.id === id)!.at;
+  return state.cores >= at || (state.galaxy.map.has('memory') && state.galaxy.bestCores >= at);
 }
 
-/** Permanent multiplier from Star Cores and achievements; applies to machines and taps. */
+/** Permanent multiplier from Star Cores, Galaxy Stars and achievements; applies to machines and taps. */
 export function globalMult(state: GameState): number {
   const perCore = PRESTIGE.perCore + researchSum(state, 'corePerCore');
-  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult');
+  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult') * starIncomeMult(state);
 }
 
 /** Income bonus per Star Core, as a fraction. */
@@ -282,15 +286,30 @@ export function coresForAllTime(allTime: Decimal): number {
   return log < 0 ? 0 : Math.floor(Math.pow(10, log) + 1e-9);
 }
 
-/** Cores the player would gain by relocating now. */
-export function claimableCores(state: GameState): number {
-  return Math.max(0, coresForAllTime(state.allTime) - state.cores);
+/** Total Star Cores this galaxy's earnings are worth (a Galaxy Shift starts the count again). */
+export function coreTotal(state: GameState): number {
+  const earned = state.allTime.sub(state.galaxy.base);
+  return Math.floor(coresForAllTime(earned.gt(0) ? earned : D(0)) * coreGainMult(state) + 1e-9);
 }
 
-/** All-time scrap needed before the next core becomes claimable. */
+/** Cores the player would gain by relocating now. */
+export function claimableCores(state: GameState): number {
+  return Math.max(0, coreTotal(state) - state.cores);
+}
+
+/** All-time scrap at which this galaxy's core total reaches `n`. */
+function allTimeForCores(state: GameState, n: number): Decimal {
+  if (n <= 0) return state.galaxy.base;
+  return D(n / coreGainMult(state)).pow(1 / PRESTIGE.exponent).mul(PRESTIGE.divisor).add(state.galaxy.base);
+}
+
+/** All-time scrap needed before the next core becomes claimable, and where the current one began. */
 export function nextCoreAt(state: GameState): Decimal {
-  const target = Math.max(coresForAllTime(state.allTime), state.cores) + 1;
-  return D(target).pow(1 / PRESTIGE.exponent).mul(PRESTIGE.divisor);
+  return allTimeForCores(state, Math.max(coreTotal(state), state.cores) + 1);
+}
+
+export function lastCoreAt(state: GameState): Decimal {
+  return allTimeForCores(state, Math.max(coreTotal(state), state.cores));
 }
 
 /**
@@ -323,7 +342,15 @@ export function resetRun(state: GameState, now: number): void {
   state.lastSeen = now;
   state.stats.runSec = 0;
   if (hasPerk(state, 'headstart')) state.owned.drone = 10;
+  if (state.galaxy.map.has('kit')) giveStarterKit(state);
   if (hasPerk(state, 'seedfund')) state.scrap = D(1e6);
+}
+
+/** The Starter Kit's machines; never takes any away. */
+export function giveStarterKit(state: GameState): void {
+  state.owned.drone = Math.max(state.owned.drone, 25);
+  state.owned.hauler = Math.max(state.owned.hauler, 10);
+  state.owned.smelter = Math.max(state.owned.smelter, 5);
 }
 
 /** The cheapest single machine purchase, for the Auto-Builder perk. */

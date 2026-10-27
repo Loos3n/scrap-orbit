@@ -1147,3 +1147,36 @@ button.gen-icon:active { transform: scale(0.94); }
 .decor-swatch .hull.skin b { position: absolute; right: 18%; top: 22%; width: 12px; height: 12px; border-radius: 3px; background: var(--m); transform: rotate(20deg); box-shadow: 0 0 6px var(--m); }
 .decor-tag svg { width: 12px; height: 12px; vertical-align: -2px; margin-right: 2px; }
 .skin-card:disabled .decor-swatch { filter: grayscale(0.7) brightness(0.7); }
+
+/* ---------- Galaxy Shift ---------- */
+.galaxy-card { position: relative; margin: 14px 0 4px; padding: 16px; border-radius: 20px; overflow: hidden; background: radial-gradient(120% 90% at 85% 0%, rgb(255 233 168 / 0.16), transparent 60%), radial-gradient(90% 80% at 0% 100%, rgb(143 123 255 / 0.22), transparent 60%), rgb(10 10 36 / 0.7); border: 1px solid rgb(255 233 168 / 0.32); box-shadow: 0 0 28px rgb(255 209 102 / 0.08); }
+.galaxy-head { display: flex; align-items: center; gap: 12px; }
+.galaxy-art { width: 48px; height: 48px; padding: 10px; border-radius: 50%; color: #ffe9a8; background: radial-gradient(circle, rgb(255 233 168 / 0.35), rgb(143 123 255 / 0.15) 70%); box-shadow: 0 0 22px rgb(255 233 168 / 0.35); animation: star-spin 12s linear infinite; }
+.galaxy-art svg { width: 100%; height: 100%; }
+@keyframes star-spin { to { transform: rotate(360deg); } }
+.galaxy-count { font-family: var(--font-display); font-size: 18px; }
+.galaxy-count b { color: #ffe9a8; font-size: 22px; }
+.galaxy-now { margin-top: 10px; font-size: 12.5px; font-weight: 600; color: #ffe9a8; }
+.galaxy-desc { margin: 8px 0 12px; font-size: 13px; line-height: 1.4; color: var(--ink-dim); }
+.galaxy-lock { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.05); font-size: 13px; color: var(--ink-dim); line-height: 1.35; }
+.galaxy-lock svg { flex: none; width: 16px; height: 16px; }
+.galaxy-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(#fff3c8, #ffc94d); color: #2a1a00; box-shadow: 0 5px 0 #b8861f, 0 0 26px rgb(255 209 102 / 0.4); }
+.galaxy-btn svg { width: 20px; height: 20px; }
+.galaxy-btn.armed { background: linear-gradient(#ffb0c0, #ff5d7c); color: #fff; box-shadow: 0 5px 0 #a8274a, 0 0 26px rgb(255 93 124 / 0.45); }
+.galaxy-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8861f; }
+.galaxy-warn { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.4; color: #ffc0cc; }
+.star-node { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; border-radius: 16px; background: rgb(6 8 24 / 0.45); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
+.star-node.on { box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 60%, transparent), 0 0 16px color-mix(in srgb, var(--c) 20%, transparent); }
+.star-node .challenge-icon { color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.cost-star { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cost-star svg { width: 15px; height: 15px; color: #ffe9a8; }
+
+/* ---------- Feel: flying buys, big gains, tab bounce ---------- */
+.fly-orb { position: fixed; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; pointer-events: none; z-index: 60; background: radial-gradient(circle, #fff 0 25%, var(--c) 55%, transparent 72%); box-shadow: 0 0 14px 4px color-mix(in srgb, var(--c) 70%, transparent); will-change: transform; }
+.gain-pop { position: fixed; z-index: 60; transform: translate(-50%, 0); pointer-events: none; font-family: var(--font-display); font-weight: 700; font-size: 22px; color: #ffe27a; text-shadow: 0 2px 0 #7a4a00, 0 0 14px rgb(255 209 102 / 0.7); animation: gain-rise 1.4s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; white-space: nowrap; }
+@keyframes gain-rise { 0% { opacity: 0; transform: translate(-50%, 6px) scale(0.6); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 30% { transform: translate(-50%, -4px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -34px) scale(1); } }
+#scrap.glow { animation: scrap-glow 1s ease-out; }
+@keyframes scrap-glow { 0% { filter: drop-shadow(0 0 0 transparent); } 20% { filter: drop-shadow(0 0 14px #ffd166) brightness(1.25); } 100% { filter: drop-shadow(0 0 0 transparent); } }
+.tab[aria-selected='true'] [data-icon] { animation: tab-hop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes tab-hop { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-4px) scale(1.15); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .gain-pop, #scrap.glow, .tab[aria-selected='true'] [data-icon] { animation: none; } }

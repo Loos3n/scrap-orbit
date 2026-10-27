@@ -15,6 +15,7 @@ import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText, setDoneText } from './ui/book-ui';
+import { galaxyText } from './ui/galaxy-ui';
 import { tradeText } from './ui/trade-ui';
 import { UI } from './ui/ui';
 
@@ -40,10 +41,10 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('timed out')), ms))]);
 }
 
-/** Names the sector the station just warped into. */
-function showSectorCard(relocations: number): void {
+/** Names the sector (or galaxy) the station just warped into. */
+function showSectorCard(relocations: number, galaxy = 0): void {
   const card = document.getElementById('sector-card')!;
-  document.getElementById('sector-num')!.textContent = `Sector ${relocations + 1}`;
+  document.getElementById('sector-num')!.textContent = galaxy ? `Galaxy ${galaxy} · Sector ${relocations + 1}` : `Sector ${relocations + 1}`;
   document.getElementById('sector-name')!.textContent = sectorFor(relocations).name;
   card.hidden = false;
   card.style.animation = 'none';
@@ -107,7 +108,7 @@ async function boot(): Promise<void> {
   syncDecor();
 
   const fmt = (v: Parameters<typeof format>[0]) => format(v, game.state.settings.numbers);
-  const buzz = (ms: number) => {
+  const buzz = (ms: number | number[]) => {
     if (game.state.settings.haptics && 'vibrate' in navigator) {
       try {
         navigator.vibrate(ms);
@@ -122,8 +123,13 @@ async function boot(): Promise<void> {
 
   game.on((e) => {
     switch (e.type) {
-      case 'bought':
-        scene.setOwned(game.state.owned);
+      case 'bought': {
+        // The machine shows up in orbit as its orb lands on the station.
+        const color = GENERATORS.find((g) => g.id === e.gen)!.color;
+        ui.flyToStation(e.gen, hexColor(color), scene.hubOnScreen(), () => {
+          scene.setOwned(game.state.owned);
+          scene.arrive(color);
+        });
         ui.flashRow(e.gen);
         sfx.buy();
         buzz(5);
@@ -132,6 +138,7 @@ async function boot(): Promise<void> {
           if (game.state.owned.drone >= TUTORIAL_DRONES) game.advanceTutorial('more');
         }
         break;
+      }
       case 'milestone': {
         const g = GENERATORS.find((x) => x.id === e.gen)!;
         ui.toast(GEN_ICONS[g.id], `<b>${e.at} ${g.name}s!</b> Output doubled`);
@@ -159,6 +166,7 @@ async function boot(): Promise<void> {
         break;
       case 'bonus':
         ui.toast(ICONS.scrap, `<b>Salvage crate!</b> +${fmt(e.value)}`);
+        ui.bigGain(e.value);
         game.advanceTutorial('crate');
         sfx.crate();
         break;
@@ -179,6 +187,27 @@ async function boot(): Promise<void> {
         sfx.warp();
         buzz(60);
         break;
+      case 'galaxy':
+        scene.galaxyJump();
+        setTimeout(() => {
+          scene.setOwned(game.state.owned);
+          scene.setSector(sectorFor(game.state.stats.relocations));
+          scene.setGalaxy(game.state.galaxy.shifts);
+          showSectorCard(game.state.stats.relocations, game.state.galaxy.shifts + 1);
+        }, 1500);
+        syncPerks();
+        ui.toast(ICONS.star.replace('currentColor', '#ffe9a8'), galaxyText(e.stars, game.state.galaxy.shifts + 1));
+        sfx.warp();
+        setTimeout(() => sfx.achievement(), 1700);
+        buzz([60, 80, 120]);
+        break;
+      case 'starNode':
+        scene.setOwned(game.state.owned);
+        sfx.upgrade();
+        scene.celebrate(0xffe9a8);
+        buzz(15);
+        syncPerks();
+        break;
       case 'claw':
         ui.flashRow('claw');
         sfx.buy();
@@ -194,6 +223,7 @@ async function boot(): Promise<void> {
         scene.setPet(null);
         scene.setBoss(null);
         scene.setSector(sectorFor(0));
+        scene.setGalaxy(0);
         syncPerks();
         syncDecor();
         break;
@@ -292,6 +322,7 @@ async function boot(): Promise<void> {
       case 'bossDefeated': {
         scene.setBoss(null, true);
         ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>Wreck broken!</b> +${fmt(e.scrap)} and ${e.crystals} crystals`);
+        ui.bigGain(e.scrap);
         sfx.bossBreak();
         buzz(80);
         const loot = LOOT.find((l) => l.id === e.loot);
@@ -365,6 +396,7 @@ async function boot(): Promise<void> {
       case 'safeOpened':
         ui.toast(ICONS.lock.replace('currentColor', hexColor(SAFE_TYPES.find((t) => t.id === e.reward.type)!.color)), safeText(e.reward, fmt));
         if (e.reward.locks) {
+          ui.bigGain(e.reward.scrap);
           scene.celebrate(0x9dff6b);
           sfx.coins();
         }
@@ -453,6 +485,7 @@ async function boot(): Promise<void> {
   });
 
   scene.setSector(sectorFor(game.state.stats.relocations));
+  scene.setGalaxy(game.state.galaxy.shifts);
   game.start();
   scene.setEvent(meta.eventActive(game.state, Date.now()));
   scene.setPet(game.state.pets.active, petTint());

@@ -56,6 +56,8 @@ export type GameEvent =
   | { type: 'safeOpened'; reward: meta.SafeReward }
   | { type: 'set'; id: string }
   | { type: 'stationSkin' }
+  | { type: 'galaxy'; stars: number }
+  | { type: 'starNode'; id: string }
   | { type: 'trade'; result: meta.TradeResult }
   | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
   | { type: 'reset' };
@@ -426,6 +428,22 @@ export class Game {
       this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS });
     }
     return cores;
+  }
+
+  /** Shifts to a new galaxy for Galaxy Stars. */
+  shiftGalaxy(): number {
+    const stars = meta.shiftGalaxy(this.state, Date.now());
+    if (stars > 0) {
+      this.save();
+      this.emit({ type: 'galaxy', stars });
+    }
+    return stars;
+  }
+
+  /** Buys a Star Map node, or the next Star Forge level when `id` is 'forge'. */
+  buyStar(id: string): void {
+    const ok = id === 'forge' ? meta.buyForge(this.state) : meta.buyStarNode(this.state, id);
+    if (ok) this.emit({ type: 'starNode', id });
   }
 
   reset(): void {

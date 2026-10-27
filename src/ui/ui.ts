@@ -1,5 +1,5 @@
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
-import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, PRESTIGE, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
+import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
@@ -12,6 +12,7 @@ import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansi
 import { SETS } from '../core/collection';
 import { BookPanel, SafeGame, SkinPanel } from './book-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
+import { GalaxyPanel } from './galaxy-ui';
 import type { OfflineReport } from '../game';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
@@ -61,6 +62,7 @@ function achievementIcon(a: AchievementDef): string {
   if (a.id.startsWith('earn') || a.id.startsWith('rate') || a.id.startsWith('crate')) return ICONS.scrap;
   if (a.id.startsWith('boost')) return ICONS.bolt.replace('currentColor', '#ff6b9a');
   if (a.id.startsWith('relocate')) return ICONS.core;
+  if (a.id.startsWith('galaxy') || a.id === 'starmap') return ICONS.star;
   return ICONS.star;
 }
 
@@ -104,6 +106,7 @@ export class UI {
   private skins: SkinPanel;
   safeGame!: SafeGame;
   private challenges: ChallengePanel;
+  private galaxy: GalaxyPanel;
   private panel!: PanelToggle;
   readonly streak: StreakModal;
 
@@ -136,6 +139,7 @@ export class UI {
     this.book = new BookPanel(game);
     this.skins = new SkinPanel(game);
     this.challenges = new ChallengePanel(game, this.fmt);
+    this.galaxy = new GalaxyPanel(game);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
@@ -342,6 +346,62 @@ export class UI {
     }
   }
 
+  /**
+   * Sends a glowing orb from a bought machine's card up to the station, which calls `land` as it
+   * arrives. At most a few fly at once, so Max buys don't flood the screen.
+   */
+  flyToStation(id: GeneratorId, color: string, to: { x: number; y: number } | null, land: () => void): void {
+    const row = this.rows.get(id);
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!row || !to || reduce || this.flying >= 3 || row.li.offsetParent === null) return land();
+    const from = row.li.querySelector('.gen-icon')!.getBoundingClientRect();
+    // Only from a card the player can see: not one scrolled out of the sheet.
+    const view = row.li.offsetParent.getBoundingClientRect();
+    if (from.top < view.top || from.bottom > view.bottom) return land();
+    const x0 = from.left + from.width / 2;
+    const y0 = from.top + from.height / 2;
+    const orb = document.createElement('div');
+    orb.className = 'fly-orb';
+    orb.style.setProperty('--c', color);
+    document.body.appendChild(orb);
+    this.flying++;
+    // A gentle arc: out to the side a little, then into the hub.
+    const mx = (x0 + to.x) / 2 + (x0 < to.x ? -40 : 40);
+    const my = Math.min(y0, to.y) - 30;
+    const anim = orb.animate(
+      [
+        { transform: `translate(${x0}px, ${y0}px) scale(0.6)`, opacity: 0.2 },
+        { transform: `translate(${mx}px, ${my}px) scale(1.15)`, opacity: 1, offset: 0.45 },
+        { transform: `translate(${to.x}px, ${to.y}px) scale(0.5)`, opacity: 0.9 },
+      ],
+      { duration: 520, easing: 'cubic-bezier(0.45, 0, 0.6, 1)' },
+    );
+    const done = () => {
+      orb.remove();
+      this.flying--;
+      land();
+    };
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+  private flying = 0;
+
+  /** A big one-off gain (crate, boss, safe): a gold "+X" lifts off the counter and it glows. */
+  bigGain(amount: Decimal): void {
+    const el = $('scrap');
+    const r = el.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.className = 'gain-pop';
+    pop.textContent = `+${this.fmt(amount)}`;
+    pop.style.left = `${r.left + r.width / 2}px`;
+    pop.style.top = `${r.bottom}px`;
+    document.body.appendChild(pop);
+    window.setTimeout(() => pop.remove(), 1400);
+    el.classList.remove('glow');
+    void el.offsetWidth;
+    el.classList.add('glow');
+  }
+
   /** Pops the scrap counter, for taps. */
   bumpScrap(): void {
     const el = $('scrap');
@@ -391,6 +451,7 @@ export class UI {
     this.trader.render();
     this.safeGame?.render();
     this.challenges.render();
+    this.galaxy.render();
     this.coach.render();
     this.info.render();
   }
@@ -409,8 +470,7 @@ export class UI {
     setText($('core-bonus'), `+${Math.round(s.cores * eco.perCoreBonus(s) * 100).toLocaleString('en-US')}% income`);
     setText($('core-claim'), claim.toLocaleString('en-US'));
     const next = eco.nextCoreAt(s);
-    const prevTotal = Math.max(eco.coresForAllTime(s.allTime), s.cores);
-    const prev = prevTotal > 0 ? D(prevTotal).pow(1 / PRESTIGE.exponent).mul(PRESTIGE.divisor) : D(0);
+    const prev = eco.lastCoreAt(s);
     const span = next.sub(prev);
     const pct = span.gt(0) ? Math.max(0, Math.min(1, s.allTime.sub(prev).div(span).toNumber())) : 0;
     $('core-bar').style.width = `${(pct * 100).toFixed(1)}%`;
@@ -592,6 +652,7 @@ export class UI {
         ['Research finished', `${s.research.done.size} of ${RESEARCH.length}`],
         ['Achievements', `${s.achievements.size} of ${ACHIEVEMENTS.length}`],
         ['Star Cores', n(s.cores)],
+        ['Galaxy', `${n(s.galaxy.shifts + 1)} (${n(s.galaxy.earned)} stars earned)`],
         ['Boss loot found', `${s.loot.size} of ${LOOT.length}`],
         ['Station rooms built', `${s.modules.filter(Boolean).length} of ${s.modules.length}`],
         ['Blueprints found', `${s.blueprints.size} of ${MODULES.filter((m) => m.blueprint).length}`],

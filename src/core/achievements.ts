@@ -34,6 +34,9 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'boost10', name: 'Need for Speed', desc: 'Use Overdrive 10 times.', test: (s) => s.stats.boosts >= 10 },
   { id: 'relocate1', name: 'Moving Day', desc: 'Relocate your station.', test: (s) => s.stats.relocations >= 1 },
   { id: 'relocate5', name: 'Nomad', desc: 'Relocate your station 5 times.', test: (s) => s.stats.relocations >= 5 },
+  { id: 'galaxy1', name: 'Star Hopper', desc: 'Shift to a new galaxy.', test: (s) => s.galaxy.shifts >= 1 },
+  { id: 'galaxy3', name: 'Intergalactic', desc: 'Shift galaxies 3 times.', test: (s) => s.galaxy.shifts >= 3 },
+  { id: 'starmap', name: 'Cartographer', desc: 'Fill in the whole Star Map.', test: (s) => s.galaxy.map.size >= 8 },
   { id: 'all-upgrades', name: 'Fully Loaded', desc: 'Install every upgrade.', test: (s) => UPGRADES.every((u) => s.upgrades.has(u.id)) },
 ];
 
