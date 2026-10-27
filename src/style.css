@@ -1294,3 +1294,8 @@ button.gen-icon:active { transform: scale(0.94); }
 .best-buy:disabled .buy-cost { color: #c98a9a; }
 .best-buy.holding { filter: brightness(1.08); }
 #scene.panning { cursor: grabbing; }
+
+/* The row a tap on the Next goal line points at. */
+.spotlight { animation: spotlight 0.85s ease-in-out 3; box-shadow: 0 0 0 2px #ffd166, 0 0 22px rgb(255 209 102 / 0.55); }
+@keyframes spotlight { 0%, 100% { box-shadow: 0 0 0 2px #ffd166, 0 0 22px rgb(255 209 102 / 0.55); } 50% { box-shadow: 0 0 0 2px rgb(255 209 102 / 0.35), 0 0 6px rgb(255 209 102 / 0.15); } }
+.reduce-flash .spotlight { animation: none; }

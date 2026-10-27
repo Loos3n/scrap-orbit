@@ -156,7 +156,10 @@ export class UI {
     });
     $('goal').addEventListener('click', () => {
       const goal = this.goalKey ? goalByKey(game.state, this.goalKey) : null;
-      if (goal) this.openPane(goal.pane);
+      if (!goal) return;
+      this.openPane(goal.pane);
+      // Wait for the menu to finish opening, then bring the goal's row into view and light it up.
+      window.setTimeout(() => this.spotlight(goal.key), 280);
     });
   }
 
@@ -621,6 +624,26 @@ export class UI {
   }
 
   private goalKey = '';
+  private spotTimer = 0;
+
+  /** Scrolls the row that finishes a goal into the middle of its pane and makes it glow for a moment. */
+  private spotlight(key: string): void {
+    const [kind, id] = key.split(':');
+    const el =
+      kind === 'upg' ? document.querySelector<HTMLElement>(`#upgrade-list li[data-upg="${id}"]`)
+      : kind === 'core' ? document.querySelector<HTMLElement>('#tab-cores .core-card')
+      : this.rows.get(id as GeneratorId)?.li;
+    const body = el?.closest<HTMLElement>('.tab-body');
+    if (!el || !body || el.hidden || body.hidden) return;
+    const r = el.getBoundingClientRect();
+    const b = body.getBoundingClientRect();
+    body.scrollTo({ top: body.scrollTop + r.top - b.top - (body.clientHeight - r.height) / 2, behavior: 'smooth' });
+    document.querySelectorAll('.spotlight').forEach((x) => x.classList.remove('spotlight'));
+    void el.offsetWidth;
+    el.classList.add('spotlight');
+    clearTimeout(this.spotTimer);
+    this.spotTimer = window.setTimeout(() => el.classList.remove('spotlight'), 2600);
+  }
 
   /** The Next goal line: holds on to one goal until it is done, then picks the cheapest one left. */
   private renderGoal(): void {
@@ -724,6 +747,7 @@ export class UI {
         const { icon, color } = upgradeArt(u);
         const li = document.createElement('li');
         li.className = 'upg';
+        li.dataset.upg = u.id;
         li.style.setProperty('--c', color);
         li.innerHTML = `<div class="upg-icon">${icon}</div><div><div class="upg-name"></div><div class="upg-desc"></div></div>
           <button class="buy" type="button"><span class="buy-count">Install</span><span class="buy-cost"><span data-icon="scrap"></span><span class="n"></span></span></button>`;
