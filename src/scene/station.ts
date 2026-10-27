@@ -672,12 +672,12 @@ export class StationScene {
     this.placePan();
   }
 
-  /** The finger lifted: the view stays put, settling back inside the limit if it was stretched. */
+  /** The finger lifted: the view glides back to the middle. */
   panEnd(): void {
-    this.panning = false;
+    this.recenter();
   }
 
-  /** Back to the middle, gently (a relocation does this). */
+  /** Back to the middle, gently: after a drag, and on a relocation. */
   recenter(): void {
     this.panning = false;
     this.panRaw = { x: 0, y: 0 };
@@ -696,7 +696,7 @@ export class StationScene {
       if (tx === this.pan.x && ty === this.pan.y) return;
       this.pan = { x: tx, y: ty };
     } else {
-      const k = Math.min(1, dt * (this.recentering ? 2.5 : 12));
+      const k = Math.min(1, dt * (this.recentering ? 4 : 12));
       this.pan = { x: this.pan.x + (tx - this.pan.x) * k, y: this.pan.y + (ty - this.pan.y) * k };
     }
     this.placePan();
