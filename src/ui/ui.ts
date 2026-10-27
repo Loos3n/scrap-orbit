@@ -18,7 +18,7 @@ import { ALL_PANES, GROUPS, groupOf } from './panes';
 import * as meta from '../core/meta';
 import { STAR_NODES } from '../core/galaxy';
 import type { OfflineReport } from '../game';
-import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
+import { Coach, CrewPanel, DecorPanel, OrnamentPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -99,6 +99,7 @@ export class UI {
   private crew: CrewPanel;
   private lab: LabPanel;
   private decor: DecorPanel;
+  private ornaments: OrnamentPanel;
   readonly missions: MissionsPanel;
   readonly coach: Coach;
   private pets: PetPanel;
@@ -134,6 +135,7 @@ export class UI {
     this.crew = new CrewPanel(game);
     this.lab = new LabPanel(game);
     this.decor = new DecorPanel(game);
+    this.ornaments = new OrnamentPanel(game);
     this.missions = new MissionsPanel(game, this.fmt);
     this.coach = new Coach(game);
     this.pets = new PetPanel(game);
@@ -523,6 +525,7 @@ export class UI {
     $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'progress-dot', 'station-dot'].every((id) => $(id).hidden);
     if (!$('tab-station').hidden) {
       if (!$('seg-decor').hidden) {
+        this.ornaments.render();
         this.decor.render();
         this.skins.render();
       }
@@ -870,6 +873,8 @@ export class UI {
     el.innerHTML = `<span data-icon></span><span></span>`;
     el.firstElementChild!.innerHTML = icon;
     el.lastElementChild!.innerHTML = html;
+    // Just under the HUD, whatever height the goal line gives it.
+    $('toasts').style.top = `${Math.round($('hud').getBoundingClientRect().bottom + 6)}px`;
     $('toasts').appendChild(el);
     while ($('toasts').children.length > 3) $('toasts').firstElementChild!.remove();
     setTimeout(() => el.remove(), 2900);

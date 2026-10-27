@@ -2043,3 +2043,420 @@ function drawRock(ctx: Ctx, x: number, y: number, rad: number, res: number, look
 
 const ROCK_GREY: Pick<RockLook, 'light' | 'dark'> = { light: [168, 160, 196], dark: [62, 56, 86] };
 const ROCK_RUST: Pick<RockLook, 'light' | 'dark'> = { light: [196, 150, 128], dark: [70, 48, 58] };
+
+// ---------- Station decorations ----------
+
+/** Sizes of each decoration's painting, in world units. */
+export const ORNAMENT_SIZE: Record<string, [number, number]> = {
+  fern: [22, 34],
+  poster: [16, 20],
+  pennant: [20, 12],
+  garden: [32, 18],
+  lantern: [10, 16],
+  duck: [16, 14],
+  cactus: [14, 20],
+  gnome: [14, 20],
+  neon: [36, 15],
+  disco: [14, 26],
+  flag: [6, 8],
+  bulb: [6, 6],
+};
+
+function drawOrnament(ctx: Ctx, id: string): void {
+  switch (id) {
+    case 'fern': {
+      // Three cords to a basket, fronds spilling over the rim.
+      ctx.strokeStyle = 'rgba(220,210,190,0.8)';
+      ctx.lineWidth = 0.5;
+      for (const x of [4, 11, 18]) {
+        ctx.beginPath();
+        ctx.moveTo(11, 0);
+        ctx.lineTo(x, 13);
+        ctx.stroke();
+      }
+      ctx.fillStyle = linear(ctx, 4, 13, 18, 20, [
+        [0, '#d98a5c'],
+        [1, '#7a3f2a'],
+      ]);
+      ctx.beginPath();
+      ctx.moveTo(3, 13);
+      ctx.lineTo(19, 13);
+      ctx.quadraticCurveTo(18, 20, 11, 20);
+      ctx.quadraticCurveTo(4, 20, 3, 13);
+      ctx.fill();
+      const frond = (x0: number, y0: number, dx: number, dy: number, color: string) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.quadraticCurveTo(x0 + dx, y0 - 2, x0 + dx * 1.2, y0 + dy);
+        ctx.stroke();
+        ctx.lineWidth = 0.8;
+        for (let t = 0.2; t < 1; t += 0.2) {
+          const x = x0 + dx * 1.2 * t;
+          const y = y0 + dy * t * t;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 1.6, y + 1.4);
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - 1.6, y + 1.4);
+          ctx.stroke();
+        }
+      };
+      frond(6, 13, -4, 18, '#3fae6a');
+      frond(16, 13, 4, 18, '#3fae6a');
+      frond(9, 13, -2, 14, '#5fd68a');
+      frond(13, 13, 2, 15, '#5fd68a');
+      frond(11, 13, 0.5, 19, '#4cc27a');
+      break;
+    }
+    case 'poster': {
+      ctx.fillStyle = '#f3e6c8';
+      ctx.fillRect(1, 1, 14, 18);
+      ctx.fillStyle = linear(ctx, 0, 2, 0, 14, [
+        [0, '#5b3fa8'],
+        [0.6, '#ff6b9a'],
+        [1, '#ffb347'],
+      ]);
+      ctx.fillRect(2, 2, 12, 12);
+      ctx.fillStyle = '#ffe27a';
+      ctx.beginPath();
+      ctx.arc(8, 10, 3.2, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#fff4c8';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.ellipse(8, 10, 5.4, 1.4, -0.25, 0, TAU);
+      ctx.stroke();
+      ctx.fillStyle = '#3a2a5a';
+      ctx.fillRect(3, 15.2, 10, 1.2);
+      ctx.fillRect(4.5, 17, 7, 0.8);
+      ctx.fillStyle = 'rgba(200,220,255,0.55)';
+      ctx.fillRect(0, 0, 3.5, 1.6);
+      ctx.fillRect(12.5, 18.4, 3.5, 1.6);
+      break;
+    }
+    case 'pennant': {
+      ctx.fillStyle = linear(ctx, 1, 0, 20, 0, [
+        [0, '#ff5d8f'],
+        [1, '#ff9a6b'],
+      ]);
+      ctx.beginPath();
+      ctx.moveTo(1, 1);
+      ctx.quadraticCurveTo(10, 3, 19, 6);
+      ctx.quadraticCurveTo(10, 8, 1, 11);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#fff3b0';
+      ctx.beginPath();
+      ctx.arc(7, 6, 1.8, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#c5cbff';
+      ctx.fillRect(0, 0, 1.2, 12);
+      break;
+    }
+    case 'garden': {
+      // A planter box with a bush, a tulip and a sprout.
+      ctx.fillStyle = '#4fae5a';
+      ctx.beginPath();
+      ctx.arc(8, 9, 5.5, 0, TAU);
+      ctx.arc(12, 7.5, 4.5, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#7fe08a';
+      ctx.beginPath();
+      ctx.arc(9.5, 6.5, 2.4, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#3f9a4a';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(19, 13);
+      ctx.lineTo(19, 4);
+      ctx.stroke();
+      ctx.fillStyle = '#ff6b9a';
+      ctx.beginPath();
+      ctx.moveTo(16.6, 2);
+      ctx.lineTo(17.6, 5.4);
+      ctx.lineTo(20.4, 5.4);
+      ctx.lineTo(21.4, 2);
+      ctx.lineTo(19, 3.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#5fd68a';
+      ctx.beginPath();
+      ctx.ellipse(25, 9, 1.4, 3, -0.6, 0, TAU);
+      ctx.ellipse(28, 9, 1.4, 3, 0.6, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = linear(ctx, 0, 11, 0, 18, [
+        [0, '#c9845a'],
+        [1, '#6a3524'],
+      ]);
+      ctx.fillRect(2, 11, 28, 6.5);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(2, 11, 28, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      for (const x of [9, 16, 23]) ctx.fillRect(x, 12, 0.6, 5.5);
+      break;
+    }
+    case 'lantern': {
+      ctx.fillStyle = radial(ctx, 5, 9, 9, [
+        [0, 'rgba(255,255,255,0.5)'],
+        [1, 'rgba(255,255,255,0)'],
+      ]);
+      ctx.fillRect(0, 0, 10, 16);
+      ctx.fillStyle = linear(ctx, 1, 0, 9, 0, [
+        [0, '#c8c8c8'],
+        [0.45, '#ffffff'],
+        [1, '#a0a0a0'],
+      ]);
+      ctx.beginPath();
+      ctx.ellipse(5, 9, 4, 5, 0, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+      ctx.lineWidth = 0.4;
+      for (const y of [6.5, 9, 11.5]) {
+        ctx.beginPath();
+        ctx.moveTo(1.4, y);
+        ctx.lineTo(8.6, y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#3a2a2a';
+      ctx.fillRect(3, 3.4, 4, 1.2);
+      ctx.fillRect(3, 13.6, 4, 1.2);
+      ctx.fillRect(4.7, 0, 0.6, 3.6);
+      break;
+    }
+    case 'duck': {
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.ellipse(8, 10, 7, 4, 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(11.5, 5, 3.4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#ff9a2e';
+      ctx.beginPath();
+      ctx.ellipse(15.2, 5.6, 1.8, 0.9, 0.1, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#2a1f1a';
+      ctx.beginPath();
+      ctx.arc(12.3, 4.2, 0.7, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(6, 8.4, 3, 1.2, -0.2, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#f0b81e';
+      ctx.beginPath();
+      ctx.ellipse(5, 9.6, 2.6, 1.6, 0.3, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'cactus': {
+      ctx.fillStyle = '#3fae6a';
+      const pill = (x: number, y: number, w: number, h: number) => {
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, w / 2);
+        ctx.fill();
+      };
+      pill(5, 3, 4, 12);
+      pill(1.6, 6, 2.8, 5);
+      pill(9.6, 4.5, 2.8, 5);
+      ctx.fillRect(3, 9.5, 2.5, 1.6);
+      ctx.fillRect(8.5, 8, 2.5, 1.6);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(6, 4, 0.7, 10);
+      ctx.fillStyle = '#ff7ab8';
+      ctx.beginPath();
+      ctx.arc(7, 3, 1.6, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = linear(ctx, 0, 14, 0, 20, [
+        [0, '#d98a5c'],
+        [1, '#7a3f2a'],
+      ]);
+      ctx.beginPath();
+      ctx.moveTo(2.5, 14);
+      ctx.lineTo(11.5, 14);
+      ctx.lineTo(10.5, 19.6);
+      ctx.lineTo(3.5, 19.6);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'gnome': {
+      ctx.fillStyle = '#4f7cff';
+      ctx.beginPath();
+      ctx.ellipse(7, 16, 5, 4, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#f4f0e8';
+      ctx.beginPath();
+      ctx.moveTo(3.4, 10.5);
+      ctx.quadraticCurveTo(7, 19, 10.6, 10.5);
+      ctx.fill();
+      ctx.fillStyle = '#ffc8a8';
+      ctx.beginPath();
+      ctx.arc(7, 10, 2.4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#ff9a8a';
+      ctx.beginPath();
+      ctx.arc(7, 10.8, 0.9, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#e8324e';
+      ctx.beginPath();
+      ctx.moveTo(3.6, 9);
+      ctx.quadraticCurveTo(7, -1, 10.4, 9);
+      ctx.closePath();
+      ctx.fill();
+      // A bubble helmet: it is a space gnome.
+      ctx.strokeStyle = 'rgba(200,240,255,0.75)';
+      ctx.lineWidth = 0.6;
+      ctx.fillStyle = 'rgba(160,220,255,0.15)';
+      ctx.beginPath();
+      ctx.arc(7, 7.5, 6, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.beginPath();
+      ctx.ellipse(4.6, 4.8, 1.4, 0.7, -0.6, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'neon': {
+      ctx.fillStyle = 'rgba(14,10,32,0.88)';
+      ctx.beginPath();
+      ctx.roundRect(1, 1, 34, 13, 3);
+      ctx.fill();
+      ctx.strokeStyle = '#5cf2ff';
+      ctx.lineWidth = 0.8;
+      ctx.shadowColor = '#5cf2ff';
+      ctx.shadowBlur = 3;
+      ctx.beginPath();
+      ctx.roundRect(2.2, 2.2, 31.6, 10.6, 2.4);
+      ctx.stroke();
+      ctx.shadowColor = '#ff5daf';
+      ctx.fillStyle = '#ffd0ea';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('OPEN', 18, 8);
+      ctx.shadowBlur = 0;
+      break;
+    }
+    case 'disco': {
+      ctx.strokeStyle = 'rgba(200,206,255,0.6)';
+      ctx.lineWidth = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(7, 0);
+      ctx.lineTo(7, 13);
+      ctx.stroke();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(7, 19, 6, 0, TAU);
+      ctx.clip();
+      ctx.fillStyle = radial(ctx, 5, 17, 8, [
+        [0, '#ffffff'],
+        [0.5, '#b8c0e8'],
+        [1, '#4a5090'],
+      ]);
+      ctx.fillRect(0, 12, 14, 14);
+      const r = rng(42);
+      for (let y = 13; y < 25; y += 1.6) {
+        for (let x = 1; x < 13; x += 1.6) {
+          ctx.fillStyle = `rgba(${r() > 0.7 ? '255,255,255' : r() > 0.5 ? '255,180,230' : '120,130,200'},${0.25 + r() * 0.5})`;
+          ctx.fillRect(x, y, 1.3, 1.3);
+        }
+      }
+      ctx.restore();
+      break;
+    }
+    case 'flag': {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(3, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath();
+      ctx.moveTo(3, 0);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(3, 8);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'bulb': {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(3, 3.4, 1.6, 2.2, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#5a5f80';
+      ctx.fillRect(2.2, 0, 1.6, 1.4);
+      break;
+    }
+  }
+}
+
+export const ornament = (id: string) => {
+  const [w, h] = ORNAMENT_SIZE[id];
+  return paint(w, h, (ctx) => drawOrnament(ctx, id), 5);
+};
+
+/** A picture of each decoration for the menu, 40 units square. */
+export function ornamentUrl(id: string): string {
+  return paintUrl(40, 40, (ctx) => {
+    const piece = (pid: string, x: number, y: number, s: number, tint?: string) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(s, s);
+      drawOrnament(ctx, pid);
+      if (tint) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = tint;
+        const [w, h] = ORNAMENT_SIZE[pid];
+        ctx.fillRect(0, 0, w, h);
+      }
+      ctx.restore();
+    };
+    if (id === 'bulbs') {
+      ctx.strokeStyle = '#5a5f80';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(2, 12);
+      ctx.quadraticCurveTo(20, 30, 38, 12);
+      ctx.stroke();
+      const colors = ['#ff6b9a', '#ffd166', '#4fe3c1', '#7aa7ff', '#ff9a4c'];
+      colors.forEach((c, i) => {
+        const t = (i + 0.5) / colors.length;
+        const x = 2 + 36 * t;
+        const y = 12 + 2 * t * (1 - t) * 18;
+        ctx.fillStyle = radial(ctx, x, y + 3, 6, [
+          [0, rgba(c, 0.6)],
+          [1, rgba(c, 0)],
+        ]);
+        ctx.fillRect(x - 6, y - 3, 12, 12);
+        piece('bulb', x - 3, y, 1.2, rgba(c, 0.85));
+      });
+    } else if (id === 'bunting') {
+      ctx.strokeStyle = '#c5cbff';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(1, 12);
+      ctx.quadraticCurveTo(20, 26, 39, 12);
+      ctx.stroke();
+      const colors = ['#ff6b9a', '#ffd166', '#4fe3c1', '#7aa7ff', '#c58cff'];
+      colors.forEach((c, i) => {
+        const t = (i + 0.5) / colors.length;
+        piece('flag', 1 + 38 * t - 3.6, 12 + 2 * t * (1 - t) * 14 - 0.5, 1.2, rgba(c, 0.95));
+      });
+    } else if (id === 'lanterns') {
+      piece('lantern', 3, 8, 1.3, 'rgba(255,90,90,0.75)');
+      piece('lantern', 14, 4, 1.3, 'rgba(255,170,70,0.75)');
+      piece('lantern', 25, 10, 1.3, 'rgba(255,110,180,0.75)');
+    } else {
+      const [w, h] = ORNAMENT_SIZE[id];
+      const s = Math.min(34 / w, 34 / h);
+      piece(id, 20 - (w * s) / 2, 20 - (h * s) / 2, s);
+    }
+  }, 3);
+}

@@ -14,10 +14,12 @@ import { Game } from './game';
 import { StationScene } from './scene/station';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
-import { SafeGame, safeText, setDoneText } from './ui/book-ui';
+import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
 import { tradeText } from './ui/trade-ui';
 import { UI } from './ui/ui';
+import { Fanfare } from './ui/fanfare';
+import { ORNAMENTS } from './core/ornaments';
 
 /**
  * If anything throws, say so on screen instead of silently freezing, so a player can report
@@ -120,14 +122,27 @@ async function boot(): Promise<void> {
   const unlock = () => sfx.unlock();
   window.addEventListener('pointerdown', unlock, { capture: true });
 
+  const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  // Decorations earned together (an old save catching up) share one toast.
+  let freshOrnaments: string[] = [];
+
   game.on((e) => {
     switch (e.type) {
       case 'bought': {
         // The machine shows up in orbit as its orb lands on the station.
-        const color = GENERATORS.find((g) => g.id === e.gen)!.color;
+        const g = GENERATORS.find((x) => x.id === e.gen)!;
+        const color = g.color;
+        // The very first of a machine, ever, gets a celebration once it lands.
+        const first = !game.state.collection.has(`gen:${e.gen}`) && game.state.tutorial < 0;
+        if (first) game.state.collection.add(`gen:${e.gen}`);
         ui.flyToStation(e.gen, hexColor(color), scene.hubOnScreen(), () => {
           scene.setOwned(game.state.owned);
           scene.arrive(color);
+          if (!first) return;
+          fanfare.cheer({ icon: GEN_ICONS[e.gen], kicker: 'New machine', title: g.name, sub: g.blurb, color: hexColor(color) });
+          scene.fireworks([color, 0xffd166, 0xffffff]);
+          sfx.fanfare();
+          buzz([30, 60, 30]);
         });
         ui.flashRow(e.gen);
         sfx.buy();
@@ -180,6 +195,9 @@ async function boot(): Promise<void> {
           scene.setOwned(game.state.owned);
           scene.setSector(sectorFor(game.state.stats.relocations));
           showSectorCard(game.state.stats.relocations);
+          fanfare.confetti();
+          scene.fireworks([0x8f7bff, 0x5cd6ff, 0xffd166]);
+          sfx.fanfare();
         }, 1500);
         syncPerks();
         ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores, +${e.crystals} crystals`);
@@ -193,6 +211,8 @@ async function boot(): Promise<void> {
           scene.setSector(sectorFor(game.state.stats.relocations));
           scene.setGalaxy(game.state.galaxy.shifts);
           showSectorCard(game.state.stats.relocations, game.state.galaxy.shifts + 1);
+          fanfare.confetti(['#ffe9a8', '#8f7bff', '#ffd166', '#ffffff']);
+          scene.fireworks([0xffe9a8, 0x8f7bff, 0xffffff]);
         }, 1500);
         syncPerks();
         ui.toast(ICONS.star.replace('currentColor', '#ffe9a8'), galaxyText(e.stars, game.state.galaxy.shifts + 1));
@@ -400,12 +420,42 @@ async function boot(): Promise<void> {
           sfx.coins();
         }
         break;
-      case 'set':
-        ui.toast(ICONS.trophy.replace('currentColor', hexColor(SETS.find((x) => x.id === e.id)!.color)), setDoneText(e.id));
-        scene.celebrate(SETS.find((x) => x.id === e.id)!.color);
-        sfx.achievement();
-        buzz(40);
+      case 'set': {
+        const set = SETS.find((x) => x.id === e.id)!;
+        const skin = SKINS.find((k) => k.id === set.skin);
+        fanfare.cheer({
+          icon: ICONS.trophy,
+          kicker: 'Set complete',
+          title: set.name,
+          sub: `+${set.crystals} crystals${skin ? ` and the <b>${skin.name}</b> station skin` : ''}`,
+          color: hexColor(set.color),
+        });
+        scene.celebrate(set.color);
+        scene.fireworks([set.color, 0xffd166, 0xffffff]);
+        sfx.fanfare();
+        buzz([30, 60, 30]);
         break;
+      }
+      case 'ornament': {
+        scene.setOrnaments(game.state.ornaments.on);
+        if (!e.fresh) {
+          sfx.buy();
+          break;
+        }
+        if (!freshOrnaments.length) {
+          // Wait a beat (and for any celebration card) so a batch shares one toast.
+          window.setTimeout(() => fanfare.whenIdle(() => {
+            const names = freshOrnaments.map((id) => ORNAMENTS.find((o) => o.id === id)!.name);
+            freshOrnaments = [];
+            const what = names.length === 1 ? `<b>${names[0]}</b> is` : `<b>${names.length} decorations</b> are`;
+            ui.toast(ICONS.palette, `${what} up on the station. Change them in Station, Decor`);
+            scene.celebrate(0xffd166);
+            sfx.upgrade();
+          }), 0);
+        }
+        freshOrnaments.push(e.id);
+        break;
+      }
       case 'stationSkin':
         syncDecor();
         sfx.upgrade();
@@ -555,6 +605,7 @@ async function boot(): Promise<void> {
   scene.setPet(game.state.pets.active, petTint());
   if (game.state.boss) scene.setBoss(game.state.boss.name);
   scene.setTrader(meta.traderHere(game.state, Date.now()));
+  scene.setOrnaments(game.state.ornaments.on);
 
   let lastUi = 0;
   let lastFrame = performance.now();

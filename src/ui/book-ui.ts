@@ -234,13 +234,6 @@ export class SkinPanel {
   }
 }
 
-/** Toast text for a finished set. */
-export function setDoneText(id: string): string {
-  const set = SETS.find((x) => x.id === id)!;
-  const skin = SKINS.find((k) => k.id === set.skin)!;
-  return `<b>Collection complete: ${esc(set.name)}!</b> +${set.crystals} crystals and the ${esc(skin.name)} skin (Station, Decor)`;
-}
-
 /** Toast text for a cracked safe. */
 export function safeText(r: meta.SafeReward, fmt: Fmt): string {
   const name = SAFE_TYPES.find((t) => t.id === r.type)!.name;

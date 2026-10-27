@@ -312,6 +312,211 @@ export class StationScene {
   /** False until init finishes; every public method is a no-op before then. */
   ready = false;
 
+  // ---------- Decorations ----------
+
+  private ornLayer = new Container();
+  private ornTex = new Map<string, Texture>();
+  /** Each decoration's sprites, and how it moves. */
+  private orns: { id: string; parts: Sprite[]; wire?: Graphics }[] = [];
+  private ornKey = '';
+
+  private ornTexture(id: string): Texture {
+    let t = this.ornTex.get(id);
+    if (!t) {
+      t = art.ornament(id);
+      this.ornTex.set(id, t);
+    }
+    return t;
+  }
+
+  /** Puts up the decorations in `on`, taking down the rest. */
+  setOrnaments(on: Iterable<string>): void {
+    if (!this.ready) return;
+    const ids = [...on].sort();
+    const key = ids.join();
+    if (key === this.ornKey) return;
+    this.ornKey = key;
+    if (!this.ornLayer.parent) this.hub.addChild(this.ornLayer);
+    for (const o of this.orns) {
+      o.parts.forEach((p) => p.destroy());
+      o.wire?.destroy();
+    }
+    this.orns = [];
+    // Draw order: things around the rim first, then what hangs and sits on top.
+    const order = ['bunting', 'bulbs', 'poster', 'gnome', 'garden', 'cactus', 'fern', 'lanterns', 'pennant', 'neon', 'disco', 'duck'];
+    for (const id of order) if (ids.includes(id)) this.orns.push(this.buildOrnament(id));
+  }
+
+  private buildOrnament(id: string): { id: string; parts: Sprite[]; wire?: Graphics } {
+    const L = this.ornLayer;
+    const place = (tex: string, x: number, y: number, ax = 0.5, ay = 0.5) => {
+      const sp = this.sprite(this.ornTexture(tex), L, x, y);
+      sp.anchor.set(ax, ay);
+      return sp;
+    };
+    const colors = [0xff6b9a, 0xffd166, 0x4fe3c1, 0x7aa7ff, 0xff9a4c, 0xc58cff];
+    switch (id) {
+      case 'bulbs': {
+        // A ring of bulbs around the station, the wire dipping between hooks.
+        const wire = new Graphics();
+        L.addChild(wire);
+        const n = 18;
+        const r = 74;
+        const parts: Sprite[] = [];
+        for (let i = 0; i < n; i++) {
+          const a0 = (i / n) * TAU;
+          const a1 = ((i + 1) / n) * TAU;
+          const am = (a0 + a1) / 2;
+          wire.moveTo(Math.cos(a0) * r, Math.sin(a0) * r).quadraticCurveTo(Math.cos(am) * (r - 6), Math.sin(am) * (r - 6), Math.cos(a1) * r, Math.sin(a1) * r);
+          const halo = this.sprite(this.tex.glow, L, Math.cos(am) * (r - 3), Math.sin(am) * (r - 3));
+          halo.blendMode = 'add';
+          halo.scale.set(0.2);
+          halo.tint = colors[i % colors.length];
+          const bulb = place('bulb', halo.x, halo.y);
+          bulb.tint = colors[i % colors.length];
+          bulb.rotation = am - Math.PI / 2;
+          parts.push(halo, bulb);
+        }
+        wire.stroke({ width: 0.7, color: 0x5a5f80, alpha: 0.9 });
+        return { id, parts, wire };
+      }
+      case 'bunting': {
+        const wire = new Graphics();
+        L.addChild(wire);
+        const parts: Sprite[] = [];
+        const r = 84;
+        const from = Math.PI * 1.12;
+        const to = Math.PI * 1.88;
+        const n = 11;
+        wire.moveTo(Math.cos(from) * r, Math.sin(from) * r);
+        for (let i = 1; i <= 40; i++) {
+          const a = from + ((to - from) * i) / 40;
+          const sag = Math.sin((i / 40) * Math.PI * 4) * 1.5;
+          wire.lineTo(Math.cos(a) * (r - sag), Math.sin(a) * (r - sag));
+        }
+        wire.stroke({ width: 0.6, color: 0xc5cbff, alpha: 0.8 });
+        for (let i = 0; i < n; i++) {
+          const a = from + ((to - from) * (i + 0.5)) / n;
+          const f = place('flag', Math.cos(a) * r, Math.sin(a) * r, 0.5, 0);
+          f.rotation = a + Math.PI / 2 + Math.PI;
+          f.tint = colors[i % colors.length];
+          parts.push(f);
+        }
+        return { id, parts, wire };
+      }
+      case 'lanterns': {
+        const wire = new Graphics();
+        L.addChild(wire);
+        const parts: Sprite[] = [];
+        const spots: [number, number, number][] = [[84, 10, 0xff5a5a], [102, 16, 0xffaa46], [118, 8, 0xff6eb4]];
+        for (const [x, len, c] of spots) {
+          wire.moveTo(x, 8).lineTo(x, 8 + len);
+          const glow = this.sprite(this.tex.glow, L, x, 8 + len + 8);
+          glow.blendMode = 'add';
+          glow.tint = c;
+          glow.scale.set(0.5);
+          glow.alpha = 0.6;
+          const l = place('lantern', x, 8 + len, 0.5, 0);
+          l.tint = c;
+          parts.push(glow, l);
+        }
+        wire.stroke({ width: 0.5, color: 0xb0b0c0, alpha: 0.8 });
+        return { id, parts, wire };
+      }
+      case 'fern':
+        return { id, parts: [place('fern', -104, 8, 0.5, 0)] };
+      case 'garden':
+        return { id, parts: [place('garden', -98, -9, 0.5, 1)] };
+      case 'cactus':
+        return { id, parts: [place('cactus', 108, -9, 0.5, 1)] };
+      case 'poster': {
+        const p = place('poster', -34, 36);
+        p.rotation = -0.18;
+        return { id, parts: [p] };
+      }
+      case 'gnome':
+        return { id, parts: [place('gnome', 36, 46, 0.5, 1)] };
+      case 'pennant':
+        return { id, parts: [place('pennant', 2, 60, 0, 0.5)] };
+      case 'neon': {
+        const glow = this.sprite(this.tex.glow, L, -86, -52);
+        glow.blendMode = 'add';
+        glow.tint = 0xff5daf;
+        glow.scale.set(1.1, 0.5);
+        glow.alpha = 0.35;
+        return { id, parts: [glow, place('neon', -86, -52)] };
+      }
+      case 'disco': {
+        const parts = [place('disco', 70, -96, 0.5, 0)];
+        for (let i = 0; i < 4; i++) {
+          const sp = this.sprite(this.tex.glow, L, 70, -77);
+          sp.blendMode = 'add';
+          sp.scale.set(0.12);
+          parts.push(sp);
+        }
+        return { id, parts };
+      }
+      case 'duck':
+        return { id, parts: [place('duck', 100, 0)] };
+    }
+    return { id, parts: [] };
+  }
+
+  private updateOrnaments(): void {
+    const t = this.time;
+    const calm = this.reducedMotion;
+    for (const o of this.orns) {
+      switch (o.id) {
+        case 'bulbs':
+          // Bulbs twinkle in a slow chase around the ring.
+          for (let i = 0; i < o.parts.length; i += 2) {
+            const k = 0.5 + 0.5 * Math.sin(t * 2.2 - i * 0.35);
+            o.parts[i].alpha = this.calmFlash ? 0.6 : 0.35 + k * 0.65;
+          }
+          break;
+        case 'lanterns':
+          for (let i = 1; i < o.parts.length; i += 2) o.parts[i].rotation = calm ? 0 : Math.sin(t * 1.3 + i) * 0.12;
+          break;
+        case 'fern':
+          o.parts[0].rotation = calm ? 0 : Math.sin(t * 0.9) * 0.06;
+          break;
+        case 'pennant':
+          o.parts[0].skew.y = calm ? 0 : Math.sin(t * 3) * 0.12;
+          o.parts[0].scale.x = 1 + Math.sin(t * 3 + 1) * 0.05;
+          break;
+        case 'neon': {
+          // A neon sign hums, and now and then stutters.
+          const flicker = !this.calmFlash && Math.sin(t * 0.7) > 0.97 && Math.sin(t * 40) > 0;
+          o.parts[1].alpha = flicker ? 0.55 : 1;
+          o.parts[0].alpha = flicker ? 0.1 : 0.3 + 0.08 * Math.sin(t * 3);
+          o.parts[0].y = o.parts[1].y = -52 + (calm ? 0 : Math.sin(t * 1.1) * 1.5);
+          break;
+        }
+        case 'disco': {
+          const ball = o.parts[0];
+          ball.rotation = calm ? 0 : Math.sin(t * 0.8) * 0.08;
+          for (let i = 1; i < o.parts.length; i++) {
+            const a = t * 1.6 + (i * TAU) / 4;
+            const sp = o.parts[i];
+            sp.position.set(70 + Math.cos(a) * 5, -77 + Math.sin(a * 1.3) * 5);
+            sp.alpha = this.calmFlash ? 0.15 : Math.max(0, Math.sin(t * 5 + i * 1.7)) * 0.9;
+            sp.tint = [0xffffff, 0xff9ad5, 0x9fe0ff, 0xffe27a][i - 1];
+          }
+          break;
+        }
+        case 'duck': {
+          // The duck drifts round the station, bobbing as if on water.
+          const a = t * 0.12 + 0.6;
+          const d = o.parts[0];
+          d.position.set(Math.cos(a) * 100, Math.sin(a) * 100 + (calm ? 0 : Math.sin(t * 2) * 2));
+          d.scale.x = Math.sin(a) < 0 ? 1 : -1;
+          d.rotation = calm ? 0 : Math.sin(t * 2.4) * 0.12;
+          break;
+        }
+      }
+    }
+  }
+
   private sprite(tex: Texture, parent: Container, x = 0, y = 0): Sprite {
     const s = new Sprite(tex);
     s.anchor.set(0.5);
@@ -1144,6 +1349,25 @@ export class StationScene {
     p.s.rotation = Math.sin(this.time * 1.7) * 0.12;
   }
 
+  /** A few bursts of colour popping around the station, for a big moment. */
+  fireworks(colors: number[]): void {
+    if (!this.ready) return;
+    const n = this.calmFlash ? 2 : 6;
+    for (let i = 0; i < n; i++) {
+      window.setTimeout(() => {
+        const a = rand(0, TAU);
+        const d = rand(70, 150);
+        const x = Math.cos(a) * d;
+        const y = Math.sin(a) * d * 0.8;
+        const c = colors[i % colors.length];
+        this.burst(x, y, c, this.calmFlash ? 12 : 26, 1.5);
+        this.rings.push({ x, y, r: 6, life: 0.9, color: c, width: 2.5 });
+        this.puff(x, y, c, 2, 0.5);
+      }, i * 170);
+    }
+    this.squash = Math.max(this.squash, 0.6);
+  }
+
   celebrate(color = COLORS.dock): void {
     if (!this.ready) return;
     this.rings.push({ x: 0, y: 0, r: 40, life: 1, color, width: 4 });
@@ -1176,6 +1400,7 @@ export class StationScene {
     this.updateMachines(dt * speed);
     this.updateFar(dt * speed);
     this.updateHub(dt);
+    this.updateOrnaments();
     this.updateBoss(dt);
     this.updatePet(dt);
     this.updateFx(dt);

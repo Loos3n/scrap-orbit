@@ -7,7 +7,8 @@ import * as meta from '../core/meta';
 import { D, Decimal, format, formatDuration } from '../core/num';
 import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
-import { petUrl } from '../scene/art';
+import { ornamentUrl, petUrl } from '../scene/art';
+import { ORNAMENTS } from '../core/ornaments';
 import { pressWatch } from './gestures';
 import { portrait } from './portrait';
 
@@ -226,6 +227,42 @@ export class DecorPanel {
     $('paint-list').innerHTML = PAINTS.map((p) =>
       card(p.id, p.name, p.cost, `<span class="hull" style="--t:${hex(p.tint)}"><i></i></span>`),
     ).join('');
+  }
+}
+
+// ---------- Decorations ----------
+
+export class OrnamentPanel {
+  private key = '';
+  private urls = new Map<string, string>();
+
+  constructor(private game: Game) {
+    $('orn-list').addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-orn]');
+      if (btn) this.game.toggleOrnament(btn.dataset.orn!);
+    });
+  }
+
+  private url(id: string): string {
+    if (!this.urls.has(id)) this.urls.set(id, ornamentUrl(id));
+    return this.urls.get(id)!;
+  }
+
+  render(): void {
+    const s = this.game.state;
+    const progress = ORNAMENTS.map((o) => (s.ornaments.got.has(o.id) ? '' : o.progress(s).map((n) => Math.min(n, 1e6)).join('/')));
+    const key = [...s.ornaments.got].join() + '|' + [...s.ornaments.on].join() + '|' + progress.join();
+    if (key === this.key) return;
+    this.key = key;
+    $('orn-sum').textContent = `${s.ornaments.got.size} of ${ORNAMENTS.length}`;
+    $('orn-list').innerHTML = ORNAMENTS.map((o) => {
+      const got = s.ornaments.got.has(o.id);
+      const on = s.ornaments.on.has(o.id);
+      const [have, need] = o.progress(s);
+      const tag = !got ? `${esc(o.hint)} <b>${Math.min(have, need).toLocaleString('en-US')} / ${need.toLocaleString('en-US')}</b>` : on ? 'Up' : 'Put up';
+      return `<li><button type="button" class="decor-card orn-card${on ? ' on' : ''}${got ? '' : ' locked'}" data-orn="${o.id}" ${got ? '' : 'disabled'}>
+        <span class="decor-swatch orn-swatch"><img src="${this.url(o.id)}" alt=""></span><span class="decor-name">${esc(o.name)}</span><span class="decor-tag">${tag}</span></button></li>`;
+    }).join('');
   }
 }
 

@@ -1299,3 +1299,44 @@ button.gen-icon:active { transform: scale(0.94); }
 .spotlight { animation: spotlight 0.85s ease-in-out 3; box-shadow: 0 0 0 2px #ffd166, 0 0 22px rgb(255 209 102 / 0.55); }
 @keyframes spotlight { 0%, 100% { box-shadow: 0 0 0 2px #ffd166, 0 0 22px rgb(255 209 102 / 0.55); } 50% { box-shadow: 0 0 0 2px rgb(255 209 102 / 0.35), 0 0 6px rgb(255 209 102 / 0.15); } }
 .reduce-flash .spotlight { animation: none; }
+
+/* Decoration cards */
+.orn-swatch { display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #232a66, #0d1030); }
+.orn-swatch img { width: 62%; height: auto; aspect-ratio: 1; image-rendering: auto; }
+.orn-card.locked .orn-swatch img { filter: grayscale(1) brightness(0.45); }
+.orn-card.locked .decor-tag { font-size: 11px; line-height: 1.25; text-align: center; color: var(--ink-dim); }
+.orn-card.locked .decor-tag b { display: block; color: var(--ink); font-variant-numeric: tabular-nums; }
+.orn-card.locked:disabled { opacity: 0.8; }
+
+/* Celebrations */
+.fanfare { position: fixed; left: 16px; right: 16px; top: 22%; z-index: 19; display: grid; justify-items: center; pointer-events: none; }
+.fanfare-card {
+  display: grid; justify-items: center; gap: 2px; max-width: 360px; width: 100%; padding: 16px 18px 18px; border-radius: 22px; text-align: center;
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--c) 30%, transparent), transparent 70%), rgb(12 14 40 / 0.92);
+  border: 1.5px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: 0 0 40px color-mix(in srgb, var(--c) 45%, transparent), 0 14px 40px rgb(0 0 0 / 0.45);
+}
+.fanfare.show .fanfare-card { animation: fanfare-in 2.6s cubic-bezier(0.2, 1.3, 0.4, 1) forwards; }
+@keyframes fanfare-in {
+  0% { opacity: 0; transform: scale(0.6) translateY(10px); }
+  12% { opacity: 1; transform: scale(1.05); }
+  20% { transform: scale(1); }
+  85% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.96) translateY(-8px); }
+}
+.fanfare-icon { width: 54px; height: 54px; padding: 10px; margin-bottom: 4px; border-radius: 50%; color: var(--c); background: color-mix(in srgb, var(--c) 18%, rgb(0 0 0 / 0.3)); box-shadow: 0 0 22px color-mix(in srgb, var(--c) 50%, transparent); }
+.fanfare-icon svg { width: 100%; height: 100%; display: block; }
+.fanfare-card small { font-size: 11.5px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; color: var(--c); }
+.fanfare-card b { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 8vw, 34px); line-height: 1.1; color: #fff; text-shadow: 0 0 18px color-mix(in srgb, var(--c) 70%, transparent); }
+.fanfare-card span { font-size: 13.5px; color: var(--ink-dim); }
+.fanfare-card span b { font-family: inherit; font-size: inherit; color: var(--ink); text-shadow: none; }
+.reduce-flash .fanfare.show .fanfare-card { animation: fanfare-calm 2.6s ease forwards; box-shadow: 0 14px 40px rgb(0 0 0 / 0.45); }
+@keyframes fanfare-calm { 0% { opacity: 0; } 12%, 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.confetti { position: fixed; inset: 0; z-index: 19; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -12px; left: var(--x); width: 7px; height: 11px; border-radius: 2px; opacity: 0.95; animation: confetti-fall var(--d) var(--delay) cubic-bezier(0.25, 0.4, 0.5, 1) forwards; }
+.confetti i.round { width: 8px; height: 8px; border-radius: 50%; }
+@keyframes confetti-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(var(--dx), 105vh) rotate(var(--r)); opacity: 0; }
+}

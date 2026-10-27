@@ -233,6 +233,17 @@ export class Sfx {
     }
   }
 
+  /** A celebration: a quick rising fanfare, a bright held chord and a shimmer on top. */
+  fanfare(): void {
+    if (!this.ready()) return;
+    [392, 523, 659, 784].forEach((f, i) => this.bell(f, i * 0.09, 0.4, 0.15, 2, 1.1, 0.3));
+    for (const [f, d] of [[523, -6], [659, 6], [784, -4], [1047, 4]] as [number, number][]) {
+      this.voice({ freq: f, detune: d, dur: 1.4, vol: 0.05, start: 0.38, attack: 0.04, type: 'sawtooth', filter: { type: 'lowpass', freq: 3200, to: 900 }, echo: 0.5 });
+    }
+    [1568, 2093, 2637, 3136].forEach((f, i) => this.bell(f, 0.42 + i * 0.05, 0.9, 0.06, 3.5, 1.6, 0.6));
+    this.noise(0.38, 0.9, 0.05, { type: 'highpass', freq: 6000 }, 0.5, 0.02);
+  }
+
   /** Overdrive: a filtered riser and a rush of air, landing on a punchy low hit. */
   boost(): void {
     if (!this.ready()) return;

@@ -1,5 +1,6 @@
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { bestPurchase } from './core/advisor';
+import { checkOrnaments, toggleOrnament } from './core/ornaments';
 import { checkAchievements, type AchievementDef } from './core/achievements';
 import { ACHIEVEMENT_CRYSTALS, RESEARCH, TUTORIAL, type CrewId, type EventKind, type PetId, type TutorialStep } from './core/content';
 import * as eco from './core/economy';
@@ -57,6 +58,7 @@ export type GameEvent =
   | { type: 'safeOpened'; reward: meta.SafeReward }
   | { type: 'set'; id: string }
   | { type: 'stationSkin' }
+  | { type: 'ornament'; id: string; fresh: boolean }
   | { type: 'galaxy'; stars: number }
   | { type: 'starNode'; id: string }
   | { type: 'trade'; result: meta.TradeResult }
@@ -177,6 +179,8 @@ export class Game {
     if (meta.updateSafe(s, now)) this.emit({ type: 'safe' });
     meta.noteCollection(s);
     for (const set of meta.checkSets(s)) this.emit({ type: 'set', id: set.id });
+    // Decorations wait for the tutorial to finish, so it stays uncluttered.
+    if (s.tutorial < 0) for (const o of checkOrnaments(s)) this.emit({ type: 'ornament', id: o.id, fresh: true });
     const beaten = meta.checkChallenge(s);
     if (beaten) this.emit({ type: 'challenge', id: beaten.id, phase: 'done' });
     for (const t of s.trips) {
@@ -255,6 +259,10 @@ export class Game {
   finishSafe(locks: number): void {
     const reward = meta.finishSafe(this.state, locks);
     if (reward) this.emit({ type: 'safeOpened', reward });
+  }
+
+  toggleOrnament(id: string): void {
+    if (toggleOrnament(this.state, id)) this.emit({ type: 'ornament', id, fresh: false });
   }
 
   chooseStationSkin(id: string | null): void {

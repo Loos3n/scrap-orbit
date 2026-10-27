@@ -2,6 +2,7 @@ import { GENERATORS, SAVE_VERSION, type GeneratorId } from './config';
 import { BOSS_NAMES, CREW, PETS, SECTORS, TUTORIAL, type CrewId, type EventKind, type MissionKind, type PetId, type TutorialStep } from './content';
 import { CHALLENGES, GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Offer, type Trip } from './expansion';
 import { SAFE_TYPES, SETS, SKINS, skinUnlocked } from './collection';
+import { ORNAMENTS } from './ornaments';
 import { STAR_NODES } from './galaxy';
 import { D, Decimal, type NumberStyle } from './num';
 
@@ -84,6 +85,8 @@ export interface GameState {
   collection: Set<string>;
   setsDone: Set<string>;
   skin: string | null;
+  /** Station decorations earned, and the ones up on the station. */
+  ornaments: { got: Set<string>; on: Set<string> };
   stats: {
     crates: number;
     boosts: number;
@@ -167,6 +170,7 @@ interface SaveData {
   collection?: string[];
   setsDone?: string[];
   skin?: string | null;
+  ornaments?: { got?: string[]; on?: string[] };
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -228,6 +232,7 @@ export function newState(now: number): GameState {
     collection: new Set(),
     setsDone: new Set(),
     skin: null,
+    ornaments: { got: new Set(), on: new Set() },
     stats: {
       crates: 0,
       boosts: 0,
@@ -293,6 +298,7 @@ export function serialize(state: GameState): string {
     collection: [...state.collection],
     setsDone: [...state.setsDone],
     skin: state.skin,
+    ornaments: { got: [...state.ornaments.got], on: [...state.ornaments.on] },
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -439,6 +445,9 @@ export function deserialize(json: string | null, now: number): GameState | null 
   for (const id of strings(data.setsDone)) if (setIds.has(id)) state.setsDone.add(id);
   state.skin = typeof data.skin === 'string' && SKINS.some((k) => k.id === data.skin) && skinUnlocked(state, data.skin) ? data.skin : null;
   state.stats = { ...state.stats, ...(data.stats ?? {}) };
+  const ornamentIds = new Set(ORNAMENTS.map((o) => o.id));
+  for (const id of strings(data.ornaments?.got)) if (ornamentIds.has(id)) state.ornaments.got.add(id);
+  for (const id of strings(data.ornaments?.on)) if (state.ornaments.got.has(id)) state.ornaments.on.add(id);
   if (!Array.isArray(data.collection)) {
     // Saves from before the book: credit what the save already shows.
     for (let i = 0; i <= Math.min(state.stats.relocations, SECTORS.length - 1); i++) state.collection.add(`sector:${i}`);
