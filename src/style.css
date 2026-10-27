@@ -1293,3 +1293,4 @@ button.gen-icon:active { transform: scale(0.94); }
 .best-buy:disabled { cursor: default; }
 .best-buy:disabled .buy-cost { color: #c98a9a; }
 .best-buy.holding { filter: brightness(1.08); }
+#scene.panning { cursor: grabbing; }

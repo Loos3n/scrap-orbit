@@ -203,6 +203,12 @@ export class StationScene {
   private resizeTimer = 0;
   /** The open band of screen between the HUD and the panel, where the station sits. */
   private focus = { top: 0, bottom: 0 };
+  /** Where layout() puts things before the player's pan is added. */
+  private home = { world: { x: 0, y: 0 }, planet: { x: 0, y: 0 }, galaxy: { x: 0, y: 0 } };
+  /** The view's offset in screen pixels: `raw` follows the finger, `pan` is what is shown. */
+  private pan = { x: 0, y: 0 };
+  private panRaw = { x: 0, y: 0 };
+  private panning = false;
 
   async init(el: HTMLElement): Promise<void> {
     await this.app.init({
@@ -378,7 +384,7 @@ export class StationScene {
     const fh = bottom - top;
     this.baseScale = Math.min(w, fh * 1.08) / WORLD;
     this.scale = this.baseScale / this.zoom;
-    this.world.position.set(w / 2, top + fh / 2);
+    this.home.world = { x: w / 2, y: top + fh / 2 };
     this.world.scale.set(this.scale);
 
     // Painting the sky and scattering stars is slow, so only redo it when the screen size or
@@ -399,9 +405,9 @@ export class StationScene {
     const ps = Math.min(w, fh, 520) * 0.62;
     this.planet.width = ps * 1.7;
     this.planet.height = ps * 1.7;
-    this.planet.position.set(w / 2 + Math.min(w, 540) * 0.52, bottom - ps * 0.02);
+    this.home.planet = { x: w / 2 + Math.min(w, 540) * 0.52, y: bottom - ps * 0.02 };
     this.moon.scale.set(ps / 220);
-    this.galaxy.position.set(w * 0.16, top + fh * 0.86);
+    this.home.galaxy = { x: w * 0.16, y: top + fh * 0.86 };
     this.galaxy.scale.set(Math.min(w, 600) / 300);
     this.flash.width = w;
     this.flash.height = h;
@@ -410,6 +416,7 @@ export class StationScene {
     this.vignette.position.set(-w * 0.075, -h * 0.075);
     this.keyLight.position.set(w * 0.1, top + fh * 0.1);
     this.keyLight.scale.set(Math.max(w, h) / 34);
+    this.placePan();
 
     if (!repaint) return;
     // Dust drifting close to the camera gives the scene depth.
@@ -645,8 +652,70 @@ export class StationScene {
     this.layout();
   }
 
+  /** How far the view may be dragged from the middle, in screen pixels. */
+  private panLimit(): { x: number; y: number } {
+    const { width: w, height: h } = this.app.screen;
+    const fh = this.focus.bottom > this.focus.top ? this.focus.bottom - this.focus.top : h;
+    return { x: Math.min(w * 0.2, 110), y: Math.min(fh * 0.15, 90) };
+  }
+
+  /** Drag the view by a finger's movement. Past the limit it stretches, like a rubber band. */
+  panBy(dx: number, dy: number): void {
+    if (!this.ready) return;
+    if (!this.panning) this.panRaw = { ...this.pan };
+    this.panning = true;
+    this.panRaw.x += dx;
+    this.panRaw.y += dy;
+    const L = this.panLimit();
+    const soft = (v: number, l: number) => (Math.abs(v) <= l ? v : Math.sign(v) * (l + (Math.abs(v) - l) * 0.3));
+    this.pan = { x: soft(this.panRaw.x, L.x), y: soft(this.panRaw.y, L.y) };
+    this.placePan();
+  }
+
+  /** The finger lifted: the view stays put, settling back inside the limit if it was stretched. */
+  panEnd(): void {
+    this.panning = false;
+  }
+
+  /** Back to the middle, gently (a relocation does this). */
+  recenter(): void {
+    this.panning = false;
+    this.panRaw = { x: 0, y: 0 };
+    this.recentering = true;
+  }
+
+  private recentering = false;
+
+  private updatePan(dt: number): void {
+    if (this.panning) return;
+    const L = this.panLimit();
+    const tx = this.recentering ? 0 : Math.max(-L.x, Math.min(L.x, this.pan.x));
+    const ty = this.recentering ? 0 : Math.max(-L.y, Math.min(L.y, this.pan.y));
+    if (Math.abs(tx - this.pan.x) < 0.3 && Math.abs(ty - this.pan.y) < 0.3) {
+      this.recentering = false;
+      if (tx === this.pan.x && ty === this.pan.y) return;
+      this.pan = { x: tx, y: ty };
+    } else {
+      const k = Math.min(1, dt * (this.recentering ? 2.5 : 12));
+      this.pan = { x: this.pan.x + (tx - this.pan.x) * k, y: this.pan.y + (ty - this.pan.y) * k };
+    }
+    this.placePan();
+  }
+
+  /** Moves the station by the pan, and the scenery by less, so the distance shows. */
+  private placePan(): void {
+    const { x, y } = this.pan;
+    this.world.position.set(this.home.world.x + x, this.home.world.y + y);
+    this.planet.position.set(this.home.planet.x + x * 0.45, this.home.planet.y + y * 0.45);
+    this.galaxy.position.set(this.home.galaxy.x + x * 0.2, this.home.galaxy.y + y * 0.2);
+    this.starLayer.position.set(x * 0.1, y * 0.1);
+    this.fgLayer.position.set(x * 1.3, y * 1.3);
+    this.dustLayer.position.set(x * 1.15, y * 1.15);
+  }
+
   warpJump(): void {
     if (!this.ready) return;
+    this.recenter();
     this.flash.tint = 0xffffff;
     this.jump = 2.4;
     this.shake = Math.max(this.shake, 9);
@@ -1100,6 +1169,7 @@ export class StationScene {
     }
     this.flare += ((this.event === 'flare' ? 1 : 0) - this.flare) * Math.min(1, dt * 2);
     this.flareGlow.alpha = this.flare * (this.calmFlash ? 0.4 : 0.55 + 0.15 * Math.sin(this.time * 3));
+    this.updatePan(dt);
     this.updateStars(dt);
     this.updateScenery(dt);
     this.updateDrifts(dt);

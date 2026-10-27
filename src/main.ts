@@ -454,10 +454,39 @@ async function boot(): Promise<void> {
     clearTimeout(hold);
     hold = 0;
   };
+  // Drag the first finger to pan the view a little. Other fingers keep tapping, and a press
+  // only becomes a drag once it has moved, so taps and holds work as before.
+  let drag: { id: number; x: number; y: number; moving: boolean } | null = null;
+  const DRAG_START = 10;
   sceneEl.addEventListener('pointermove', (ev) => {
     if (hold && Math.hypot(ev.clientX - holdAt.x, ev.clientY - holdAt.y) > 12) cancelHold();
+    if (!drag || ev.pointerId !== drag.id) return;
+    const dx = ev.clientX - drag.x;
+    const dy = ev.clientY - drag.y;
+    if (!drag.moving && Math.hypot(dx, dy) < DRAG_START) return;
+    if (!drag.moving) {
+      cancelHold();
+      sceneEl.classList.add('panning');
+    }
+    drag.moving = true;
+    drag.x = ev.clientX;
+    drag.y = ev.clientY;
+    scene.panBy(dx, dy);
   });
-  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) sceneEl.addEventListener(type, cancelHold);
+  const endDrag = (ev: PointerEvent) => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    drag = null;
+    sceneEl.classList.remove('panning');
+    scene.panEnd();
+  };
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
+    sceneEl.addEventListener(type, (ev) => {
+      cancelHold();
+      endDrag(ev);
+    });
+  }
+  // Some apps that host the page take vertical swipes for themselves; claim them first.
+  sceneEl.addEventListener('touchmove', (ev) => ev.cancelable && ev.preventDefault(), { passive: false });
 
   sceneEl.addEventListener('pointerdown', (ev) => {
     const rect = sceneEl.getBoundingClientRect();
@@ -469,6 +498,14 @@ async function boot(): Promise<void> {
       return;
     }
     cancelHold();
+    if (!drag) {
+      drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moving: false };
+      try {
+        sceneEl.setPointerCapture(ev.pointerId);
+      } catch {
+        // Without capture the drag just ends if the finger leaves the scene.
+      }
+    }
     holdAt = { x: ev.clientX, y: ev.clientY };
     hold = window.setTimeout(() => {
       hold = 0;
