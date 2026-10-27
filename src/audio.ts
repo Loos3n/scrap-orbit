@@ -37,6 +37,9 @@ export class Sfx {
   private noiseBuf: AudioBuffer | null = null;
   private musicBus: GainNode | null = null;
   private musicOn = false;
+  /** Effects and music volume, 0 to 1, from the settings sliders. */
+  private sfxVol = 0.8;
+  private musicVol = 0.6;
   private musicTimer = 0;
   private nextChordAt = 0;
   private chord = 0;
@@ -63,7 +66,7 @@ export class Sfx {
       comp.release.value = 0.2;
       comp.connect(ctx.destination);
       this.master = ctx.createGain();
-      this.master.gain.value = 0.42;
+      this.master.gain.value = 0.42 * this.sfxVol;
       this.master.connect(comp);
       // A shared space echo: a generated impulse of decaying stereo noise.
       const verb = ctx.createConvolver();
@@ -336,6 +339,16 @@ export class Sfx {
 
   // ---------- Music ----------
 
+  /** Sets both volumes; zero switches that side off. */
+  setVolumes(sfx: number, music: number): void {
+    this.sfxVol = sfx;
+    this.musicVol = music;
+    this.enabled = sfx > 0;
+    if (this.ctx && this.master) this.master.gain.setTargetAtTime(0.42 * sfx, this.ctx.currentTime, 0.05);
+    if (this.ctx && this.musicBus && this.musicTimer) this.musicBus.gain.setTargetAtTime(0.16 * music, this.ctx.currentTime, 0.2);
+    this.setMusic(music > 0);
+  }
+
   setMusic(on: boolean): void {
     if (on === this.musicOn) return;
     this.musicOn = on;
@@ -348,7 +361,7 @@ export class Sfx {
     const t = this.ctx.currentTime;
     this.musicBus.gain.cancelScheduledValues(t);
     this.musicBus.gain.setValueAtTime(this.musicBus.gain.value, t);
-    this.musicBus.gain.linearRampToValueAtTime(0.16, t + 3);
+    this.musicBus.gain.linearRampToValueAtTime(0.16 * this.musicVol, t + 3);
     this.nextChordAt = t + 0.1;
     // Schedule a little ahead on a timer; the audio clock keeps the notes on time.
     this.musicTimer = window.setInterval(() => this.scheduleMusic(), 400);

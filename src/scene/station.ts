@@ -192,6 +192,14 @@ export class StationScene {
   private hullSprites: Sprite[] = [];
   private jump = 0;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** Comfort settings: soften flashes and pulses, and keep the camera still. */
+  private calmFlash = false;
+  private calmShake = false;
+
+  setComfort(reduceFlash: boolean, reduceShake: boolean): void {
+    this.calmFlash = reduceFlash;
+    this.calmShake = reduceShake;
+  }
   private resizeTimer = 0;
   /** The open band of screen between the HUD and the panel, where the station sits. */
   private focus = { top: 0, bottom: 0 };
@@ -763,6 +771,46 @@ export class StationScene {
     return hit.kind as 'crate' | 'meteor' | 'convoy' | 'golden';
   }
 
+  /**
+   * The machine under a screen point, for press-and-hold. Checks the nearest sprite of each kind
+   * against its on-screen size, smallest things first so a drone in front of the dock ring wins.
+   */
+  machineAt(sx: number, sy: number): GeneratorId | null {
+    if (!this.ready) return null;
+    const groups: [GeneratorId, Container[]][] = [
+      ['drone', this.drones.map((d) => d.s)],
+      ['laser', this.turrets.map((t) => t.s)],
+      ['fabricator', this.fabs],
+      ['smelter', this.pods],
+      ['hauler', this.haulers.map((h) => h.s)],
+      ['dock', [...this.dockedShips, ...this.docks]],
+      ['gravity', this.wells.map((w) => w.s)],
+      ['gate', this.gate ? [this.gate.ring] : []],
+      ['dyson', this.sun ? [this.sun.core, ...this.sun.panels] : []],
+    ];
+    let best: { id: GeneratorId; d: number } | null = null;
+    for (const [id, sprites] of groups) {
+      for (const sp of sprites) {
+        if (sp.destroyed || !sp.visible) continue;
+        const b = sp.getBounds();
+        const cx = b.x + b.width / 2;
+        const cy = b.y + b.height / 2;
+        const reach = Math.max(18, Math.min(b.width, b.height) / 2);
+        const d = Math.hypot(cx - sx, cy - sy);
+        if (d < reach && (!best || d < best.d)) best = { id, d };
+      }
+    }
+    return best?.id ?? null;
+  }
+
+  /** Whether a screen point is on the docked trader's ship. */
+  traderAt(sx: number, sy: number): boolean {
+    const o = this.traderShip;
+    if (!this.ready || !o || o.s.destroyed) return false;
+    const b = o.s.getBounds();
+    return sx >= b.x - 10 && sx <= b.x + b.width + 10 && sy >= b.y - 10 && sy <= b.y + b.height + 10;
+  }
+
   /** Where a hit happened, in world units, for floating text. */
   lastHit = { x: 0, y: 0 };
 
@@ -1043,7 +1091,7 @@ export class StationScene {
     this.warp += (warpTarget - this.warp) * Math.min(1, dt * 3);
     // The flash peaks partway through the jump, as the station lands somewhere new.
     const jt = 2.4 - this.jump;
-    this.flash.alpha = this.jump > 0 ? Math.max(0, 1 - Math.abs(jt - 1.6) * 2.2) * 0.85 : 0;
+    this.flash.alpha = this.jump > 0 ? Math.max(0, 1 - Math.abs(jt - 1.6) * 2.2) * (this.calmFlash ? 0.12 : 0.85) : 0;
     const speed = 1 + Math.min(1, this.warp) * 1.4;
     if (Math.abs(this.zoom - this.zoomTarget) > 0.0005) {
       this.zoom += (this.zoomTarget - this.zoom) * Math.min(1, dt * 1.5);
@@ -1051,7 +1099,7 @@ export class StationScene {
       this.world.scale.set(this.scale);
     }
     this.flare += ((this.event === 'flare' ? 1 : 0) - this.flare) * Math.min(1, dt * 2);
-    this.flareGlow.alpha = this.flare * (0.55 + 0.15 * Math.sin(this.time * 3));
+    this.flareGlow.alpha = this.flare * (this.calmFlash ? 0.4 : 0.55 + 0.15 * Math.sin(this.time * 3));
     this.updateStars(dt);
     this.updateScenery(dt);
     this.updateDrifts(dt);
@@ -1061,6 +1109,7 @@ export class StationScene {
     this.updateBoss(dt);
     this.updatePet(dt);
     this.updateFx(dt);
+    if (this.calmShake) this.shake = 0;
     if (!this.reducedMotion && this.shake > 0.05) {
       this.world.pivot.set(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);
       this.shake *= Math.pow(0.002, dt);

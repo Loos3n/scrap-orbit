@@ -36,7 +36,7 @@ export class GalaxyPanel {
   }
 
   render(): void {
-    if ($('tab-cores').hidden) {
+    if ($('tab-galaxy').hidden) {
       this.arming = false;
       return;
     }

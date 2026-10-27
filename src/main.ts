@@ -71,13 +71,12 @@ async function boot(): Promise<void> {
     else sfx.buy();
     buzz(kind === 'miss' ? 30 : 15);
   });
-  ui.onSoundChange = (sound, music) => {
-    sfx.enabled = sound;
-    sfx.setMusic(music);
-  };
+  ui.onSoundChange = (effects, music) => sfx.setVolumes(effects, music);
   ui.onRelocate = () => game.relocate();
   ui.syncSettings();
   const scene = new StationScene();
+  ui.onComfortChange = (reduceFlash, reduceShake) => scene.setComfort(reduceFlash, reduceShake);
+  ui.syncSettings();
   const sceneEl = document.getElementById('scene')!;
   const stage = document.getElementById('stage')!;
   const syncFocus = () => {
@@ -448,10 +447,38 @@ async function boot(): Promise<void> {
     }
   });
 
+  // Press and hold a machine on the station to open its sheet (taps still salvage as usual).
+  let hold = 0;
+  let holdAt = { x: 0, y: 0 };
+  const cancelHold = () => {
+    clearTimeout(hold);
+    hold = 0;
+  };
+  sceneEl.addEventListener('pointermove', (ev) => {
+    if (hold && Math.hypot(ev.clientX - holdAt.x, ev.clientY - holdAt.y) > 12) cancelHold();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) sceneEl.addEventListener(type, cancelHold);
+
   sceneEl.addEventListener('pointerdown', (ev) => {
     const rect = sceneEl.getBoundingClientRect();
     const x = ev.clientX - rect.left;
     const y = ev.clientY - rect.top;
+    if (scene.traderAt(x, y) && meta.traderHere(game.state, Date.now())) {
+      ui.openTrader();
+      buzz(10);
+      return;
+    }
+    cancelHold();
+    holdAt = { x: ev.clientX, y: ev.clientY };
+    hold = window.setTimeout(() => {
+      hold = 0;
+      const id = scene.machineAt(x, y);
+      if (id && game.state.owned[id] > 0) {
+        ui.openMachine(id);
+        sfx.buy();
+        buzz(20);
+      }
+    }, 450);
     const hit = scene.hitSpecial(x, y);
     if (hit === 'crate') {
       const v = game.collectBonus();

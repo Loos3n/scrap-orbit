@@ -40,6 +40,11 @@ export class InfoSheet {
     private fmt: Fmt,
   ) {
     $('info-close').addEventListener('click', () => this.close());
+    // Building from the sheet, so a machine tapped on the station can be bought right there.
+    $('info-buy').addEventListener('click', () => {
+      if (this.sheet?.kind === 'machine') this.game.buy(this.sheet.id);
+      this.render();
+    });
     $('info').addEventListener('click', (e) => {
       if (e.target === $('info')) this.close();
     });
@@ -59,6 +64,17 @@ export class InfoSheet {
 
   render(): void {
     if (!this.sheet) return;
+    const buy = $<HTMLButtonElement>('info-buy');
+    buy.hidden = this.sheet.kind !== 'machine';
+    if (this.sheet.kind === 'machine') {
+      const s = this.game.state;
+      const quote = eco.purchaseQuote(s, GENERATORS.find((g) => g.id === (this.sheet as { id: GeneratorId }).id)!, this.game.buyMode);
+      buy.disabled = quote.count === 0 || quote.cost.gt(s.scrap);
+      const label = this.game.buyMode === 'max' ? `Build ${Math.max(1, quote.count)}` : `Build ${quote.count}`;
+      if ($('info-buy-count').textContent !== label) $('info-buy-count').textContent = label;
+      const cost = this.fmt(quote.cost);
+      if ($('info-buy-cost').textContent !== cost) $('info-buy-cost').textContent = cost;
+    }
     const html = this.sheet.kind === 'machine' ? this.machine(this.sheet.id) : this.income();
     if (html === this.html) return;
     this.html = html;

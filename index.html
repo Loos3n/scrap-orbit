@@ -24,6 +24,7 @@
           </div>
         </div>
         <div class="hud-actions">
+          <button id="settings-btn" class="round-btn" type="button" aria-label="Settings"><span data-icon="gear"></span></button>
           <button id="missions-btn" class="round-btn" type="button" aria-label="Missions"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></button>
           <button id="boost" class="boost" type="button">
             <span class="boost-icon" data-icon="bolt"></span>
@@ -55,6 +56,15 @@
       </div>
       <section id="panel">
         <div id="sheet" class="sheet">
+        <div class="segments pane-seg two" data-group="build" role="tablist" aria-label="Build sections">
+          <button type="button" data-pane="build" aria-selected="true">Machines</button>
+          <button type="button" data-pane="upgrades" aria-selected="false">Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
+        </div>
+        <div class="segments pane-seg three" data-group="progress" role="tablist" aria-label="Progress sections" hidden>
+          <button type="button" data-pane="lab" aria-selected="true">Lab<span id="lab-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="cores" aria-selected="false">Cores<span id="cores-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="galaxy" aria-selected="false">Galaxy<span id="galaxy-dot" class="dot" hidden></span></button>
+        </div>
         <div id="tab-build" class="tab-body">
           <div id="challenge-line" class="challenge-line" hidden><span data-icon="trophy"></span><span>Challenge: <b id="challenge-line-name"></b></span><div class="bar"><i id="challenge-line-bar"></i></div><b id="challenge-line-pct"></b></div>
           <ul class="list claw-list">
@@ -77,6 +87,7 @@
           </div>
           <ul id="gen-list" class="list"></ul>
           <p id="gen-hint" class="hint">Build more to discover new machines.</p>
+          <p class="hold-hint">Tip: press and hold a machine on the station to see it up close.</p>
         </div>
         <div id="tab-upgrades" class="tab-body" hidden>
           <ul id="upgrade-list" class="list"></ul>
@@ -126,21 +137,21 @@
               </div>
             </div>
           </div>
-          <div id="galaxy-card" class="galaxy-card"></div>
-          <h3 id="star-map-title" class="section-title" hidden>Star Map</h3>
-          <ul id="star-map" class="list challenge-list" hidden></ul>
           <h3 class="section-title">Challenge runs</h3>
           <ul id="challenge-list" class="list challenge-list"></ul>
           <h3 class="section-title">Core perks</h3>
           <ul id="perk-list" class="list"></ul>
         </div>
+        <div id="tab-galaxy" class="tab-body" hidden>
+          <div id="galaxy-card" class="galaxy-card"></div>
+          <h3 id="star-map-title" class="section-title" hidden>Star Map</h3>
+          <ul id="star-map" class="list challenge-list" hidden></ul>
+        </div>
         <div id="tab-station" class="tab-body" hidden>
-          <div class="segments" role="tablist" aria-label="Station sections">
+          <div class="segments three" role="tablist" aria-label="Station sections">
             <button type="button" data-seg="modules" aria-selected="true">Rooms</button>
             <button type="button" data-seg="decor" aria-selected="false">Decor</button>
             <button type="button" data-seg="awards" aria-selected="false">Book</button>
-            <button type="button" data-seg="stats" aria-selected="false">Stats</button>
-            <button type="button" data-seg="settings" aria-selected="false">Settings</button>
           </div>
           <div id="seg-modules" class="seg">
             <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
@@ -167,14 +178,42 @@
             <h3 class="section-title">Boss loot <span id="loot-sum" class="section-sub"></span></h3>
             <p class="tab-intro">Boss wrecks sometimes drop a rare part or pet skin. Parts work for good; skins are worn from the Pets list.</p>
             <ul id="loot-grid" class="loot-grid"></ul>
-          </div>
-          <div id="seg-stats" class="seg" hidden>
+            <h3 class="section-title">Stats</h3>
             <dl id="stats" class="stats"></dl>
           </div>
-          <div id="seg-settings" class="seg settings" hidden>
-            <label class="toggle"><input id="opt-sound" type="checkbox" /><span>Sound effects</span></label>
-            <label class="toggle"><input id="opt-music" type="checkbox" /><span>Music</span></label>
+        </div>
+        </div>
+        <nav class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build<span id="build-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="crew" aria-selected="false" type="button"><span data-icon="crew"></span>Crew<span id="crew-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="progress" aria-selected="false" type="button"><span data-icon="core"></span>Progress<span id="progress-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station<span id="station-dot" class="dot" hidden></span></button>
+        </nav>
+      </section>
+    </div>
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-art" data-icon="scrap"></div>
+        <div class="eyebrow">While you were away</div>
+        <h2 id="modal-title">Your crew kept salvaging</h2>
+        <div id="modal-amount" class="modal-amount">+0</div>
+        <p id="modal-time" class="modal-time"></p>
+        <ul id="modal-report" class="modal-report"></ul>
+        <button id="modal-ok" class="primary" type="button">Collect</button>
+      </div>
+    </div>
+    <div id="settings" class="modal" hidden>
+      <div class="modal-card settings-card settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <button id="settings-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <h2 id="settings-title">Settings</h2>
+            <h3 class="section-title">Sound</h3>
+            <label class="slider-row"><span>Effects</span><input id="opt-sfx-vol" type="range" min="0" max="100" step="5" aria-label="Effects volume" /><b id="opt-sfx-val"></b></label>
+            <label class="slider-row"><span>Music</span><input id="opt-music-vol" type="range" min="0" max="100" step="5" aria-label="Music volume" /><b id="opt-music-val"></b></label>
+            <h3 class="section-title">Comfort</h3>
+            <label class="toggle"><input id="opt-flash" type="checkbox" /><span>Reduce flashing<small>Softer warps, glows and pops</small></span></label>
+            <label class="toggle"><input id="opt-shake" type="checkbox" /><span>Reduce screen shake<small>Keep the station still on big moments</small></span></label>
             <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration</span></label>
+            <h3 class="section-title">Game</h3>
             <label id="opt-auto-row" class="toggle" hidden><input id="opt-auto" type="checkbox" /><span>Auto-Builder</span></label>
             <div class="setting-row">
               <span>Numbers</span>
@@ -191,34 +230,13 @@
               <button id="reset-yes" type="button" class="danger">Erase</button>
               <button id="reset-no" type="button">Keep playing</button>
             </div>
-          </div>
-        </div>
-        </div>
-        <nav class="tabs" role="tablist">
-          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build</button>
-          <button class="tab" role="tab" data-tab="upgrades" aria-selected="false" type="button"><span data-icon="upgrades"></span>Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="crew" aria-selected="false" type="button"><span data-icon="crew"></span>Crew<span id="crew-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="lab" aria-selected="false" type="button"><span data-icon="lab"></span>Lab<span id="lab-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="cores" aria-selected="false" type="button"><span data-icon="core"></span>Cores<span id="cores-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station<span id="station-dot" class="dot" hidden></span></button>
-        </nav>
-      </section>
-    </div>
-    <div id="modal" class="modal" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="modal-art" data-icon="scrap"></div>
-        <div class="eyebrow">While you were away</div>
-        <h2 id="modal-title">Your crew kept salvaging</h2>
-        <div id="modal-amount" class="modal-amount">+0</div>
-        <p id="modal-time" class="modal-time"></p>
-        <ul id="modal-report" class="modal-report"></ul>
-        <button id="modal-ok" class="primary" type="button">Collect</button>
-      </div>
+                </div>
     </div>
     <div id="info" class="modal" hidden>
       <div class="modal-card info-card" role="dialog" aria-modal="true">
         <button id="info-close" class="close-btn" type="button" aria-label="Close">&times;</button>
         <div id="info-body"></div>
+        <button id="info-buy" class="buy info-buy" type="button" hidden><span id="info-buy-count" class="buy-count">Buy 1</span><span class="buy-cost"><span data-icon="scrap"></span><span id="info-buy-cost" class="n"></span></span></button>
       </div>
     </div>
     <div id="safe" class="modal" hidden>

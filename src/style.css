@@ -196,7 +196,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .gen .buy { -webkit-touch-callout: none; touch-action: manipulation; }
 .gen .buy.holding { animation: hold-pulse 0.35s ease-in-out infinite alternate; }
 @keyframes hold-pulse { to { filter: brightness(1.18); transform: scale(0.97); } }
-.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 6px 6px 8px; gap: 2px; }
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px 6px 8px; gap: 2px; }
 .tab {
   position: relative;
   display: flex;
@@ -938,8 +938,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 
 /* ---------- Trips, rooms, loot and golden scrap ---------- */
 .segments.three { grid-template-columns: repeat(3, 1fr); margin-bottom: 10px; }
-#tab-station .segments { grid-template-columns: repeat(5, 1fr); }
-#tab-station .segments button { font-size: 12.5px; }
 
 .module-total { margin: 0 4px 10px; font-size: 13px; font-weight: 600; color: var(--go); min-height: 1.3em; }
 .module-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 270px; margin: 0 auto 12px; }
@@ -1180,3 +1178,23 @@ button.gen-icon:active { transform: scale(0.94); }
 .tab[aria-selected='true'] [data-icon] { animation: tab-hop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
 @keyframes tab-hop { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-4px) scale(1.15); } 100% { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .gain-pop, #scrap.glow, .tab[aria-selected='true'] [data-icon] { animation: none; } }
+
+/* ---------- Comfort settings ---------- */
+.reduce-flash #scrap.glow, .reduce-flash .gen.flash::after, .reduce-flash .boss-edge, .reduce-flash .boss-alert-stripes, .reduce-flash .boss-alert-text small,
+.reduce-flash .golden-banner, .reduce-flash .boost[data-state='ready'], .reduce-flash .trip-slot.done, .reduce-flash .safe-dial.hit, .reduce-flash .coach-spot { animation: none; }
+.reduce-shake .boss-banner.hit, .reduce-shake .safe-dial.miss { animation: none; }
+
+/* ---------- Settings sheet ---------- */
+#settings-btn { padding: 9px; color: #cfd4ff; }
+#settings-btn svg { width: 100%; height: 100%; }
+.settings-card { justify-items: stretch; text-align: left; max-height: min(86vh, 720px); overflow-y: auto; }
+.settings-card h2 { margin: 0 0 4px; }
+.settings-card .section-title { margin: 16px 0 8px; }
+.slider-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 44px; gap: 10px; align-items: center; padding: 8px 2px; }
+.slider-row b { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-dim); }
+.slider-row input { width: 100%; accent-color: var(--accent); height: 28px; }
+.toggle small { display: block; font-size: 12px; color: var(--ink-dim); font-weight: 400; margin-top: 1px; }
+.pane-seg { margin-bottom: 12px; }
+.info-buy { width: 100%; margin-top: 14px; position: sticky; bottom: 0; min-height: 54px; }
+.hold-hint { margin: 10px 4px 0; font-size: 12.5px; color: var(--ink-dim); text-align: center; }
+@media (max-width: 340px) { .rate .info-dot { display: none; } }

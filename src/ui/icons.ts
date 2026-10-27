@@ -108,6 +108,7 @@ const RAW_ICONS = {
   check: svg(`<path d="M10 25l9 9 19-20" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
   clock: svg(`<circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" stroke-width="4"/><path d="M24 13v12l8 5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`),
   palette: svg(`<path d="M24 5C13 5 5 13 5 23c0 9 7 15 14 15 3 0 3-3 2-5s0-5 3-5h6c7 0 13-4 13-11C43 10 34 5 24 5z" fill="currentColor"/><circle cx="15" cy="20" r="3" fill="#ff6b9a"/><circle cx="22" cy="13" r="3" fill="#ffd166"/><circle cx="31" cy="14" r="3" fill="#4fe3c1"/><circle cx="35" cy="22" r="3" fill="#7aa7ff"/>`),
+  gear: svg(`<path d="M41.7 17.2 L43.0 23.5 L38.5 22.9 L36.9 30.5 L41.4 31.7 L37.8 37.1 L35.0 33.4 L28.5 37.8 L30.8 41.7 L24.5 43.0 L25.1 38.5 L17.5 36.9 L16.3 41.4 L10.9 37.8 L14.6 35.0 L10.2 28.5 L6.3 30.8 L5.0 24.5 L9.5 25.1 L11.1 17.5 L6.6 16.3 L10.2 10.9 L13.0 14.6 L19.5 10.2 L17.2 6.3 L23.5 5.0 L22.9 9.5 L30.5 11.1 L31.7 6.6 L37.1 10.2 L33.4 13.0 L37.8 19.5 Z" fill="currentColor"/><circle cx="24" cy="24" r="6" fill="#141838"/>`),
   lock: svg(`<rect x="11" y="21" width="26" height="20" rx="4" fill="currentColor"/><path d="M16 21v-5a8 8 0 0 1 16 0v5" fill="none" stroke="currentColor" stroke-width="4"/>`),
 };
 

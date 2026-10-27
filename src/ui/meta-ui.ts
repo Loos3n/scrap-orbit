@@ -1,4 +1,5 @@
 import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
+import { paneHint, paneTarget } from './panes';
 import { GENERATORS } from '../core/config';
 import { LOOT } from '../core/expansion';
 import * as eco from '../core/economy';
@@ -452,7 +453,6 @@ interface CoachStep {
   next?: string;
 }
 
-const TAB_NAMES: Record<string, string> = { build: 'Build', upgrades: 'Upgrades', crew: 'Crew', lab: 'Lab', cores: 'Cores', station: 'Station' };
 const MIKA = CREW.find((c) => c.id === 'mika')!;
 
 /** One-time tips for things that unlock after the tutorial. Each is seen once its tab is opened. */
@@ -545,7 +545,7 @@ export class Coach {
         };
       case 'upgradeTab':
         if ($('upgrade-dot').hidden) return { text: "Keep tapping and building. I'll shout when an upgrade is ready." };
-        return { text: 'An upgrade is ready! Open the Upgrades tab.', target: '.tab[data-tab="upgrades"]' };
+        return { text: `An upgrade is ready! ${paneHint('upgrades')}`, target: paneTarget('upgrades') };
       case 'upgrade':
         return {
           text: 'Upgrades make your machines much stronger. Install one!',
@@ -579,7 +579,7 @@ export class Coach {
     const dim = $('coach-dim');
     const s = this.game.state;
     const tip = this.tip();
-    let def = tip ? { text: tip.text, target: `.tab[data-tab="${tip.tab}"]`, next: 'Got it' } : this.step();
+    let def = tip ? { text: tip.text, target: paneTarget(tip.tab), next: 'Got it' } : this.step();
     // Never sit on top of a pop-up such as the welcome-back screen.
     const modalOpen = [...document.querySelectorAll<HTMLElement>('.modal')].some((m) => !m.hidden);
     if (!def || modalOpen) {
@@ -589,7 +589,7 @@ export class Coach {
     }
     // A target inside a closed tab: point at the tab first.
     const panelClosed = $('app').classList.contains('panel-closed');
-    if (def.tab && ($(`tab-${def.tab}`).hidden || panelClosed)) def = { text: `Open the ${TAB_NAMES[def.tab]} tab.`, target: `.tab[data-tab="${def.tab}"]` };
+    if (def.tab && ($(`tab-${def.tab}`).hidden || panelClosed)) def = { text: paneHint(def.tab), target: paneTarget(def.tab) };
     // A target in the hidden panel: ask for the panel back first.
     else if (panelClosed && def.target && !def.target.startsWith('@') && $('sheet').querySelector(def.target)) def = { text: 'Tap the highlighted tab to open the panel.', target: '.tab[aria-selected="true"]' };
     if (this.game.tutorialStep === 'upgradeTab' && !$('tab-upgrades').hidden) this.game.advanceTutorial('upgradeTab');

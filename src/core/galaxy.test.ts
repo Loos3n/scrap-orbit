@@ -57,3 +57,21 @@ describe('galaxy shift', () => {
     expect(back.galaxy.bestCores).toBe(60);
   });
 });
+
+describe('settings', () => {
+  it('turns old sound switches into volumes and keeps comfort options', () => {
+    const s = newState(NOW);
+    const old = JSON.parse(serialize(s));
+    old.settings = { sound: false, music: true, numbers: 'letters' };
+    const back = deserialize(JSON.stringify(old), NOW)!;
+    expect(back.settings.sfxVol).toBe(0);
+    expect(back.settings.sound).toBe(false);
+    expect(back.settings.musicVol).toBeGreaterThan(0);
+    back.settings.reduceShake = true;
+    back.settings.musicVol = 0.25;
+    const again = deserialize(serialize(back), NOW)!;
+    expect(again.settings.reduceShake).toBe(true);
+    expect(again.settings.reduceFlash).toBe(false);
+    expect(again.settings.musicVol).toBe(0.25);
+  });
+});

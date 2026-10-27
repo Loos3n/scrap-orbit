@@ -107,7 +107,21 @@ export interface GameState {
   boostReadyAt: number;
   /** Epoch ms of the last save, used for offline earnings. */
   lastSeen: number;
-  settings: { numbers: NumberStyle; haptics: boolean; sound: boolean; music: boolean; autoBuy: boolean };
+  /**
+   * Player settings. `sound` and `music` mirror whether each volume (0 to 1) is above zero;
+   * the comfort options calm down flashes and screen shake.
+   */
+  settings: {
+    numbers: NumberStyle;
+    haptics: boolean;
+    sound: boolean;
+    music: boolean;
+    sfxVol: number;
+    musicVol: number;
+    reduceFlash: boolean;
+    reduceShake: boolean;
+    autoBuy: boolean;
+  };
 }
 
 interface SaveData {
@@ -231,7 +245,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, autoBuy: true },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true },
   };
 }
 
@@ -436,5 +450,13 @@ export function deserialize(json: string | null, now: number): GameState | null 
   const { scientific, ...settings } = data.settings ?? {};
   state.settings = { ...state.settings, ...settings };
   if (scientific && !settings.numbers) state.settings.numbers = 'scientific';
+  // Saves from before the volume sliders: a switched-off sound stays silent.
+  const vol = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : fallback);
+  state.settings.sfxVol = vol(settings.sfxVol, settings.sound === false ? 0 : 0.8);
+  state.settings.musicVol = vol(settings.musicVol, settings.music === false ? 0 : 0.6);
+  state.settings.sound = state.settings.sfxVol > 0;
+  state.settings.music = state.settings.musicVol > 0;
+  state.settings.reduceFlash = settings.reduceFlash === true;
+  state.settings.reduceShake = settings.reduceShake === true;
   return state;
 }

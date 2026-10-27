@@ -13,6 +13,9 @@ import { SETS } from '../core/collection';
 import { BookPanel, SafeGame, SkinPanel } from './book-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
 import { GalaxyPanel } from './galaxy-ui';
+import { ALL_PANES, GROUPS, groupOf } from './panes';
+import * as meta from '../core/meta';
+import { STAR_NODES } from '../core/galaxy';
 import type { OfflineReport } from '../game';
 import { Coach, CrewPanel, DecorPanel, LabPanel, MissionsPanel, PetPanel, StreakModal, renderBossBanner, renderEventBanner } from './meta-ui';
 
@@ -27,6 +30,7 @@ const TAB_ACCENT: Record<string, string> = {
   lab: '#7aa7ff',
   cores: '#c58cff',
   station: '#ff7bb0',
+  galaxy: '#ffe9a8',
 };
 
 /** Fills every `data-icon="name"` placeholder in the static HTML. */
@@ -111,7 +115,8 @@ export class UI {
   readonly streak: StreakModal;
 
   /** Called when the sound or music setting changes, so main can update the synth. */
-  onSoundChange: ((sound: boolean, music: boolean) => void) | null = null;
+  onSoundChange: ((sfx: number, music: number) => void) | null = null;
+  onComfortChange: ((reduceFlash: boolean, reduceShake: boolean) => void) | null = null;
   /** Called after the player confirms a relocation. */
   onRelocate: (() => void) | null = null;
 
@@ -201,15 +206,27 @@ export class UI {
     );
   }
 
-  private openTab(name: string): void {
-    document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => {
-      const on = t.dataset.tab === name;
-      t.setAttribute('aria-selected', String(on));
-      $(`tab-${t.dataset.tab}`).hidden = !on;
+  /** The pane each tab showed last, so a tab reopens where the player left it. */
+  private lastPane: Record<string, string> = {};
+
+  /** Opens a bottom-bar tab at the pane it showed last. */
+  private openTab(group: string): void {
+    this.openPane(this.lastPane[group] ?? GROUPS[group][0]);
+  }
+
+  /** Opens one pane, and the tab that holds it. */
+  private openPane(pane: string): void {
+    const group = groupOf(pane);
+    this.lastPane[group] = pane;
+    document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === group)));
+    for (const p of ALL_PANES) $(`tab-${p}`).hidden = p !== pane;
+    document.querySelectorAll<HTMLElement>('.pane-seg').forEach((bar) => {
+      bar.hidden = bar.dataset.group !== group;
+      bar.querySelectorAll<HTMLButtonElement>('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
     });
-    if (TAB_ACCENT[name]) $('app').style.setProperty('--accent', TAB_ACCENT[name]);
+    if (TAB_ACCENT[pane]) $('app').style.setProperty('--accent', TAB_ACCENT[pane]);
     this.panel.set(true);
-    this.coach.tabOpened(name);
+    this.coach.tabOpened(pane);
     this.render();
   }
 
@@ -225,14 +242,25 @@ export class UI {
     );
   }
 
+  /** The machine sheet, for a machine held down on the station. */
+  openMachine(id: GeneratorId): void {
+    this.info.open({ kind: 'machine', id });
+  }
+
+  /** The trader's deals, for a tap on the docked ship. */
+  openTrader(): void {
+    if (!$('trader-banner').hidden) this.trader.open();
+  }
+
   /** Opens a panel tab from code (the tutorial uses it). */
   showTab(name: string): void {
-    this.openTab(name);
+    this.openPane(name);
   }
 
   private bindSegments(): void {
+    document.querySelectorAll<HTMLButtonElement>('.pane-seg button').forEach((b) => b.addEventListener('click', () => this.openPane(b.dataset.pane!)));
     // Each tab's segment bar switches only its own sections.
-    document.querySelectorAll<HTMLButtonElement>('.segments button').forEach((b) =>
+    document.querySelectorAll<HTMLButtonElement>('.segments:not(.pane-seg) button').forEach((b) =>
       b.addEventListener('click', () => {
         b.parentElement!.querySelectorAll<HTMLButtonElement>('button').forEach((x) => {
           x.setAttribute('aria-selected', String(x === b));
@@ -280,20 +308,43 @@ export class UI {
   private bindSettings(): void {
     const settings = () => this.game.state.settings;
     const hap = $<HTMLInputElement>('opt-haptics');
-    const snd = $<HTMLInputElement>('opt-sound');
-    const mus = $<HTMLInputElement>('opt-music');
+    const sfxVol = $<HTMLInputElement>('opt-sfx-vol');
+    const musVol = $<HTMLInputElement>('opt-music-vol');
+    const flash = $<HTMLInputElement>('opt-flash');
+    const shake = $<HTMLInputElement>('opt-shake');
     const auto = $<HTMLInputElement>('opt-auto');
     const nums = document.querySelectorAll<HTMLButtonElement>('#opt-numbers button');
+    const pct = (v: number) => (v > 0 ? `${Math.round(v * 100)}%` : 'Off');
     const sync = () => {
-      auto.checked = settings().autoBuy;
-      hap.checked = settings().haptics;
-      snd.checked = settings().sound;
-      mus.checked = settings().music;
-      nums.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.num === settings().numbers)));
-      this.onSoundChange?.(settings().sound, settings().music);
+      const o = settings();
+      auto.checked = o.autoBuy;
+      hap.checked = o.haptics;
+      sfxVol.value = String(Math.round(o.sfxVol * 100));
+      musVol.value = String(Math.round(o.musicVol * 100));
+      setText($('opt-sfx-val'), pct(o.sfxVol));
+      setText($('opt-music-val'), pct(o.musicVol));
+      flash.checked = o.reduceFlash;
+      shake.checked = o.reduceShake;
+      document.body.classList.toggle('reduce-flash', o.reduceFlash);
+      document.body.classList.toggle('reduce-shake', o.reduceShake);
+      nums.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.num === o.numbers)));
+      this.onSoundChange?.(o.sfxVol, o.musicVol);
+      this.onComfortChange?.(o.reduceFlash, o.reduceShake);
     };
     this.syncSettings = sync;
     sync();
+    $('settings-btn').addEventListener('click', () => {
+      sync();
+      $('settings').hidden = false;
+    });
+    const closeSettings = () => {
+      $('settings').hidden = true;
+      $('reset-confirm').hidden = true;
+    };
+    $('settings-close').addEventListener('click', closeSettings);
+    $('settings').addEventListener('click', (e) => {
+      if (e.target === $('settings')) closeSettings();
+    });
     nums.forEach((b) =>
       b.addEventListener('click', () => {
         settings().numbers = b.dataset.num as NumberStyle;
@@ -304,15 +355,24 @@ export class UI {
     );
     hap.addEventListener('change', () => (settings().haptics = hap.checked));
     auto.addEventListener('change', () => (settings().autoBuy = auto.checked));
-    snd.addEventListener('change', () => {
-      settings().sound = snd.checked;
+    const volume = (input: HTMLInputElement, key: 'sfxVol' | 'musicVol', flag: 'sound' | 'music') =>
+      input.addEventListener('input', () => {
+        settings()[key] = Number(input.value) / 100;
+        settings()[flag] = settings()[key] > 0;
+        sync();
+      });
+    volume(sfxVol, 'sfxVol', 'sound');
+    volume(musVol, 'musicVol', 'music');
+    flash.addEventListener('change', () => {
+      settings().reduceFlash = flash.checked;
       sync();
     });
-    mus.addEventListener('change', () => {
-      settings().music = mus.checked;
+    shake.addEventListener('change', () => {
+      settings().reduceShake = shake.checked;
       sync();
     });
     $('replay-tutorial').addEventListener('click', () => {
+      closeSettings();
       this.game.state.tutorial = 0;
       this.showTab('build');
     });
@@ -432,6 +492,10 @@ export class UI {
       else this.pets.render();
     }
     if (!$('tab-lab').hidden) this.lab.render();
+    // Tab dots gather their panes' dots.
+    $('build-dot').hidden = $('upgrade-dot').hidden;
+    $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
+    $('progress-dot').hidden = $('lab-dot').hidden && $('cores-dot').hidden && $('galaxy-dot').hidden;
     if (!$('tab-station').hidden) {
       if (!$('seg-decor').hidden) {
         this.decor.render();
@@ -441,8 +505,8 @@ export class UI {
       if (!$('seg-awards').hidden) {
         this.lootShelf.render();
         this.book.render();
+        this.renderStats(now);
       }
-      this.renderStats(now);
     }
     this.missions.render();
     renderEventBanner(this.game);
