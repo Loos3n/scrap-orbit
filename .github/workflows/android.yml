@@ -17,17 +17,18 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      # ubuntu-latest already has the Android SDK (ANDROID_HOME); Gradle fetches any
+      # missing platform or build tools itself.
       - run: npm ci
       - run: npm run build
       - run: npx cap sync android
