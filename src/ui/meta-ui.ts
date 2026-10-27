@@ -562,7 +562,7 @@ export class Coach {
       case 'missions':
         return { text: 'Your mission board has daily goals that pay crystals. Have a look.', target: '#missions-btn' };
       case 'panel':
-        return { text: 'Tap the open tab again to hide this panel and see your whole station. Any tab brings it back.', target: '.tab[aria-selected="true"]' };
+        return { text: 'Tap this square to hide the menu and see your whole station. Tap it again to bring the menu back.', target: '#menu-btn' };
       case 'done':
         return {
           text: "That's the basics, captain! Crew, research and new sectors open up as you go. I'll pop by when there's something new.",
@@ -591,7 +591,7 @@ export class Coach {
     const panelClosed = $('app').classList.contains('panel-closed');
     if (def.tab && ($(`tab-${def.tab}`).hidden || panelClosed)) def = { text: paneHint(def.tab), target: paneTarget(def.tab) };
     // A target in the hidden panel: ask for the panel back first.
-    else if (panelClosed && def.target && !def.target.startsWith('@') && $('sheet').querySelector(def.target)) def = { text: 'Tap the highlighted tab to open the panel.', target: '.tab[aria-selected="true"]' };
+    else if (panelClosed && def.target && !def.target.startsWith('@') && $('panel').querySelector(def.target)) def = { text: 'Tap the menu square to open the menu.', target: '#menu-btn' };
     if (this.game.tutorialStep === 'upgradeTab' && !$('tab-upgrades').hidden) this.game.advanceTutorial('upgradeTab');
 
     // '@crate' follows the drifting crate rather than an element.

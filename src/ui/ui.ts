@@ -194,7 +194,17 @@ export class UI {
   }
 
   private bindTabs(): void {
-    this.panel = makePanelToggle($('app'), document.querySelector<HTMLElement>('.tabs')!, $('hud'));
+    this.panel = makePanelToggle($('app'), document.querySelector<HTMLElement>('.tabs')!, $('hud'), $('menu-btn'));
+    // The square: one tap opens the menu where it was left, the next tap hides it.
+    $('menu-btn').addEventListener('click', () => {
+      if (this.panel.open) {
+        this.panel.set(false);
+        this.coach.panelHidden();
+      } else {
+        const tab = document.querySelector<HTMLButtonElement>('.tab[aria-selected="true"]');
+        this.openTab(tab?.dataset.tab ?? 'build');
+      }
+    });
     document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) =>
       tab.addEventListener('click', () => {
         // One tap does it all: the open tab hides the panel, any other tab opens it.
@@ -496,6 +506,8 @@ export class UI {
     $('build-dot').hidden = $('upgrade-dot').hidden;
     $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
     $('progress-dot').hidden = $('lab-dot').hidden && $('cores-dot').hidden && $('galaxy-dot').hidden;
+    // With the menu hidden, the square carries a dot when any tab has something new.
+    $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'progress-dot', 'station-dot'].every((id) => $(id).hidden);
     if (!$('tab-station').hidden) {
       if (!$('seg-decor').hidden) {
         this.decor.render();

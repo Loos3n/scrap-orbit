@@ -55,6 +55,12 @@
         </div>
       </div>
       <section id="panel">
+        <nav class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build<span id="build-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="crew" aria-selected="false" type="button"><span data-icon="crew"></span>Crew<span id="crew-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="progress" aria-selected="false" type="button"><span data-icon="core"></span>Progress<span id="progress-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station<span id="station-dot" class="dot" hidden></span></button>
+        </nav>
         <div id="sheet" class="sheet">
         <div class="segments pane-seg two" data-group="build" role="tablist" aria-label="Build sections">
           <button type="button" data-pane="build" aria-selected="true">Machines</button>
@@ -183,13 +189,8 @@
           </div>
         </div>
         </div>
-        <nav class="tabs" role="tablist">
-          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build<span id="build-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="crew" aria-selected="false" type="button"><span data-icon="crew"></span>Crew<span id="crew-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="progress" aria-selected="false" type="button"><span data-icon="core"></span>Progress<span id="progress-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station<span id="station-dot" class="dot" hidden></span></button>
-        </nav>
       </section>
+      <button id="menu-btn" class="menu-btn" type="button" aria-label="Menu" aria-expanded="false"><span class="menu-grid"><i></i><i></i><i></i><i></i></span><span class="menu-close"></span><span id="menu-dot" class="menu-dot" hidden></span></button>
     </div>
     <div id="modal" class="modal" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">

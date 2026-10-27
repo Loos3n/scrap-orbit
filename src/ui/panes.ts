@@ -1,5 +1,5 @@
 /*
- * The panel has four tabs in the bottom bar. Some tabs hold more than one pane, picked from a
+ * The menu has four tabs along its top. Some tabs hold more than one pane, picked from a
  * segment bar at the top of the sheet: Build has Machines and Upgrades, Progress has the Lab,
  * Star Cores and the Galaxy. Each pane keeps its own `tab-<pane>` element.
  */
@@ -26,8 +26,11 @@ function groupOpen(group: string): boolean {
   return tab?.getAttribute('aria-selected') === 'true' && !document.getElementById('app')!.classList.contains('panel-closed');
 }
 
-/** What to point at to reach a pane: its segment button once its tab is open, otherwise the tab. */
+const menuHidden = () => document.getElementById('app')!.classList.contains('panel-closed');
+
+/** What to point at to reach a pane: the menu square while the menu is hidden, then its tab, then its segment button. */
 export function paneTarget(pane: string): string {
+  if (menuHidden()) return '#menu-btn';
   const group = groupOf(pane);
   return groupOpen(group) && GROUPS[group].length > 1 ? `.pane-seg button[data-pane="${pane}"]` : `.tab[data-tab="${group}"]`;
 }
@@ -35,6 +38,7 @@ export function paneTarget(pane: string): string {
 /** How to ask the player to open a pane. */
 export function paneHint(pane: string): string {
   const group = groupOf(pane);
+  if (menuHidden()) return GROUPS[group].length === 1 || group === 'build' && pane === 'build' ? `Tap the menu square, then ${GROUP_NAMES[group]}.` : `Tap the menu square, then ${GROUP_NAMES[group]} and ${PANE_NAMES[pane]}.`;
   if (GROUPS[group].length === 1) return `Open the ${GROUP_NAMES[group]} tab.`;
   return groupOpen(group) ? `Tap ${PANE_NAMES[pane]} at the top.` : `Open the ${GROUP_NAMES[group]} tab, then ${PANE_NAMES[pane]}.`;
 }

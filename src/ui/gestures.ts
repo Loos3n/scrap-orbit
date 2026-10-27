@@ -4,8 +4,8 @@
  */
 
 const PANEL_KEY = 'scrap-orbit-panel';
-/** The open panel's height, as a fraction of the space between the HUD and the bottom of the screen. */
-const OPEN = 0.58;
+/** The open menu's height, as a fraction of the screen. */
+const OPEN = 0.5;
 
 function loadOpen(): boolean {
   try {
@@ -29,22 +29,23 @@ export interface PanelToggle {
 }
 
 /**
- * The panel is either open at one size or hidden, and only the tabs change it: no dragging (the
- * apps that host the game grab vertical swipes) and no extra buttons.
+ * The menu is either hidden, leaving just a small square button over the station, or open edge
+ * to edge across the bottom half of the screen with its tabs along the top. The square toggles it
+ * and rides along on the right of the tab row. No dragging: the apps that host the game grab
+ * vertical swipes.
  */
-export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLElement): PanelToggle {
+export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLElement, button: HTMLElement): PanelToggle {
   let open = loadOpen();
-  const height = () => {
-    const min = tabs.offsetHeight + 2;
-    if (!open) return min;
-    const max = Math.max(min, app.clientHeight - hud.offsetHeight - 120);
-    return min + (max - min) * OPEN;
-  };
+  const height = () => (open ? Math.max(tabs.offsetHeight + 160, Math.min(app.clientHeight * OPEN, app.clientHeight - hud.offsetHeight - 120)) : 0);
   // Set the row sizes directly: some web views mishandle var() fallbacks inside grid templates.
   const apply = (animate: boolean) => {
     app.classList.toggle('snapping', animate);
     app.classList.toggle('panel-closed', !open);
-    app.style.gridTemplateRows = `auto minmax(120px, 1fr) ${Math.round(height())}px`;
+    const h = Math.round(height());
+    app.style.gridTemplateRows = `auto minmax(120px, 1fr) ${h}px`;
+    // Open, the square sits at the right end of the tab row; closed, in the bottom corner.
+    button.style.bottom = open ? `${Math.round(h - tabs.offsetHeight + (tabs.offsetHeight - button.offsetHeight) / 2)}px` : '';
+    button.setAttribute('aria-expanded', String(open));
     if (animate) setTimeout(() => app.classList.remove('snapping'), 260);
   };
   apply(false);

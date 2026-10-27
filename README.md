@@ -39,7 +39,7 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
 - Ambient generative music, three number formats and a full stats screen (collection and adventure records too)
-- One-tap panel: four tabs sit at the bottom (Build, Crew, Progress, Station); tap a tab to open its card and tap it again to hide it. Build holds Machines and Upgrades, Progress holds the Lab, Star Cores and the Galaxy, and each tab reopens where you left it
+- Menu square: a small square in the bottom corner opens the menu edge to edge across the bottom half of the screen, with four tabs along its top (Build, Crew, Progress, Station). The square moves to the end of the tab row; tap it again to hide the menu and see the whole station. Build holds Machines and Upgrades, Progress holds the Lab, Star Cores and the Galaxy, and each tab reopens where you left it
 - On the station: press and hold any machine to open its sheet and build more right there; tap the docked trader's ship for its deals
 - Settings (gear button): separate effects and music volume, plus comfort options to reduce flashing and screen shake
 - Info sheets: tap a machine's icon for its story, output, share of income and every multiplier; tap the income line for a full breakdown of where scrap comes from
