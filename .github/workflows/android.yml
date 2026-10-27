@@ -1,0 +1,52 @@
+name: Android
+
+# Builds an installable test APK on every push and attaches it to a new release,
+# so the newest build is always at https://github.com/<owner>/<repo>/releases/latest
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk scrap-orbit.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scrap-orbit-apk
+          path: scrap-orbit.apk
+      - name: Attach the APK to a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-${{ github.run_number }}" scrap-orbit.apk \
+            --target "$GITHUB_SHA" \
+            --title "Android test build ${{ github.run_number }}" \
+            --notes "Test build from \`${GITHUB_REF_NAME}\` (${GITHUB_SHA::7}). On your Android phone, tap scrap-orbit.apk below, open the download and allow installs from your browser if asked. New builds install over the old one and keep your save."
