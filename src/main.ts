@@ -516,7 +516,7 @@ async function boot(): Promise<void> {
   // only becomes a drag once it has moved, so taps and holds work as before.
   let drag: { id: number; x: number; y: number; moving: boolean } | null = null;
   const DRAG_START = 10;
-  // Two fingers pinch to zoom. The zoom stays when they lift; the view still glides back
+  // Two fingers pinch to zoom the station. The zoom stays when they lift; the view still glides back
   // to the middle like after a drag. A mouse wheel does the same on a computer.
   const fingers = new Map<number, { x: number; y: number }>();
   let pinch: { a: number; b: number } | null = null;
@@ -533,9 +533,12 @@ async function boot(): Promise<void> {
     scene.panEnd();
     keepZoom();
   };
+  // Zooming is for the full station screen, so it is off while the menu is up.
+  const menuBtn = document.getElementById('menu-btn')!;
+  const menuOpen = () => menuBtn.getAttribute('aria-expanded') === 'true';
   sceneEl.addEventListener('pointerdown', (ev) => {
     fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-    if (pinch || fingers.size !== 2) return;
+    if (pinch || fingers.size !== 2 || menuOpen()) return;
     const [a, b] = [...fingers.keys()];
     pinch = { a, b };
     cancelHold();
@@ -563,6 +566,7 @@ async function boot(): Promise<void> {
     'wheel',
     (ev) => {
       ev.preventDefault();
+      if (menuOpen()) return;
       const rect = sceneEl.getBoundingClientRect();
       scene.zoomAt(Math.exp(-ev.deltaY * 0.0015), ev.clientX - rect.left, ev.clientY - rect.top);
       clearTimeout(wheelDone);
