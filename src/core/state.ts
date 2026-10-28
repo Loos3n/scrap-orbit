@@ -124,6 +124,8 @@ export interface GameState {
     reduceFlash: boolean;
     reduceShake: boolean;
     autoBuy: boolean;
+    /** How far the player has pinched the station view in (1 = normal). */
+    viewZoom: number;
   };
 }
 
@@ -250,7 +252,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1 },
   };
 }
 
@@ -467,5 +469,6 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.settings.music = state.settings.musicVol > 0;
   state.settings.reduceFlash = settings.reduceFlash === true;
   state.settings.reduceShake = settings.reduceShake === true;
+  state.settings.viewZoom = typeof settings.viewZoom === 'number' && Number.isFinite(settings.viewZoom) ? settings.viewZoom : 1;
   return state;
 }

@@ -4,6 +4,10 @@ import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } fr
 import type { SkinDef } from '../core/collection';
 import * as art from './art';
 
+/** How far the player can pinch the view out and in. */
+const VIEW_ZOOM_MIN = 0.7;
+const VIEW_ZOOM_MAX = 2.2;
+
 /** Size of the world in scene units; the scene scales this to fit the viewport. */
 const WORLD = 380;
 const TAU = Math.PI * 2;
@@ -181,6 +185,8 @@ export class StationScene {
   private baseScale = 1;
   private zoom = 1;
   private zoomTarget = 1;
+  /** The player's own pinch zoom on top of the automatic one (above 1 = closer). */
+  private viewZoom = 1;
   private crateRate = 1;
   private event: EventKind | null = null;
   private nextMeteor = 0;
@@ -588,7 +594,7 @@ export class StationScene {
     const bottom = this.focus.bottom > this.focus.top ? this.focus.bottom : h;
     const fh = bottom - top;
     this.baseScale = Math.min(w, fh * 1.08) / WORLD;
-    this.scale = this.baseScale / this.zoom;
+    this.scale = (this.baseScale * this.viewZoom) / this.zoom;
     this.home.world = { x: w / 2, y: top + fh / 2 };
     this.world.scale.set(this.scale);
 
@@ -861,7 +867,41 @@ export class StationScene {
   private panLimit(): { x: number; y: number } {
     const { width: w, height: h } = this.app.screen;
     const fh = this.focus.bottom > this.focus.top ? this.focus.bottom - this.focus.top : h;
-    return { x: Math.min(w * 0.2, 110), y: Math.min(fh * 0.15, 90) };
+    // Zoomed in, the station is bigger than the screen, so let the view travel further.
+    const k = Math.max(1, this.viewZoom);
+    return { x: Math.min(w * 0.2, 110) * k, y: Math.min(fh * 0.15, 90) * k };
+  }
+
+  /** The player's pinch zoom, kept between visits. */
+  getViewZoom(): number {
+    return this.viewZoom;
+  }
+
+  setViewZoom(z: number): void {
+    this.viewZoom = Math.max(VIEW_ZOOM_MIN, Math.min(VIEW_ZOOM_MAX, z));
+    if (!this.ready) return;
+    this.scale = (this.baseScale * this.viewZoom) / this.zoom;
+    this.world.scale.set(this.scale);
+  }
+
+  /**
+   * Zoom by `factor` around a point on screen (a pinch's middle, or the mouse), so the spot
+   * under the fingers stays put. The view keeps the zoom; letting go only re-centers it.
+   */
+  zoomAt(factor: number, sx: number, sy: number): void {
+    if (!this.ready) return;
+    const before = this.scale;
+    this.setViewZoom(this.viewZoom * factor);
+    const k = this.scale / before;
+    if (k === 1) return;
+    if (!this.panning) this.panRaw = { ...this.pan };
+    this.panning = true;
+    // Keep the point under (sx, sy) fixed: the station's middle moves away from it by k.
+    const cx = this.home.world.x + this.panRaw.x;
+    const cy = this.home.world.y + this.panRaw.y;
+    this.panRaw = { x: sx + (cx - sx) * k - this.home.world.x, y: sy + (cy - sy) * k - this.home.world.y };
+    this.pan = { ...this.panRaw };
+    this.placePan();
   }
 
   /** Drag the view by a finger's movement. Past the limit it stretches, like a rubber band. */
@@ -1388,7 +1428,7 @@ export class StationScene {
     const speed = 1 + Math.min(1, this.warp) * 1.4;
     if (Math.abs(this.zoom - this.zoomTarget) > 0.0005) {
       this.zoom += (this.zoomTarget - this.zoom) * Math.min(1, dt * 1.5);
-      this.scale = this.baseScale / this.zoom;
+      this.scale = (this.baseScale * this.viewZoom) / this.zoom;
       this.world.scale.set(this.scale);
     }
     this.flare += ((this.event === 'flare' ? 1 : 0) - this.flare) * Math.min(1, dt * 2);
