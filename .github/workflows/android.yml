@@ -1,9 +1,9 @@
 name: Android
 
-# Builds an installable test APK on every push and attaches it to a new release,
-# so the newest build is always at https://github.com/<owner>/<repo>/releases/latest
+# Builds an installable test APK and attaches it to a new release, so the newest
+# build is always at https://github.com/<owner>/<repo>/releases/latest
+# Runs only when started by hand (Actions > Android > Run workflow).
 on:
-  push:
   workflow_dispatch:
 
 concurrency:

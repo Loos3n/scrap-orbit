@@ -5,8 +5,9 @@ The game is a web app wrapped as a native app with [Capacitor](https://capacitor
 
 ## Android
 
-Every push builds a test APK on GitHub Actions (`.github/workflows/android.yml`) and
-attaches it to a new release. The newest one is always at **Releases > Latest**.
+A test APK is built on GitHub Actions (`.github/workflows/android.yml`) when the workflow
+is started by hand (Actions > Android > Run workflow), and attached to a new release.
+The newest one is always at **Releases > Latest**.
 
 To install it, open the release on the phone, tap `scrap-orbit.apk`, open the download and
 allow installs from the browser when Android asks. Test builds are signed with the public
