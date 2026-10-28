@@ -9,7 +9,7 @@ const WORLD = 380;
 const TAU = Math.PI * 2;
 const DOCK_RADIUS = 160;
 const CLAW_TIP = { x: 0, y: -104 };
-/** Where a boss wreck parks: up and to the left, behind the station. */
+/** Where a boss wreck arrives: up and to the left, behind the station. From there it roams across the top. */
 const BOSS_POS = { x: -92, y: -132 };
 const BOSS_SCALE = 0.78;
 
@@ -119,7 +119,7 @@ export class StationScene {
   private dustLayer = new Container();
   private dust: { s: Sprite; depth: number; phase: number; vx: number; vy: number }[] = [];
   private bossLayer = new Container();
-  private boss: { c: Container; hull: Sprite; cracks: Sprite; glow: Sprite; bar: Graphics; shown: number; state: 'in' | 'here' | 'out' | 'dead'; t: number; hit: number; health: number } | null = null;
+  private boss: { c: Container; hull: Sprite; cracks: Sprite; glow: Sprite; bar: Graphics; shown: number; state: 'in' | 'here' | 'out' | 'dead'; t: number; hit: number; health: number; roam: number; lean: number } | null = null;
   private beams: { x: number; y: number; life: number }[] = [];
   private pet: { s: Sprite; id: PetId; angle: number; pounce: number } | null = null;
   private claw!: Sprite;
@@ -1196,7 +1196,7 @@ export class StationScene {
     c.scale.set(BOSS_SCALE);
     c.position.set(-WORLD, BOSS_POS.y);
     this.bossLayer.addChild(c);
-    this.boss = { c, hull, cracks, glow, bar, shown: -1, state: 'in', t: 0, hit: 0, health: 1 };
+    this.boss = { c, hull, cracks, glow, bar, shown: -1, state: 'in', t: 0, hit: 0, health: 1, roam: 0, lean: 0 };
   }
 
   /** The health bar floating over the wreck; the red part eases down after each hit. */
@@ -1257,6 +1257,20 @@ export class StationScene {
     }
   }
 
+  /**
+   * Once parked, the wreck roams the top of the view on a slow looping path that starts where it
+   * arrived, swinging from the left edge to the right and back. Taps hit it wherever it is.
+   */
+  private roamBoss(b: NonNullable<StationScene['boss']>, dt: number): void {
+    b.roam += dt;
+    const w = b.roam;
+    const ramp = Math.min(1, w / 1.5);
+    b.c.x = BOSS_POS.x * Math.cos(w * 0.42) + Math.sin(w * 1.05) * 10 * ramp;
+    b.c.y = BOSS_POS.y + Math.sin(w * 0.77) * 16 * ramp + Math.sin(this.time * 0.7) * 4;
+    // A hit knocks it back a little.
+    b.c.y -= b.hit * 3;
+  }
+
   private updateBoss(dt: number): void {
     const b = this.boss;
     if (b) {
@@ -1273,8 +1287,13 @@ export class StationScene {
         b.c.alpha = Math.max(0, 1 - b.t * 2.5);
         b.c.scale.set(BOSS_SCALE * (1 + b.t * 0.3));
       }
-      if (b.state !== 'out' && b.state !== 'dead') b.c.y = BOSS_POS.y + Math.sin(this.time * 0.7) * 4;
-      b.c.rotation = Math.sin(this.time * 0.4) * 0.03 + (b.hit ? rand(-0.012, 0.012) : 0);
+      const px = b.c.x;
+      if (b.state === 'here') this.roamBoss(b, dt);
+      else if (b.state === 'in') b.c.y = BOSS_POS.y + Math.sin(this.time * 0.7) * 4;
+      // Tilt into the direction of travel.
+      const vx = dt > 0 ? (b.c.x - px) / dt : 0;
+      b.lean += (Math.max(-0.08, Math.min(0.08, vx * 0.0012)) - b.lean) * Math.min(1, dt * 3);
+      b.c.rotation = b.lean + Math.sin(this.time * 0.4) * 0.03 + (b.hit ? rand(-0.012, 0.012) : 0);
       b.hull.tint = b.hit > 0.5 ? 0xffd6c0 : 0xffffff;
       b.cracks.alpha = (1 - b.health) * (0.7 + 0.3 * Math.sin(this.time * 6));
       this.drawBossBar(b, dt);
