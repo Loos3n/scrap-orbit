@@ -26,6 +26,7 @@ import { galaxyText } from './ui/galaxy-ui';
 import { tradeText } from './ui/trade-ui';
 import { UI } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
+import { blockPageZoom } from './ui/nozoom';
 import { ORNAMENTS } from './core/ornaments';
 
 /**
@@ -65,6 +66,7 @@ function showSectorCard(relocations: number, galaxy = 0): void {
 const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
 async function boot(): Promise<void> {
+  blockPageZoom();
   const game = new Game();
   /** The tint of the skin the active pet wears, if any. */
   const petTint = () => {
