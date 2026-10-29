@@ -11,7 +11,9 @@ import * as meta from './core/meta';
 import * as eco from './core/economy';
 import { D, format } from './core/num';
 import { Game } from './game';
+import * as art from './scene/art';
 import { StationScene } from './scene/station';
+import { timeStretch } from './core/sectors';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
@@ -48,12 +50,17 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
 function showSectorCard(relocations: number, galaxy = 0): void {
   const card = document.getElementById('sector-card')!;
   document.getElementById('sector-num')!.textContent = galaxy ? `Galaxy ${galaxy} · Sector ${relocations + 1}` : `Sector ${relocations + 1}`;
-  document.getElementById('sector-name')!.textContent = sectorFor(relocations).name;
+  const sector = sectorFor(relocations);
+  document.getElementById('sector-name')!.textContent = sector.name;
+  const sub = document.getElementById('sector-sub')!;
+  sub.className = sector.twist ? 'sector-twist' : '';
+  sub.innerHTML = sector.twist ? `<b>${sector.twist.name}:</b> ${sector.twist.text}` : 'New sector reached';
   card.hidden = false;
   card.style.animation = 'none';
   void card.offsetWidth;
   card.style.animation = '';
-  window.setTimeout(() => (card.hidden = true), 4000);
+  card.style.animationDuration = sector.twist ? '6.5s' : '';
+  window.setTimeout(() => (card.hidden = true), sector.twist ? 6500 : 4000);
 }
 
 const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -229,6 +236,14 @@ async function boot(): Promise<void> {
         buzz(15);
         syncPerks();
         break;
+      case 'rig': {
+        const sector = sectorFor(game.state.stats.relocations);
+        scene.setRig(true, true);
+        fanfare.cheer({ icon: `<img src="${art.rigUrl(sector.look!)}" alt="">`, kicker: 'Rig built', title: sector.rig!.name, sub: sector.rig!.desc, color: hexColor(sector.rig!.color) });
+        sfx.fanfare();
+        buzz([20, 40, 20]);
+        break;
+      }
       case 'claw':
         ui.flashRow('claw');
         sfx.buy();
@@ -365,7 +380,7 @@ async function boot(): Promise<void> {
         scene.spawnGolden();
         break;
       case 'golden':
-        ui.toast(ICONS.star.replace('currentColor', '#ffd166'), `<b>Golden rush!</b> Everything earns ${GOLDEN.mult}x for ${GOLDEN.seconds} seconds`);
+        ui.toast(ICONS.star.replace('currentColor', '#ffd166'), `<b>Golden rush!</b> Everything earns ${GOLDEN.mult}x for ${GOLDEN.seconds * timeStretch(game.state)} seconds`);
         scene.celebrate(0xffd166);
         sfx.milestone();
         buzz(60);
@@ -601,6 +616,7 @@ async function boot(): Promise<void> {
   });
 
   scene.setSector(sectorFor(game.state.stats.relocations));
+  scene.setRig(game.state.rig);
   scene.setGalaxy(game.state.galaxy.shifts);
   game.start();
   scene.setEvent(meta.eventActive(game.state, Date.now()));

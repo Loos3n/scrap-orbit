@@ -1,4 +1,5 @@
 import type { CrewId, PetId } from './content';
+import { sectorBonuses } from './sectors';
 import type { GameState } from './state';
 
 /*
@@ -260,6 +261,11 @@ export function bonuses(state: GameState): Bonuses {
   for (let i = 0; i < state.modules.length; i++) for (const [stat, a] of moduleYield(state.modules, i)) b[stat] += a;
   for (const l of LOOT) if (l.stat && state.loot.has(l.id)) b[l.stat] += l.amount!;
   for (const c of CHALLENGES) if (state.challengesDone.has(c.id)) b[c.stat] += c.amount;
+  const sec = sectorBonuses(state);
+  b.income += sec.income;
+  b.tap += sec.tap;
+  b.offline += sec.offline;
+  b.boss += sec.boss;
   return b;
 }
 

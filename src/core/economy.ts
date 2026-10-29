@@ -16,6 +16,7 @@ import {
 } from './config';
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
+import { RIG, currentSector, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
@@ -130,7 +131,7 @@ export function perCoreBonus(state: GameState): number {
 }
 
 export function boostDurationSec(state: GameState): number {
-  return (hasPerk(state, 'longboost') ? 60 : BOOST.durationSec) + researchSum(state, 'boostSec');
+  return ((hasPerk(state, 'longboost') ? 60 : BOOST.durationSec) + researchSum(state, 'boostSec')) * timeStretch(state);
 }
 
 export function offlineCapSec(state: GameState): number {
@@ -278,6 +279,21 @@ export function applyOffline(state: GameState, now: number): { seconds: number; 
   return { seconds, earned };
 }
 
+/** What this sector's rig costs: ten minutes of income, so it is always within reach. */
+export function rigCost(state: GameState): Decimal {
+  return Decimal.max(D(RIG.minCost), baseIncome(state).mul(RIG.incomeSec));
+}
+
+/** Builds the sector's rig, if it has one and it isn't built yet. */
+export function buildRig(state: GameState): boolean {
+  if (!currentSector(state).rig || state.rig) return false;
+  const cost = rigCost(state);
+  if (cost.gt(state.scrap)) return false;
+  state.scrap = state.scrap.sub(cost);
+  state.rig = true;
+  return true;
+}
+
 /** Total Star Cores that all-time earnings are worth. */
 export function coresForAllTime(allTime: Decimal): number {
   if (allTime.lte(0)) return 0;
@@ -334,6 +350,8 @@ export function resetRun(state: GameState, now: number): void {
   state.owned = emptyOwned();
   state.upgrades = new Set();
   state.claw = 0;
+  // The rig stays behind in the old sector.
+  state.rig = false;
   state.boostUntil = 0;
   state.boostReadyAt = 0;
   // A wreck sized for the old station would be unbreakable (and overpaid) in the new one.

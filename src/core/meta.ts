@@ -60,6 +60,7 @@ import { SAFE, SAFE_TYPES, SETS, setComplete, skinUnlocked, type CollectionSet }
 import { GENERATORS } from './config';
 import { GALAXY, STAR_NODES, forgeCost, starsForCores } from './galaxy';
 import { D, Decimal } from './num';
+import { sectorBossRules, timeStretch } from './sectors';
 import type { GameState, Mission } from './state';
 
 // ---------- Crystals ----------
@@ -441,7 +442,7 @@ export interface BossUpdate {
 function bossHp(state: GameState, now: number): Decimal {
   const tough = BOSS.growth ** state.stats.bosses;
   const hp = tapValue(state, now, true).mul(BOSS.hpTaps).add(baseIncome(state).mul(BOSS.hpIncomeSec));
-  return Decimal.max(hp.mul(tough), D(60));
+  return Decimal.max(hp.mul(tough * sectorBossRules(state).hp), D(60));
 }
 
 /** The scrap a wreck pays out: minutes of the station's scrap per second, set when it arrives. */
@@ -449,7 +450,7 @@ export function bossReward(state: GameState, now: number): Decimal {
   const a = baseIncome(state).mul(BOSS.rewardIncomeSec);
   // Plain values: a wreck that turns up during Overdrive or a golden rush shouldn't pay 14x.
   const t = tapValue(state, now, true).mul(BOSS.rewardTaps);
-  return a.gt(t) ? a : t;
+  return (a.gt(t) ? a : t).mul(sectorBossRules(state).reward);
 }
 
 /** Damage multiplier on boss wrecks (the Goo Blob likes to chew). */
@@ -506,7 +507,7 @@ function rollLoot(state: GameState, rand: () => number): string | undefined {
 
 function scheduleBoss(state: GameState, now: number, rand: () => number): void {
   const [lo, hi] = BOSS.gap;
-  state.nextBossAt = now + (lo + rand() * (hi - lo)) * 60_000;
+  state.nextBossAt = now + (lo + rand() * (hi - lo)) * 60_000 * sectorBossRules(state).gap;
 }
 
 function damageBoss(state: GameState, amount: Decimal, now: number, rand: () => number = Math.random): BossUpdate['defeated'] {
@@ -625,7 +626,7 @@ export function goldenDue(state: GameState, now: number, rand = Math.random): bo
 
 /** Tapping a golden crate starts the rush. */
 export function claimGolden(state: GameState, now: number): void {
-  state.golden.until = now + GOLDEN.seconds * 1000;
+  state.golden.until = now + GOLDEN.seconds * 1000 * timeStretch(state);
   state.stats.golden = (state.stats.golden ?? 0) + 1;
 }
 
