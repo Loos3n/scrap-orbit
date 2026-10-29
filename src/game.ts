@@ -38,6 +38,7 @@ export type GameEvent =
   | { type: 'convoy'; crystals: number }
   | { type: 'tutorial'; step: TutorialStep | null }
   | { type: 'claw'; level: number }
+  | { type: 'rig' }
   | { type: 'streak' }
   | { type: 'streakClaim'; reward: meta.ClaimedReward }
   | { type: 'pet'; id: PetId | null; adopted: boolean }
@@ -417,6 +418,11 @@ export class Game {
     if (p.kind === 'upgrade') this.buyUpgrade(p.id);
     else this.buy(p.id, p.count);
     return true;
+  }
+
+  /** Builds this sector's rig. */
+  buildRig(): void {
+    if (eco.buildRig(this.state)) this.emit({ type: 'rig' });
   }
 
   levelClaw(): void {

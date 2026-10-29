@@ -130,6 +130,12 @@ export class StationScene {
   private podLayer = new Container();
   private lights: Sprite[] = [];
   private antenna!: Sprite;
+  /** Polish: running lights chasing round the rim, a glint across each solar wing, a star on the core. */
+  private runLights: Sprite[] = [];
+  private glints: Sprite[] = [];
+  private coreStar!: Sprite;
+  private coreStreak!: Sprite;
+  private nextThrust = rand(2, 4);
   private droneLayer = new Container();
   private fxLayer = new Container();
   private ringG = new Graphics();
@@ -194,6 +200,11 @@ export class StationScene {
   private flare = 0;
   private theme: ThemeDef | null = null;
   private sector: SectorDef = SECTORS[0];
+  /** Scenery for the deep sectors (ice shards, city ruins, the black hole's swirl), placed in screen space. */
+  private sectorDecor = new Container();
+  private decor: { s: Container; fx: number; fy: number; depth: number; spin: number; phase: number; scale: number }[] = [];
+  private decorBox = { w: 0, top: 0, fh: 0 };
+  private rig: { c: Container; part: Sprite; glow: Sprite; look: string; grow: number } | null = null;
   private coreColor: number = COLORS.scrap;
   private hullSprites: Sprite[] = [];
   private jump = 0;
@@ -300,7 +311,7 @@ export class StationScene {
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.bossLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -533,9 +544,21 @@ export class StationScene {
 
   private buildHub(): void {
     const t = this.tex;
+    // A soft pool of shadow under the whole station lifts it off the busy sky.
+    const shadow = this.sprite(t.glow, this.hub, 8, 12);
+    shadow.tint = 0x02020c;
+    shadow.alpha = 0.55;
+    shadow.scale.set(5.2, 3.4);
     for (const side of [-1, 1]) {
       const wing = this.sprite(t.wing, this.hub, side * 88, 0);
       if (side < 0) wing.scale.x = -1;
+      // A glint of starlight that sweeps along the panels now and then.
+      const glint = this.sprite(t.glow, this.hub, side * 88, 0);
+      glint.blendMode = 'add';
+      glint.tint = 0xcfe0ff;
+      glint.scale.set(0.28, 0.42);
+      glint.alpha = 0;
+      this.glints.push(glint);
     }
     const halo = this.sprite(t.glow, this.hub);
     halo.scale.set(4.4);
@@ -562,6 +585,15 @@ export class StationScene {
       l.tint = i % 2 ? 0xff6b9a : 0x4fe3c1;
       this.lights.push(l);
     }
+    // Running lights chasing round just outside the hull.
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * TAU;
+      const l = this.sprite(t.glow, this.hub, Math.cos(a) * 69, Math.sin(a) * 69);
+      l.blendMode = 'add';
+      l.scale.set(0.1);
+      l.tint = 0x9fd8ff;
+      this.runLights.push(l);
+    }
     this.rays = this.sprite(t.rays, this.hub);
     this.rays.blendMode = 'add';
     this.rays.alpha = 0.3;
@@ -583,6 +615,13 @@ export class StationScene {
     this.coreHot = this.sprite(t.glow, this.hub);
     this.coreHot.blendMode = 'add';
     this.coreHot.scale.set(0.6);
+    // A slow-turning star and a wide lens streak make the core read as a bright light, not a ball.
+    this.coreStreak = this.sprite(t.glow, this.hub);
+    this.coreStreak.blendMode = 'add';
+    this.coreStreak.scale.set(4.2, 0.12);
+    this.coreStar = this.sprite(t.flare, this.hub);
+    this.coreStar.blendMode = 'add';
+    this.coreStar.scale.set(1.5);
     this.claw = this.sprite(t.claw, this.hub, 0, -60);
     this.claw.anchor.set(0.5, 1);
   }
@@ -617,6 +656,8 @@ export class StationScene {
     this.planet.width = ps * 1.7;
     this.planet.height = ps * 1.7;
     this.home.planet = { x: w / 2 + Math.min(w, 540) * 0.52, y: bottom - ps * 0.02 };
+    // The black hole hangs high in the sky instead, where the whole disk shows.
+    if (this.sector.look === 'hole') this.home.planet = { x: w / 2 + Math.min(w, 540) * 0.3, y: top + fh * 0.1 };
     this.moon.scale.set(ps / 220);
     this.home.galaxy = { x: w * 0.16, y: top + fh * 0.86 };
     this.galaxy.scale.set(Math.min(w, 600) / 300);
@@ -627,6 +668,7 @@ export class StationScene {
     this.vignette.position.set(-w * 0.075, -h * 0.075);
     this.keyLight.position.set(w * 0.1, top + fh * 0.1);
     this.keyLight.scale.set(Math.max(w, h) / 34);
+    this.decorBox = { w, top, fh };
     this.placePan();
 
     if (!repaint) return;
@@ -857,10 +899,145 @@ export class StationScene {
     if (!this.ready || sector === this.sector) return;
     this.sector = sector;
     const old = this.tex.planet;
-    this.tex.planet = art.planet(260, sector.planet, sector.atmosphere);
+    this.tex.planet = sector.look === 'hole' ? art.blackHole(260, sector.atmosphere) : art.planet(260, sector.planet, sector.atmosphere);
     this.planet.texture = this.tex.planet;
     old.destroy(true);
+    // Nothing keeps a moon this close to a black hole.
+    this.moon.visible = sector.look !== 'hole';
+    this.setRig(false);
+    this.buildDecor();
     this.layout();
+  }
+
+  /** Lays out the sector's own scenery; fractions are of the screen width and the focus band's height. */
+  private buildDecor(): void {
+    for (const d of this.decor) d.s.destroy({ children: true });
+    this.decor = [];
+    const look = this.sector.look;
+    const add = (s: Container, fx: number, fy: number, depth: number, scale: number, spin = 0) => {
+      s.scale.set(scale);
+      this.sectorDecor.addChild(s);
+      this.decor.push({ s, fx, fy, depth, spin, phase: rand(0, TAU), scale });
+    };
+    if (look === 'ice') {
+      const spots: [number, number, number][] = [[0.08, 0.12, 0.9], [0.9, 0.2, 1.1], [0.16, 0.62, 0.7], [0.94, 0.58, 0.8], [0.05, 0.9, 1.2], [0.72, 0.06, 0.6], [0.32, 0.03, 0.5], [0.62, 0.95, 0.65], [0.86, 0.84, 0.9]];
+      spots.forEach(([fx, fy, k], i) => {
+        const s = new Sprite(art.iceShard(i));
+        s.anchor.set(0.5);
+        s.alpha = 0.55 + k * 0.3;
+        s.rotation = rand(-0.8, 0.8);
+        add(s, fx, fy, 0.25 + k * 0.25, k * 1.3, rand(-0.06, 0.06));
+      });
+    } else if (look === 'city') {
+      const spots: [number, number, number][] = [[0.92, 0.1, 1.1], [0.06, 0.32, 0.7], [0.18, 0.86, 0.85]];
+      spots.forEach(([fx, fy, k], i) => {
+        const s = new Sprite(art.ruin(i));
+        s.anchor.set(0.5);
+        s.alpha = 0.8;
+        s.tint = 0xd8d0e0;
+        add(s, fx, fy, 0.15 + k * 0.15, k * 0.75);
+      });
+    } else if (look === 'hole') {
+      // Spiral arms tilted to match the disk, turning slowly; tied to the black hole's position.
+      const tilt = new Container();
+      const swirl = new Sprite(art.holeSwirl());
+      swirl.anchor.set(0.5);
+      swirl.blendMode = 'add';
+      tilt.addChild(swirl);
+      tilt.rotation = -0.28;
+      add(tilt, -1, -1, 0.45, 1, 0.25);
+    }
+  }
+
+  private placeDecor(): void {
+    const { w, top, fh } = this.decorBox;
+    for (const d of this.decor) {
+      if (d.fx < 0) {
+        // The swirl sits on the black hole.
+        d.s.position.copyFrom(this.planet.position);
+        const k = this.planet.width / 520;
+        d.s.scale.set(k * 2.6, k * 2.6 * 0.24);
+        continue;
+      }
+      d.s.position.set(d.fx * w + this.pan.x * d.depth, top + d.fy * fh + this.pan.y * d.depth + Math.sin(this.time * 0.4 + d.phase) * 4);
+    }
+  }
+
+  private updateDecor(dt: number): void {
+    if (!this.decor.length) return;
+    if (!this.reducedMotion) {
+      for (const d of this.decor) {
+        if (d.fx < 0) (d.s.children[0] as Sprite).rotation += dt * d.spin;
+        else d.s.rotation += dt * d.spin;
+      }
+    }
+    this.placeDecor();
+  }
+
+  /** Shows the sector's rig hanging under the hub, or takes it away. `fresh` grows it in with a flourish. */
+  setRig(on: boolean, fresh = false): void {
+    if (!this.ready) return;
+    const look = this.sector.look;
+    if (this.rig && (!on || this.rig.look !== look)) {
+      this.rig.c.destroy({ children: true });
+      this.rig = null;
+    }
+    this.antenna.visible = !on || !look;
+    if (!on || !look || this.rig) return;
+    const c = new Container();
+    const color = this.sector.rig?.color ?? 0xffffff;
+    const glow = this.sprite(this.tex.glow, c, 0, 30);
+    glow.blendMode = 'add';
+    glow.tint = color;
+    glow.scale.set(1.6);
+    glow.alpha = 0.35;
+    const body = new Sprite(art.rigBody(look));
+    body.anchor.set(0.5, 0);
+    c.addChild(body);
+    const part = new Sprite(art.rigPart(look));
+    part.anchor.set(...art.rigPartAnchor(look));
+    const [px, py] = art.RIG_PART_AT[look];
+    part.position.set(px - art.RIG_SIZE / 2, py);
+    c.addChild(part);
+    if (look === 'hole') part.blendMode = 'add';
+    c.position.set(0, 56);
+    c.scale.set(1.1);
+    this.hub.addChildAt(c, this.hub.getChildIndex(this.antenna) + 1);
+    this.rig = { c, part, glow, look, grow: fresh ? 0 : 1 };
+    if (fresh) {
+      this.squash = 1;
+      this.celebrate(color);
+    }
+  }
+
+  private updateRig(dt: number): void {
+    const r = this.rig;
+    if (!r) return;
+    const t = this.time;
+    r.grow = Math.min(1, r.grow + dt * 1.6);
+    // An overshooting pop as it is built.
+    const g = r.grow < 1 ? 1 + Math.sin(r.grow * Math.PI) * 0.25 - (1 - r.grow) * 0.9 : 1;
+    r.c.scale.set(1.1 * Math.max(0.05, g));
+    r.glow.alpha = 0.25 + 0.15 * Math.sin(t * 2.2);
+    if (this.reducedMotion) return;
+    if (r.look === 'ice') {
+      const [, py] = art.RIG_PART_AT.ice;
+      r.part.y = py + Math.abs(Math.sin(t * 9)) * 1.4;
+      r.part.x = Math.sin(t * 31) * 0.3;
+      if (Math.random() < dt * 5) {
+        const s = this.sparkPool.get();
+        s.position.set(rand(-4, 4), this.hub.y + 56 + 58 * 1.1);
+        s.tint = 0xcff4ff;
+        s.scale.set(0.3);
+        const a = rand(0.4, Math.PI - 0.4);
+        this.sparks.push({ s, vx: Math.cos(a) * 26, vy: Math.sin(a) * 16, life: 0.6, max: 0.6 });
+      }
+    } else if (r.look === 'city') {
+      r.part.rotation = Math.sin(t * 1.5) * 0.5;
+    } else {
+      r.part.rotation = -t * 2.4;
+      r.part.alpha = 0.8 + 0.2 * Math.sin(t * 3);
+    }
   }
 
   /** How far the view may be dragged from the middle, in screen pixels. */
@@ -956,6 +1133,7 @@ export class StationScene {
     this.starLayer.position.set(x * 0.1, y * 0.1);
     this.fgLayer.position.set(x * 1.3, y * 1.3);
     this.dustLayer.position.set(x * 1.15, y * 1.15);
+    this.placeDecor();
   }
 
   warpJump(): void {
@@ -1461,6 +1639,8 @@ export class StationScene {
     this.updateHub(dt);
     this.updateOrnaments();
     this.updateBoss(dt);
+    this.updateDecor(dt);
+    this.updateRig(dt);
     this.updatePet(dt);
     this.updateFx(dt);
     if (this.calmShake) this.shake = 0;
@@ -1948,6 +2128,44 @@ export class StationScene {
     }
   }
 
+  private updatePolish(dt: number, color: number, beat: number): void {
+    const t = this.time;
+    const n = this.runLights.length;
+    // Three pulses chase round the rim; Overdrive speeds them up and paints them pink.
+    const head = (t * (this.boosting ? 1.4 : 0.45)) % 1;
+    this.runLights.forEach((l, i) => {
+      let d = (i / n - head) * 3;
+      d -= Math.floor(d);
+      const k = Math.max(0, 1 - d * 4);
+      l.alpha = 0.18 + k * 0.8;
+      l.scale.set(0.09 + k * 0.08);
+      l.tint = this.boosting ? COLORS.boost : 0x9fd8ff;
+    });
+    // Each wing catches the light in turn, every few seconds.
+    this.glints.forEach((g, i) => {
+      const side = i ? 1 : -1;
+      const cycle = (t * 0.16 + i * 0.5) % 1;
+      const k = cycle < 0.2 ? cycle / 0.2 : -1;
+      g.alpha = k < 0 || this.reducedMotion ? 0 : Math.sin(k * Math.PI) * 0.55;
+      g.x = side * (62 + k * 52);
+    });
+    this.coreStar.tint = color;
+    this.coreStar.rotation = t * 0.15;
+    this.coreStar.alpha = 0.45 + beat * 0.3 + this.squash * 0.3;
+    this.coreStreak.tint = color;
+    this.coreStreak.alpha = 0.18 + beat * 0.12 + this.squash * 0.25;
+    // Station-keeping thrusters on the wing tips give a little puff now and then.
+    if (this.reducedMotion) return;
+    this.nextThrust -= dt;
+    if (this.nextThrust <= 0) {
+      this.nextThrust = rand(2.5, 5);
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const x = side * 121;
+      const y = this.hub.y + rand(-6, 6);
+      for (let k = 0; k < 3; k++) this.puff(x + side * k * 5, y, 0x9fd8ff, 0.5 + k * 0.25, 0.45 + k * 0.1);
+    }
+  }
+
   private updateHub(dt: number): void {
     const t = this.time;
     this.squash = Math.max(0, this.squash - dt * 5);
@@ -1984,6 +2202,7 @@ export class StationScene {
       const on = Math.sin(t * 3 + i * 1.3) > 0.2;
       l.alpha = on ? 0.9 : 0.15;
     });
+    this.updatePolish(dt, color, beat);
 
     // Smelter pods breathe heat and throw the odd ember.
     this.pods.forEach((p, i) => (p.alpha = 0.85 + 0.15 * Math.sin(t * 4 + i)));

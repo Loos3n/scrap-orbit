@@ -71,6 +71,7 @@
         </div>
         <div id="tab-build" class="tab-body">
           <div id="challenge-line" class="challenge-line" hidden><span data-icon="trophy"></span><span>Challenge: <b id="challenge-line-name"></b></span><div class="bar"><i id="challenge-line-bar"></i></div><b id="challenge-line-pct"></b></div>
+          <div id="sector-line" class="sector-line" hidden><small id="sector-line-where"></small><b id="sector-line-name"></b><span id="sector-line-text"></span></div>
           <button id="best-buy" class="best-buy" type="button"><span class="best-icon" data-icon="star"></span><span class="best-info"><b>Buy best</b><span id="best-what"></span></span><span class="buy-cost"><span data-icon="scrap"></span><span id="best-cost" class="n"></span></span></button>
           <ul class="list claw-list">
             <li id="claw-row" class="gen claw">
@@ -82,6 +83,15 @@
                 <div id="claw-next" class="milestone"></div>
               </div>
               <button id="claw-buy" class="buy" type="button"><span class="buy-count">Level up</span><span class="buy-cost"><span data-icon="scrap"></span><span id="claw-cost" class="n"></span></span></button>
+            </li>
+            <li id="rig-row" class="gen rig" hidden>
+              <div class="gen-icon"><img id="rig-img" alt="" /><span class="gen-count">Rig</span></div>
+              <div class="gen-info">
+                <div id="rig-name" class="gen-name"></div>
+                <div id="rig-desc" class="gen-rate"></div>
+                <div class="milestone">Only in this sector</div>
+              </div>
+              <button id="rig-buy" class="buy" type="button"><span id="rig-label" class="buy-count">Build</span><span class="buy-cost"><span data-icon="scrap"></span><span id="rig-cost" class="n"></span></span></button>
             </li>
           </ul>
           <div class="buy-modes" role="radiogroup" aria-label="Buy amount">
@@ -296,7 +306,7 @@
     <div id="sector-card" class="sector-card" hidden>
       <small id="sector-num"></small>
       <b id="sector-name"></b>
-      <span>New sector reached</span>
+      <span id="sector-sub">New sector reached</span>
     </div>
     <div id="boss-edge" class="boss-edge" hidden></div>
     <div id="boss-alert" class="boss-alert" hidden>

@@ -14,6 +14,8 @@ import { SETS } from '../core/collection';
 import { BookPanel, SafeGame, SkinPanel } from './book-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
 import { GalaxyPanel } from './galaxy-ui';
+import { currentSector } from '../core/sectors';
+import { rigUrl } from '../scene/art';
 import { ALL_PANES, GROUPS, groupOf } from './panes';
 import * as meta from '../core/meta';
 import { STAR_NODES } from '../core/galaxy';
@@ -152,6 +154,7 @@ export class UI {
     this.streak = new StreakModal(game, this.fmt);
     $('boost').addEventListener('click', () => game.boost());
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
+    $('rig-buy').addEventListener('click', () => game.buildRig());
     holdToRepeat($('best-buy') as HTMLButtonElement, () => {
       game.buyBest();
       this.renderBest();
@@ -611,6 +614,46 @@ export class UI {
     btn.style.setProperty('--p', p.toFixed(3));
   }
 
+  private rigLook = '';
+
+  /** The sector's twist and rig, at the top of the Build tab, in the sectors that have them. */
+  private renderSector(): void {
+    const s = this.game.state;
+    const sector = currentSector(s);
+    const line = $('sector-line');
+    const row = $('rig-row');
+    line.hidden = !sector.twist || s.tutorial >= 0;
+    row.hidden = !sector.rig || s.tutorial >= 0;
+    if (line.hidden) return;
+    const color = hex(sector.rig?.color ?? 0x9fe6ff);
+    if (this.rigLook !== sector.name) {
+      this.rigLook = sector.name;
+      line.style.setProperty('--c', color);
+      row.style.setProperty('--c', color);
+      setText($('sector-line-where'), `Sector rule · ${sector.name}`);
+      setText($('sector-line-name'), sector.twist!.name);
+      setText($('sector-line-text'), sector.twist!.text);
+      if (sector.rig) {
+        ($('rig-img') as HTMLImageElement).src = rigUrl(sector.look!);
+        setText($('rig-name'), sector.rig.name);
+        setText($('rig-desc'), sector.rig.desc);
+      }
+    }
+    if (row.hidden) return;
+    const btn = $('rig-buy') as HTMLButtonElement;
+    row.classList.toggle('built', s.rig);
+    if (s.rig) {
+      btn.disabled = true;
+      setText($('rig-label'), 'Built');
+      setText($('rig-cost'), '-');
+      return;
+    }
+    const cost = eco.rigCost(s);
+    btn.disabled = s.scrap.lt(cost);
+    setText($('rig-label'), 'Build');
+    setText($('rig-cost'), this.fmt(cost));
+  }
+
   private renderClaw(): void {
     const s = this.game.state;
     const level = s.claw;
@@ -694,6 +737,7 @@ export class UI {
   }
 
   private renderGenerators(): void {
+    this.renderSector();
     this.renderClaw();
     this.renderBest();
     const s = this.game.state;

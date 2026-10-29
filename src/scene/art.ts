@@ -2460,3 +2460,399 @@ export function ornamentUrl(id: string): string {
     }
   }, 3);
 }
+
+// ---------- Deep sectors ----------
+
+/** A black hole in place of the gas giant: horizon, photon ring and a tilted accretion disk. Same framing as `planet`. */
+export function blackHole(size: number, glowColor = '#ff9a4c'): Texture {
+  const pad = size * 0.35;
+  const S = size + pad * 2;
+  return paint(S, S, (ctx) => {
+    const c = S / 2;
+    const r = size * 0.2;
+    ctx.fillStyle = radial(ctx, c, c, size * 0.62, [
+      [0, rgba(glowColor, 0.5)],
+      [0.35, rgba(glowColor, 0.18)],
+      [1, rgba(glowColor, 0)],
+    ]);
+    ctx.fillRect(0, 0, S, S);
+    const disk = (front: boolean) => {
+      ctx.save();
+      ctx.translate(c, c);
+      ctx.rotate(-0.28);
+      ctx.beginPath();
+      if (front) ctx.rect(-S, 0, S * 2, S);
+      else ctx.rect(-S, -S, S * 2, S);
+      ctx.clip();
+      const n = 14;
+      for (let i = 0; i < n; i++) {
+        const t = i / (n - 1);
+        const rx = r * (1.35 + t * 1.6);
+        // Hot white-gold near the hole, cooling to orange and violet further out.
+        const col = t < 0.3 ? `rgba(255,${235 - t * 200},${200 - t * 400},${0.85 - t})` : t < 0.7 ? `rgba(255,${150 - (t - 0.3) * 150},${60 + (t - 0.3) * 100},${0.65 - t * 0.45})` : `rgba(${200 - (t - 0.7) * 200},${70},${200},${0.4 - (t - 0.7) * 0.9})`;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = r * 0.14;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, rx * 0.2, 0, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    disk(false);
+    // The far side of the disk, bent up over the hole by its gravity.
+    ctx.save();
+    ctx.translate(c, c);
+    ctx.rotate(-0.28);
+    for (let i = 0; i < 5; i++) {
+      ctx.strokeStyle = `rgba(255,${200 - i * 25},${120 - i * 20},${0.55 - i * 0.09})`;
+      ctx.lineWidth = r * 0.1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * (1.18 + i * 0.09), r * (1.12 + i * 0.08), 0, Math.PI, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Photon ring and the horizon itself.
+    ctx.shadowColor = 'rgba(255,190,120,0.9)';
+    ctx.shadowBlur = r * 0.5;
+    ctx.strokeStyle = 'rgba(255,236,200,0.95)';
+    ctx.lineWidth = r * 0.07;
+    ctx.beginPath();
+    ctx.arc(c, c, r * 1.06, 0, TAU);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(c, c, r, 0, TAU);
+    ctx.fill();
+    disk(true);
+  }, 2);
+}
+
+/** Faint spiral arms of infalling matter; spun slowly over the black hole. */
+export const holeSwirl = () =>
+  paint(160, 160, (ctx) => {
+    const c = 80;
+    for (let arm = 0; arm < 3; arm++) {
+      for (let i = 0; i < 40; i++) {
+        const t = i / 40;
+        const a = arm * (TAU / 3) + t * 4.2;
+        const rr = 74 - t * 56;
+        ctx.fillStyle = `rgba(255,${150 + t * 80},${110 + t * 60},${0.08 + t * 0.22})`;
+        ctx.beginPath();
+        ctx.arc(c + Math.cos(a) * rr, c + Math.sin(a) * rr, 2.5 + t * 2, 0, TAU);
+        ctx.fill();
+      }
+    }
+  }, 2);
+
+/** A floating ice crystal cluster for the Ice Belt. */
+export const iceShard = (seed: number) =>
+  paint(48, 64, (ctx) => {
+    const r = rng(seed * 13 + 5);
+    const count = 2 + Math.floor(r() * 3);
+    for (let i = 0; i < count; i++) {
+      const lean = (r() - 0.5) * 0.9;
+      const h = 30 + r() * 28;
+      const w = 7 + r() * 7;
+      ctx.save();
+      ctx.translate(24 + (r() - 0.5) * 12, 60);
+      ctx.rotate(lean);
+      // A long hexagonal prism: a lit face on the left, a shaded one on the right.
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(-w / 2, -h + w);
+      ctx.lineTo(0, -h);
+      ctx.lineTo(w / 2, -h + w);
+      ctx.lineTo(w / 2, 0);
+      ctx.closePath();
+      ctx.fillStyle = linear(ctx, -w / 2, 0, w / 2, 0, [
+        [0, 'rgba(235,250,255,0.95)'],
+        [0.45, 'rgba(150,215,255,0.85)'],
+        [0.5, 'rgba(90,160,230,0.85)'],
+        [1, 'rgba(40,90,170,0.9)'],
+      ]);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + 0.6, -2);
+      ctx.lineTo(-w / 2 + 0.6, -h + w);
+      ctx.lineTo(0, -h + 0.8);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath();
+      ctx.moveTo(0, -h + 2);
+      ctx.lineTo(0, -4);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }, 3);
+
+/** A broken chunk of an old city drifting in the Derelict City: rock, towers and a few lit windows. */
+export const ruin = (seed: number) =>
+  paint(200, 160, (ctx) => {
+    const r = rng(seed * 7 + 3);
+    // Rock underside.
+    ctx.beginPath();
+    ctx.moveTo(14, 112);
+    for (let i = 0; i <= 10; i++) {
+      const x = 14 + i * 17.2;
+      ctx.lineTo(x, 116 + Math.sin((i / 10) * Math.PI) * (30 + r() * 12));
+    }
+    ctx.lineTo(186, 112);
+    ctx.closePath();
+    ctx.fillStyle = linear(ctx, 0, 110, 0, 160, [
+      [0, '#4a3a32'],
+      [1, '#1a1412'],
+    ]);
+    ctx.fill();
+    ctx.fillStyle = '#5a4a40';
+    ctx.fillRect(12, 108, 176, 6);
+    // Towers, some with broken tops.
+    let x = 20;
+    while (x < 175) {
+      const w = 14 + r() * 18;
+      const h = 30 + r() * 70;
+      const top = 108 - h;
+      ctx.fillStyle = linear(ctx, x, 0, x + w, 0, [
+        [0, '#5a6070'],
+        [0.25, '#3a3f4c'],
+        [1, '#22252e'],
+      ]);
+      ctx.beginPath();
+      ctx.moveTo(x, 108);
+      ctx.lineTo(x, top + (r() < 0.5 ? 0 : 6));
+      if (r() < 0.45) {
+        // Snapped off: a jagged top.
+        for (let k = 1; k <= 4; k++) ctx.lineTo(x + (w * k) / 4, top + r() * 12);
+      } else ctx.lineTo(x + w, top);
+      ctx.lineTo(x + w, 108);
+      ctx.closePath();
+      ctx.fill();
+      for (let wy = top + 8; wy < 102; wy += 7) {
+        for (let wx = x + 3; wx < x + w - 4; wx += 5) {
+          const lit = r() < 0.22;
+          ctx.fillStyle = lit ? `rgba(255,${190 + r() * 40},${100 + r() * 40},0.95)` : 'rgba(10,12,18,0.7)';
+          ctx.fillRect(wx, wy, 2.4, 3.2);
+        }
+      }
+      if (h > 80) {
+        ctx.strokeStyle = '#6a6f80';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + w / 2, top);
+        ctx.lineTo(x + w / 2, top - 14);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,90,90,0.9)';
+        ctx.beginPath();
+        ctx.arc(x + w / 2, top - 14, 1.6, 0, TAU);
+        ctx.fill();
+      }
+      x += w + 2 + r() * 6;
+    }
+  }, 2);
+
+/** The size of each rig's painting, and where its moving part hangs, in world units. */
+export const RIG_SIZE = 64;
+export const RIG_PART_AT: Record<string, [number, number]> = { ice: [32, 34], city: [56, 18], hole: [32, 40] };
+
+function steel(ctx: Ctx, x0: number, x1: number, light = '#e6eefc', dark = '#5a6a8a'): CanvasGradient {
+  return linear(ctx, x0, 0, x1, 0, [
+    [0, light],
+    [0.4, '#a8b6d0'],
+    [1, dark],
+  ]);
+}
+
+/** The fixed frame of a sector rig, hanging from a mount at the top middle. */
+function drawRigBody(ctx: Ctx, look: string): void {
+  // Mount plate where it bolts onto the hull.
+  ctx.fillStyle = steel(ctx, 22, 42);
+  ctx.beginPath();
+  ctx.roundRect(22, 0, 20, 7, 2);
+  ctx.fill();
+  if (look === 'ice') {
+    ctx.strokeStyle = '#8a9ab8';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(27, 6);
+    ctx.lineTo(20, 16);
+    ctx.moveTo(37, 6);
+    ctx.lineTo(44, 16);
+    ctx.stroke();
+    ctx.fillStyle = steel(ctx, 14, 50, '#f4faff', '#4a6488');
+    ctx.beginPath();
+    ctx.roundRect(14, 14, 36, 20, 6);
+    ctx.fill();
+    // Coolant window.
+    ctx.fillStyle = radial(ctx, 32, 24, 10, [
+      [0, '#e8fbff'],
+      [0.5, '#5fd0ff'],
+      [1, '#1a5a9a'],
+    ]);
+    ctx.beginPath();
+    ctx.roundRect(24, 19, 16, 9, 4);
+    ctx.fill();
+    // Frost on top.
+    ctx.fillStyle = 'rgba(240,252,255,0.95)';
+    for (const [fx, fh] of [[17, 5], [22, 3], [41, 4], [46, 6]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(fx - 2, 15);
+      ctx.lineTo(fx, 15 - fh);
+      ctx.lineTo(fx + 2, 15);
+      ctx.fill();
+    }
+  } else if (look === 'city') {
+    // A short mast with a jib reaching out to the right.
+    ctx.fillStyle = steel(ctx, 26, 38, '#ffe2a8', '#8a5a2a');
+    ctx.fillRect(28, 6, 8, 20);
+    ctx.strokeStyle = '#ffb547';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(30, 12);
+    ctx.lineTo(58, 16);
+    ctx.moveTo(30, 22);
+    ctx.lineTo(58, 16);
+    ctx.stroke();
+    // Lattice.
+    ctx.strokeStyle = '#c78a3a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const a = 34 + i * 6;
+      ctx.moveTo(a, 12.6 + ((a - 30) / 28) * 4);
+      ctx.lineTo(a + 6, 21 - ((a + 6 - 30) / 28) * 5);
+    }
+    ctx.stroke();
+    // Counterweight and a warning stripe.
+    ctx.fillStyle = '#4a4a58';
+    ctx.fillRect(14, 12, 14, 10);
+    ctx.fillStyle = '#ffd166';
+    for (let i = 0; i < 3; i++) ctx.fillRect(15 + i * 4.5, 13, 2, 8);
+    ctx.fillStyle = 'rgba(255,90,90,0.95)';
+    ctx.beginPath();
+    ctx.arc(58, 16, 1.8, 0, TAU);
+    ctx.fill();
+  } else {
+    // Three struts holding a ring.
+    ctx.strokeStyle = '#7a6a9a';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(32, 6);
+    ctx.lineTo(32, 18);
+    ctx.moveTo(26, 6);
+    ctx.lineTo(14, 32);
+    ctx.moveTo(38, 6);
+    ctx.lineTo(50, 32);
+    ctx.stroke();
+    ctx.strokeStyle = steel(ctx, 10, 54, '#f0e6ff', '#4a3a6a');
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(32, 40, 19, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(220,170,255,0.9)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(32, 40, 15.5, 0, TAU);
+    ctx.stroke();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU;
+      ctx.fillStyle = i % 2 ? '#ffd166' : '#c58cff';
+      ctx.beginPath();
+      ctx.arc(32 + Math.cos(a) * 19, 40 + Math.sin(a) * 19, 1.3, 0, TAU);
+      ctx.fill();
+    }
+  }
+}
+
+/** The rig's moving part, drawn around its pivot at (0, 0). */
+function drawRigPart(ctx: Ctx, look: string): void {
+  if (look === 'ice') {
+    // A drill bit pointing down, with its spiral grooves.
+    ctx.fillStyle = linear(ctx, -8, 0, 8, 0, [
+      [0, '#f0f8ff'],
+      [0.45, '#9ab8d8'],
+      [1, '#3a5478'],
+    ]);
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    ctx.lineTo(8, 0);
+    ctx.lineTo(0, 24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(30,50,80,0.7)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const y = 3 + i * 5;
+      const hw = 8 * (1 - y / 24);
+      ctx.beginPath();
+      ctx.moveTo(-hw, y);
+      ctx.lineTo(hw, y + 3.5);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#e8fbff';
+    ctx.beginPath();
+    ctx.arc(0, 23, 1.2, 0, TAU);
+    ctx.fill();
+  } else if (look === 'city') {
+    ctx.strokeStyle = '#8a8a9a';
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash([2, 1.2]);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 20);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = radial(ctx, -2.5, 23, 9, [
+      [0, '#a0a4b8'],
+      [0.6, '#4a4e60'],
+      [1, '#1c1e28'],
+    ]);
+    ctx.beginPath();
+    ctx.arc(0, 26, 7, 0, TAU);
+    ctx.fill();
+  } else {
+    for (let arm = 0; arm < 3; arm++) {
+      for (let i = 0; i < 16; i++) {
+        const t = i / 16;
+        const a = arm * (TAU / 3) + t * 3.6;
+        const rr = 14 - t * 12;
+        ctx.fillStyle = `rgba(${200 + t * 55},${120 + t * 100},255,${0.35 + t * 0.6})`;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, 1 + t * 1.2, 0, TAU);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = '#05020a';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, TAU);
+    ctx.fill();
+  }
+}
+
+const RIG_PART_BOX: Record<string, [number, number, number, number]> = { ice: [-9, -1, 18, 27], city: [-8, -1, 16, 35], hole: [-16, -16, 32, 32] };
+
+export const rigBody = (look: string) => paint(RIG_SIZE, RIG_SIZE, (ctx) => drawRigBody(ctx, look), RES, { bevel: 1.2, light: 0.5, grain: 0.05, grime: 0.15, seed: 3 });
+
+/** The moving part, with its pivot at the texture's anchor given by `rigPartAnchor`. */
+export const rigPart = (look: string) => {
+  const [x, y, w, h] = RIG_PART_BOX[look];
+  return paint(w, h, (ctx) => {
+    ctx.translate(-x, -y);
+    drawRigPart(ctx, look);
+  });
+};
+export const rigPartAnchor = (look: string): [number, number] => {
+  const [x, y, w, h] = RIG_PART_BOX[look];
+  return [-x / w, -y / h];
+};
+
+/** The whole rig as a picture for the menus. Empty if the canvas can't be read. */
+export function rigUrl(look: string): string {
+  return paintUrl(RIG_SIZE, RIG_SIZE, (ctx) => {
+    drawRigBody(ctx, look);
+    const [px, py] = RIG_PART_AT[look];
+    ctx.translate(px, py);
+    drawRigPart(ctx, look);
+  }, 2);
+}

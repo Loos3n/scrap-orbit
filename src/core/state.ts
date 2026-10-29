@@ -87,6 +87,8 @@ export interface GameState {
   skin: string | null;
   /** Station decorations earned, and the ones up on the station. */
   ornaments: { got: Set<string>; on: Set<string> };
+  /** Whether this sector's rig is built; it stays behind on a relocation. */
+  rig: boolean;
   stats: {
     crates: number;
     boosts: number;
@@ -173,6 +175,7 @@ interface SaveData {
   setsDone?: string[];
   skin?: string | null;
   ornaments?: { got?: string[]; on?: string[] };
+  rig?: boolean;
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -235,6 +238,7 @@ export function newState(now: number): GameState {
     setsDone: new Set(),
     skin: null,
     ornaments: { got: new Set(), on: new Set() },
+    rig: false,
     stats: {
       crates: 0,
       boosts: 0,
@@ -301,6 +305,7 @@ export function serialize(state: GameState): string {
     setsDone: [...state.setsDone],
     skin: state.skin,
     ornaments: { got: [...state.ornaments.got], on: [...state.ornaments.on] },
+    rig: state.rig,
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -450,6 +455,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   const ornamentIds = new Set(ORNAMENTS.map((o) => o.id));
   for (const id of strings(data.ornaments?.got)) if (ornamentIds.has(id)) state.ornaments.got.add(id);
   for (const id of strings(data.ornaments?.on)) if (state.ornaments.got.has(id)) state.ornaments.on.add(id);
+  state.rig = data.rig === true;
   if (!Array.isArray(data.collection)) {
     // Saves from before the book: credit what the save already shows.
     for (let i = 0; i <= Math.min(state.stats.relocations, SECTORS.length - 1); i++) state.collection.add(`sector:${i}`);

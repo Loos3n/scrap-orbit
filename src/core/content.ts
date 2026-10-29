@@ -266,7 +266,15 @@ export interface SectorDef {
   /** The gas giant's bands, top to bottom, and its glow. */
   planet: [string, string, string, string];
   atmosphere: string;
+  /** Extra scenery for the deeper sectors; their twist and rig rules live in sectors.ts. */
+  look?: SectorLook;
+  /** A rule that only holds here, shown on arrival and at the top of the Build tab. */
+  twist?: { name: string; text: string };
+  /** A one-off machine that can only be built here, once per visit. */
+  rig?: { name: string; desc: string; color: number };
 }
+
+export type SectorLook = 'ice' | 'city' | 'hole';
 
 /**
  * Each relocation lands in a new sector with its own sky and planet, cycling after the last.
@@ -279,6 +287,36 @@ export const SECTORS: readonly SectorDef[] = [
   { name: 'Glass Sea', sky: ['#020a20', '#06183a', '#030c22'], nebula: ['#1f5fc2', '#2ab0e0', '#3f3fc2', '#1f8fd0', '#6bc0ff'], planet: ['#fff0b0', '#f0c050', '#c07a2a', '#6a3a1a'], atmosphere: '#ffd88a' },
   { name: 'Rose Nebula', sky: ['#18041a', '#2a0a2c', '#120416'], nebula: ['#e02a8f', '#ff6bb0', '#8f2ac2', '#c23f8f', '#ff8fa8'], planet: ['#c8fff0', '#5ce0b0', '#1f9a7a', '#0f4a4a'], atmosphere: '#8fffd8' },
   { name: 'Hollow Expanse', sky: ['#030306', '#0a0a14', '#040408'], nebula: ['#4a4a6a', '#6a5a8a', '#3a3a5a', '#5a5a7a', '#2a2a4a'], planet: ['#f4f4ff', '#b8b8d0', '#70708a', '#3a3a4a'], atmosphere: '#e0e0ff' },
+  {
+    name: 'Ice Belt',
+    sky: ['#04121e', '#0a2236', '#06141f'],
+    nebula: ['#5fc8ff', '#a8e8ff', '#3f7fd0', '#7fd8f0', '#d0f4ff'],
+    planet: ['#ffffff', '#cfefff', '#7fbfe8', '#3a6a9a'],
+    atmosphere: '#c8f0ff',
+    look: 'ice',
+    twist: { name: 'Brittle scrap', text: 'Frozen hulls shatter at a touch: taps are worth 2x, but machines run 20% slower in the cold.' },
+    rig: { name: 'Cryo Drill', desc: '+50% income and 2x taps', color: 0x9fe6ff },
+  },
+  {
+    name: 'Derelict City',
+    sky: ['#0e0a08', '#1c1410', '#0a0806'],
+    nebula: ['#c27a2a', '#e0b050', '#5a3a2a', '#a8602a', '#3f6f6a'],
+    planet: ['#d0c0a0', '#8a7a5a', '#5a4a3a', '#2a2420'],
+    atmosphere: '#ffc878',
+    look: 'city',
+    twist: { name: 'Bigger wrecks', text: 'Boss wrecks turn up twice as often. They are twice as tough and pay out 3x.' },
+    rig: { name: 'Wrecking Crane', desc: '+50% income, 2x wreck damage', color: 0xffb547 },
+  },
+  {
+    name: 'Black Hole Edge',
+    sky: ['#040208', '#0c0616', '#030106'],
+    nebula: ['#7a2ac2', '#ff7a3a', '#3a1a6a', '#c23f8f', '#ffb060'],
+    planet: ['#000000', '#000000', '#000000', '#000000'],
+    atmosphere: '#ff9a4c',
+    look: 'hole',
+    twist: { name: 'Slow time', text: 'Time crawls this close to the hole: Overdrive and golden rushes last twice as long, and time away earns double.' },
+    rig: { name: 'Horizon Siphon', desc: '+75% income from the event horizon', color: 0xc58cff },
+  },
 ];
 
 export function sectorFor(relocations: number): SectorDef {
