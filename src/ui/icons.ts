@@ -1,127 +1,522 @@
 import type { GeneratorId } from '../core/config';
 
-/** Inline SVG icons, drawn on a 48x48 grid. Colours come from CSS (currentColor) where it matters. */
+/**
+ * The menu art set, drawn as inline SVG on a 48x48 grid.
+ *
+ * House style, shared by every coloured icon so they read as one set:
+ * - Each object has a four-tone ramp (highlight, base, shade, ink) from the game palette.
+ * - Light comes from the upper left, the same as the painted station sprites, so a shape is
+ *   its shade colour with the base laid over it nudged up and left, leaving a shadow rim on
+ *   the lower right, plus a soft highlight and a small white glint.
+ * - Every shape gets a 2-unit outline in its own dark ink colour (never pure black).
+ * - Glow (energy, light, flames) is drawn as stacked flat circles, never gradients, so the
+ *   icons carry no ids and any number of copies can sit on a page.
+ *
+ * Plain glyphs (tabs, buttons, toasts) take their colour from CSS: each one wraps its parts in
+ * a single `<g color="currentColor">`, so `.replace('currentColor', '#hex')` tints the whole glyph.
+ */
 const svg = (body: string, view = 48) =>
   `<svg viewBox="0 0 ${view} ${view}" aria-hidden="true" focusable="false">${body}</svg>`;
 
-const RAW_GEN_ICONS: Record<GeneratorId, string> = {
-  drone: svg(`
-    <defs><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9fff3"/><stop offset="1" stop-color="#1fa587"/></linearGradient></defs>
-    <path d="M24 8 L38 34 L24 28 L10 34 Z" fill="url(#gd)" stroke="#0b2b2a" stroke-width="1.5" stroke-linejoin="round"/>
-    <ellipse cx="24" cy="21" rx="3.6" ry="5" fill="#0b2b2a"/><ellipse cx="23" cy="19" rx="1.2" ry="1.8" fill="#fff" opacity=".85"/>
-    <path d="M18 35 Q24 44 30 35" fill="none" stroke="#4fe3c1" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>`),
-  hauler: svg(`
-    <defs><linearGradient id="gh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3edff"/><stop offset="1" stop-color="#3557b8"/></linearGradient></defs>
-    <rect x="6" y="15" width="30" height="18" rx="4" fill="url(#gh)" stroke="#16245a" stroke-width="1.5"/>
-    <path d="M36 16 Q45 24 36 32 Z" fill="url(#gh)" stroke="#16245a" stroke-width="1.5" stroke-linejoin="round"/>
-    <rect x="10" y="19" width="6" height="10" rx="1" fill="#ff8a4c"/><rect x="18" y="19" width="6" height="10" rx="1" fill="#ffd166"/><rect x="26" y="19" width="6" height="10" rx="1" fill="#4fe3c1"/>
-    <rect x="2" y="19" width="4" height="10" rx="1" fill="#2b3170"/>`),
-  smelter: svg(`
-    <defs><linearGradient id="gs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd8bd"/><stop offset="1" stop-color="#7a3014"/></linearGradient>
-    <radialGradient id="gsf"><stop offset="0" stop-color="#fff4c2"/><stop offset=".6" stop-color="#ffb547"/><stop offset="1" stop-color="#ff5a1f"/></radialGradient></defs>
-    <rect x="8" y="10" width="32" height="30" rx="8" fill="url(#gs)" stroke="#4a1a0a" stroke-width="1.5"/>
-    <rect x="14" y="18" width="20" height="14" rx="3" fill="url(#gsf)"/>
-    <path d="M19 18v14M24 18v14M29 18v14" stroke="#7a2a10" stroke-width="1.6" opacity=".7"/>
-    <path d="M20 9 Q22 4 20 1 M28 9 Q30 5 28 2" stroke="#ffb547" stroke-width="2" fill="none" stroke-linecap="round" opacity=".7"/>`),
-  fabricator: svg(`
-    <defs><linearGradient id="gf" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f1e1ff"/><stop offset="1" stop-color="#5a2fa0"/></linearGradient></defs>
-    <path d="M24 5 L40 14.5 L40 33.5 L24 43 L8 33.5 L8 14.5 Z" fill="url(#gf)" stroke="#2a1250" stroke-width="1.5" stroke-linejoin="round"/>
-    <circle cx="24" cy="24" r="8" fill="#241245"/><circle cx="24" cy="24" r="3.5" fill="#f2e3ff"/>
-    <circle cx="14" cy="17" r="1.6" fill="#4fe3c1"/><circle cx="34" cy="17" r="1.6" fill="#ffd166"/>`),
-  dock: svg(`
-    <defs><linearGradient id="gk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1c4"/><stop offset="1" stop-color="#b07a12"/></linearGradient></defs>
-    <path d="M6 30 A20 20 0 0 1 42 30" fill="none" stroke="url(#gk)" stroke-width="4" stroke-linecap="round"/>
-    <path d="M10 33 A16 16 0 0 1 38 33" fill="none" stroke="url(#gk)" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M12 22 L16 30 M18 17 L21 27 M26 15 L26 26 M33 18 L30 27 M37 23 L33 30" stroke="#ffd166" stroke-width="1.6" opacity=".9"/>
-    <rect x="19" y="34" width="10" height="8" rx="2" fill="url(#gk)" stroke="#6a4808" stroke-width="1.2"/>
-    <circle cx="24" cy="38" r="1.5" fill="#ff6b9a"/>`),
-  laser: svg(`
-    <defs><linearGradient id="gl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd0d4"/><stop offset="1" stop-color="#8a1e2a"/></linearGradient></defs>
-    <path d="M27 21 L45 7" stroke="#ff5d6c" stroke-width="4" stroke-linecap="round" opacity=".55"/>
-    <path d="M27 21 L45 7" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-    <rect x="9" y="30" width="22" height="12" rx="3" fill="#2b3170" stroke="#151845" stroke-width="1.5"/>
-    <circle cx="20" cy="29" r="9" fill="url(#gl)" stroke="#4a0e16" stroke-width="1.5"/>
-    <path d="M22 26 L32 18" stroke="url(#gl)" stroke-width="6" stroke-linecap="round"/>
-    <circle cx="33" cy="17.5" r="2.4" fill="#fff"/>`),
-  gravity: svg(`
-    <defs><radialGradient id="gg"><stop offset="0" stop-color="#05061a"/><stop offset=".45" stop-color="#0d2a4a"/><stop offset=".75" stop-color="#5ce1ff"/><stop offset="1" stop-color="#5ce1ff" stop-opacity="0"/></radialGradient></defs>
-    <circle cx="24" cy="24" r="20" fill="url(#gg)"/>
-    <path d="M24 8 C36 8 40 20 32 26 M24 40 C12 40 8 28 16 22 M8 24 C8 13 19 9 25 16 M40 24 C40 35 29 39 23 32" fill="none" stroke="#c8f6ff" stroke-width="2" stroke-linecap="round" opacity=".85"/>
-    <circle cx="24" cy="24" r="5" fill="#000"/>`),
-  nanite: svg(`
-    <g fill="#9dff6b">
-      <circle cx="24" cy="24" r="4"/><circle cx="14" cy="18" r="2.6"/><circle cx="33" cy="16" r="2.2"/><circle cx="35" cy="30" r="3"/>
-      <circle cx="16" cy="33" r="2.4"/><circle cx="25" cy="37" r="1.8"/><circle cx="9" cy="25" r="1.6"/><circle cx="40" cy="22" r="1.5"/>
-      <circle cx="24" cy="10" r="1.8"/><circle cx="30" cy="42" r="1.3"/>
-    </g>
-    <g stroke="#9dff6b" stroke-width="1" opacity=".5"><path d="M24 24 L14 18 M24 24 L33 16 M24 24 L35 30 M24 24 L16 33 M24 24 L25 37"/></g>
-    <circle cx="23" cy="23" r="1.4" fill="#fff"/>`),
-  gate: svg(`
-    <defs><radialGradient id="gw"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#c2b6ff"/><stop offset="1" stop-color="#3a2a9a"/></radialGradient>
-    <linearGradient id="gwr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6e0ff"/><stop offset="1" stop-color="#4a3aa8"/></linearGradient></defs>
-    <circle cx="24" cy="24" r="15" fill="url(#gw)"/>
-    <circle cx="24" cy="24" r="17" fill="none" stroke="url(#gwr)" stroke-width="5"/>
-    <g fill="#8f7bff" stroke="#241a6a" stroke-width="1"><rect x="21" y="3" width="6" height="6" rx="1"/><rect x="21" y="39" width="6" height="6" rx="1"/><rect x="3" y="21" width="6" height="6" rx="1"/><rect x="39" y="21" width="6" height="6" rx="1"/></g>`),
-  dyson: svg(`
-    <defs><radialGradient id="gy"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#ffe9a8"/><stop offset="1" stop-color="#ff8a4c"/></radialGradient></defs>
-    <circle cx="24" cy="24" r="9" fill="url(#gy)"/>
-    <g fill="#ffd166" stroke="#7a5208" stroke-width="1">
-      <path d="M24 5 l6 3 -2 5 -8 0 -2 -5z"/><path d="M41 18 l-1 7 -5 0 -2 -7 4 -3z"/><path d="M37 38 l-6 3 -3 -4 4 -6 5 1z"/>
-      <path d="M11 38 l6 3 3 -4 -4 -6 -5 1z"/><path d="M7 18 l1 7 5 0 2 -7 -4 -3z"/>
-    </g>`),
+export interface Ramp {
+  hi: string;
+  base: string;
+  lo: string;
+  ink: string;
+}
+
+/** The art set's palette. Machine ramps are built around each machine's colour in config.ts. */
+export const PALETTE = {
+  teal: { hi: '#c4fff1', base: '#4fe3c1', lo: '#1f9e88', ink: '#0b3536' },
+  blue: { hi: '#dfe9ff', base: '#7aa7ff', lo: '#3b5cc6', ink: '#131d55' },
+  orange: { hi: '#ffe0c4', base: '#ff8a4c', lo: '#c24d1f', ink: '#4a1608' },
+  purple: { hi: '#f1e0ff', base: '#c58cff', lo: '#7443c4', ink: '#28104f' },
+  gold: { hi: '#fff3c9', base: '#ffd166', lo: '#c98f1b', ink: '#4a2f05' },
+  red: { hi: '#ffd9dd', base: '#ff5d6c', lo: '#b42438', ink: '#45091a' },
+  cyan: { hi: '#d9f9ff', base: '#5ce1ff', lo: '#1f8ec2', ink: '#062a45' },
+  green: { hi: '#e8ffd9', base: '#9dff6b', lo: '#4cb52d', ink: '#123d0a' },
+  violet: { hi: '#e8e2ff', base: '#8f7bff', lo: '#4d3bc2', ink: '#1a1250' },
+  sun: { hi: '#fffbe8', base: '#ffe9a8', lo: '#e3a53b', ink: '#4f3205' },
+  pink: { hi: '#ffe0ea', base: '#ff6b9a', lo: '#c23a68', ink: '#4a0f26' },
+  steel: { hi: '#f0f2ff', base: '#b8bfe6', lo: '#6c74ad', ink: '#1b1f4d' },
+  dark: { hi: '#4a5a9a', base: '#232a5c', lo: '#11163a', ink: '#070a20' },
+  rock: { hi: '#d9c8b4', base: '#9a8672', lo: '#5e4d3e', ink: '#2a1e14' },
+  ice: { hi: '#f2fdff', base: '#7fdcff', lo: '#2f7fd6', ink: '#0b1a40' },
+} satisfies Record<string, Ramp>;
+
+const P = PALETTE;
+const n = (v: number) => +v.toFixed(2);
+
+// Shape builders, all returning path data.
+const circ = (cx: number, cy: number, r: number) => ell(cx, cy, r, r);
+const ell = (cx: number, cy: number, rx: number, ry: number) =>
+  `M${n(cx - rx)} ${n(cy)}a${n(rx)} ${n(ry)} 0 1 0 ${n(rx * 2)} 0a${n(rx)} ${n(ry)} 0 1 0 ${n(-rx * 2)} 0Z`;
+const rrect = (x: number, y: number, w: number, h: number, r: number) => {
+  r = Math.min(r, w / 2, h / 2);
+  return `M${n(x + r)} ${n(y)}h${n(w - 2 * r)}a${n(r)} ${n(r)} 0 0 1 ${n(r)} ${n(r)}v${n(h - 2 * r)}a${n(r)} ${n(r)} 0 0 1 ${n(-r)} ${n(r)}h${n(-(w - 2 * r))}a${n(r)} ${n(r)} 0 0 1 ${n(-r)} ${n(-r)}v${n(-(h - 2 * r))}a${n(r)} ${n(r)} 0 0 1 ${n(r)} ${n(-r)}Z`;
+};
+const poly = (...pts: number[]) => {
+  let d = '';
+  for (let i = 0; i < pts.length; i += 2) d += `${i ? 'L' : 'M'}${n(pts[i])} ${n(pts[i + 1])}`;
+  return d + 'Z';
+};
+/** A regular polygon with `k` corners, the first one pointing at `rot` degrees. */
+const ngon = (cx: number, cy: number, r: number, k: number, rot = -90) => {
+  const pts: number[] = [];
+  for (let i = 0; i < k; i++) {
+    const a = ((rot + (360 / k) * i) * Math.PI) / 180;
+    pts.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  return poly(...pts);
+};
+/** A star with `k` points between radii `r1` (tips) and `r2` (valleys). */
+const starPts = (cx: number, cy: number, r1: number, r2: number, k: number, rot = -90) => {
+  const pts: number[] = [];
+  for (let i = 0; i < k * 2; i++) {
+    const a = ((rot + (180 / k) * i) * Math.PI) / 180;
+    const r = i % 2 ? r2 : r1;
+    pts.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  return pts;
 };
 
+const fill = (d: string, color: string, extra = '') => `<path d="${d}" fill="${color}"${extra}/>`;
+const line = (d: string, color: string, w: number, extra = '') =>
+  `<path d="${d}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"${extra}/>`;
+const outline = (d: string, ink: string, w = 2) => line(d, ink, w);
+/** A small four-point sparkle. */
+const glint = (x: number, y: number, r = 2, color = '#fff', op = 1) =>
+  fill(poly(x, y - r, x + r * 0.28, y - r * 0.28, x + r, y, x + r * 0.28, y + r * 0.28, x, y + r, x - r * 0.28, y + r * 0.28, x - r, y, x - r * 0.28, y - r * 0.28), color, op < 1 ? ` opacity="${op}"` : '');
+/** Soft glow: flat circles stacked from faint and wide to bright and small. */
+const glow = (cx: number, cy: number, r: number, color: string, op = 0.5) =>
+  [1, 0.72, 0.48].map((k, i) => fill(circ(cx, cy, r * k), color, ` opacity="${n(op * (0.3 + i * 0.3))}"`)).join('');
+
+interface CelOpts {
+  /** Size of the highlight blob relative to the shape (0 = none). */
+  hl?: number;
+  /** Opacity of the highlight. */
+  hlOp?: number;
+  /** Width of the outline. */
+  ink?: number;
+  /** Extra drawing laid over the shading and under the outline. */
+  detail?: string;
+}
+
+/**
+ * A filled shape in the house style. `box` is the shape's centre and rough radius, used to
+ * place the shade rim and highlight. Works for any shape without holes.
+ */
+function cel(d: string, c: Ramp, box: [number, number, number], o: CelOpts = {}): string {
+  const [cx, cy, r] = box;
+  const off = Math.min(1.5, r * 0.11);
+  const s = 1 - (off * 1.41) / r;
+  const scaled = (k: number, dx: number, dy: number) =>
+    ` transform="translate(${n(cx + dx)} ${n(cy + dy)}) scale(${n(k)}) translate(${n(-cx)} ${n(-cy)})"`;
+  const hl = o.hl ?? 0.5;
+  return (
+    fill(d, c.lo) +
+    fill(d, c.base, scaled(s, -off, -off)) +
+    (hl > 0 ? fill(d, c.hi, scaled(hl, -r * (1 - hl) * 0.55, -r * (1 - hl) * 0.55) + ` opacity="${o.hlOp ?? 0.55}"`) : '') +
+    (o.detail ?? '') +
+    outline(d, c.ink, o.ink ?? 2)
+  );
+}
+
+/** A thick rounded line (struts, arms, barrels) in the house style. */
+function tube(d: string, c: Ramp, w: number): string {
+  return (
+    line(d, c.ink, w + 2.4) +
+    line(d, c.lo, w) +
+    line(d, c.base, w * 0.62, ` transform="translate(${n(-w * 0.12)} ${n(-w * 0.12)})"`) +
+    line(d, c.hi, Math.max(0.8, w * 0.2), ` transform="translate(${n(-w * 0.25)} ${n(-w * 0.25)})" opacity=".7"`)
+  );
+}
+
+// ---------------------------------------------------------------- machines
+
+const drone = () =>
+  [
+    line('M24 14V7', P.steel.ink, 2.6),
+    line('M24 14V7', P.steel.base, 1.2),
+    cel(circ(24, 6, 2.6), P.gold, [24, 6, 2.6], { hl: 0, ink: 1.6 }),
+    tube('M19 34L15.5 41.5M29 34L32.5 41.5', P.steel, 2.2),
+    glow(10.5, 36, 5, P.teal.base, 0.6),
+    glow(37.5, 36, 5, P.teal.base, 0.6),
+    cel(ell(10.5, 28, 4.6, 7), P.steel, [10.5, 28, 5.5], { ink: 1.8 }),
+    cel(ell(37.5, 28, 4.6, 7), P.steel, [37.5, 28, 5.5], { ink: 1.8 }),
+    cel(ell(24, 26, 13.5, 11), P.teal, [24, 26, 12], {
+      detail:
+        line('M13.5 30.5Q24 36 34.5 30.5', P.teal.lo, 1.6) +
+        fill(circ(24, 23.5, 6.4), P.teal.ink) +
+        fill(circ(24, 23.5, 4.6), '#2fd6b6', ' opacity=".5"') +
+        fill(circ(24, 23.5, 3.3), '#9dfff0') +
+        fill(circ(22.6, 22, 1.3), '#fff'),
+    }),
+  ].join('');
+
+const hauler = () =>
+  [
+    glow(6, 27, 6, P.cyan.base, 0.7),
+    fill(ell(5.5, 27, 3.4, 2.2), '#fff'),
+    cel(rrect(7, 20.5, 6, 13, 2), P.steel, [10, 27, 5], { hl: 0, ink: 1.8 }),
+    cel(rrect(11, 11, 7.5, 9, 1.8), P.orange, [14.75, 15.5, 4.5], { hl: 0, ink: 1.6, detail: line('M11.5 15.5h6.5', P.orange.lo, 1.2) }),
+    cel(rrect(18.5, 11, 7.5, 9, 1.8), P.gold, [22.25, 15.5, 4.5], { hl: 0, ink: 1.6, detail: line('M19 15.5h6.5', P.gold.lo, 1.2) }),
+    cel(rrect(26, 13, 6, 7, 1.6), P.teal, [29, 16.5, 3.5], { hl: 0, ink: 1.6 }),
+    cel(rrect(11, 19.5, 24, 16, 4), P.blue, [23, 27.5, 11], {
+      detail: line('M14 30h18', P.blue.lo, 1.4) + [16, 21, 26, 31].map((x) => fill(circ(x, 25, 1), P.blue.hi, ' opacity=".8"')).join(''),
+    }),
+    cel(rrect(28.5, 15.5, 15.5, 20, 7.5), P.blue, [36, 25.5, 9], {
+      detail: fill(rrect(33.5, 19.5, 7.5, 6.5, 3), P.cyan.ink) + fill(rrect(34.5, 20.5, 5.5, 4.5, 2.2), P.cyan.base) + fill(circ(35.8, 21.8, 0.9), '#fff'),
+    }),
+    fill(circ(41.5, 31, 1.3), P.pink.base),
+  ].join('');
+
+const smelter = () =>
+  [
+    cel(rrect(29, 6, 7.5, 12, 2), P.steel, [32.75, 12, 5], { hl: 0, ink: 1.8 }),
+    fill(circ(35, 4.2, 2.6), '#e8ecff', ' opacity=".55"'),
+    fill(circ(39.5, 2.6, 2), '#e8ecff', ' opacity=".4"'),
+    cel(rrect(11, 39, 7, 6, 1.5), P.steel, [14.5, 42, 3.5], { hl: 0, ink: 1.6 }),
+    cel(rrect(30, 39, 7, 6, 1.5), P.steel, [33.5, 42, 3.5], { hl: 0, ink: 1.6 }),
+    cel(rrect(7, 13, 34, 29, 9), P.orange, [24, 27.5, 15], {
+      hl: 0.3,
+      hlOp: 0.4,
+      detail:
+        line('M10 19.5h28', P.orange.lo, 1.4) +
+        [12, 36].map((x) => fill(circ(x, 16.5, 1), P.orange.hi)).join('') +
+        fill(rrect(13.5, 22, 21, 14.5, 5), P.orange.ink) +
+        glow(24, 29.5, 11, '#ffb547', 0.55) +
+        fill(rrect(15.5, 24, 17, 10.5, 3.5), '#ffb547') +
+        fill(rrect(17.5, 25.5, 13, 6.5, 3), '#ffe9a8') +
+        line('M20 24v10.5M24 24v10.5M28 24v10.5', P.orange.lo, 1.6),
+    }),
+  ].join('');
+
+const fabricator = () =>
+  [
+    cel(ngon(24, 25.5, 17.5, 6), P.purple, [24, 25.5, 16], {
+      detail:
+        fill(circ(24, 27, 9.5), P.purple.ink) +
+        fill(circ(24, 27, 8), '#3a1f6e') +
+        fill(ell(24, 32.5, 6, 1.6), P.teal.base, ' opacity=".35"') +
+        fill(poly(24, 22, 29.5, 25, 24, 28, 18.5, 25), P.teal.hi) +
+        fill(poly(18.5, 25, 24, 28, 24, 34, 18.5, 31), P.teal.base) +
+        fill(poly(24, 28, 29.5, 25, 29.5, 31, 24, 34), P.teal.lo) +
+        line('M24 22L29.5 25V31L24 34L18.5 31V25ZM24 28V34M18.5 25L24 28L29.5 25', P.teal.ink, 1.1) +
+        fill(circ(12.5, 19, 1.4), P.gold.base) +
+        fill(circ(35.5, 19, 1.4), P.teal.base) +
+        fill(circ(12.5, 32, 1.4), P.pink.base),
+    }),
+    line('M24 18.5V22', P.teal.base, 1.4, ' stroke-dasharray="1 1.2" opacity=".9"'),
+    tube('M24 3V14', P.steel, 2.6),
+    cel(poly(20, 13, 28, 13, 26, 18.5, 22, 18.5), P.steel, [24, 15.5, 4], { hl: 0, ink: 1.6 }),
+  ].join('');
+
+const dock = () => {
+  const arch = 'M6 30A18 18 0 0 1 42 30';
+  return [
+    line(arch, P.gold.ink, 9.5),
+    line(arch, P.gold.lo, 7),
+    line('M7.6 27A16.6 16.6 0 0 1 40.4 27', P.gold.base, 4.6),
+    line('M9.5 21A16 16 0 0 1 24 12.6', P.gold.hi, 1.6, ' opacity=".8"'),
+    [[12.2, 17.7], [24, 12.3], [35.8, 17.7]].map(([x, y]) => fill(circ(x, y, 1.4), P.pink.base)).join(''),
+    cel(rrect(2.5, 28, 11, 8, 2.2), P.steel, [8, 32, 5], { hl: 0, ink: 1.8 }),
+    cel(rrect(34.5, 28, 11, 8, 2.2), P.steel, [40, 32, 5], { hl: 0, ink: 1.8 }),
+    line('M13.5 32H18M30 32h4.5', P.steel.ink, 1.6),
+    cel(ell(24, 31, 7.5, 4.6), P.steel, [24, 31, 6], {
+      detail: fill(ell(26.5, 30, 2.6, 1.8), P.cyan.ink) + fill(ell(26.5, 30, 1.7, 1.1), P.cyan.base),
+    }),
+    glow(15.5, 31, 3.5, P.cyan.base, 0.6),
+    cel(rrect(14, 38, 20, 6, 2.5), P.steel, [24, 41, 8], { hl: 0, ink: 1.8, detail: line('M18 41h12', P.steel.lo, 1.2, ' stroke-dasharray="2 2"') }),
+  ].join('');
+};
+
+const laser = () =>
+  [
+    line('M38 15L44.5 8.5', P.red.base, 6, ' opacity=".35"'),
+    line('M38 15L44.5 8.5', P.red.hi, 3, ' opacity=".7"'),
+    line('M38 15L44.5 8.5', '#fff', 1.4),
+    cel(rrect(8, 35, 27, 9, 3), P.steel, [21.5, 39.5, 9], { hl: 0, ink: 1.8, detail: line('M12 39.5h19', P.steel.lo, 1.2, ' stroke-dasharray="2.5 2"') }),
+    tube('M25 27L36.5 15.5', P.steel, 5.2),
+    line('M33.5 18.5L36.5 15.5', P.red.base, 5.2),
+    line('M33.5 18.5L36.5 15.5', P.red.hi, 1.4, ' transform="translate(-.7 -.7)"'),
+    glow(38, 14, 5, P.red.base, 0.7),
+    glint(38, 14, 3.2),
+    cel('M10 35A11.5 11.5 0 0 1 33 35Z', P.red, [21.5, 30, 10], {
+      detail: fill(circ(21.5, 30.5, 3.4), P.red.ink) + fill(circ(21.5, 30.5, 2.1), '#ffb3ba') + fill(circ(20.8, 29.8, 0.8), '#fff'),
+    }),
+  ].join('');
+
+const gravity = () =>
+  [
+    fill(circ(24, 24, 21), P.cyan.base, ' opacity=".12"'),
+    `<g transform="rotate(-22 24 24)">`,
+    line('M4.5 24A19.5 6.5 0 0 1 43.5 24', P.cyan.ink, 5),
+    line('M4.5 24A19.5 6.5 0 0 1 43.5 24', P.cyan.lo, 2.6),
+    `</g>`,
+    glow(24, 24, 15, P.cyan.base, 0.5),
+    cel(circ(24, 24, 10.5), P.dark, [24, 24, 10.5], {
+      hl: 0.35,
+      hlOp: 0.35,
+      detail: line('M15.5 20A9.5 9.5 0 0 1 22 14.6', P.cyan.hi, 1.6, ' opacity=".9"') + fill(circ(24, 24, 4.4), '#03050f'),
+    }),
+    `<g transform="rotate(-22 24 24)">`,
+    line('M4.5 24A19.5 6.5 0 0 0 43.5 24', P.cyan.ink, 5),
+    line('M4.5 24A19.5 6.5 0 0 0 43.5 24', P.cyan.base, 2.8),
+    line('M9 27.6A19.5 6.5 0 0 0 22 30.4', P.cyan.hi, 1.2),
+    `</g>`,
+    cel(ngon(39, 10, 3.2, 5, -20), P.rock, [39, 10, 3.2], { hl: 0, ink: 1.5 }),
+    cel(ngon(8, 37, 2.4, 5, 10), P.rock, [8, 37, 2.4], { hl: 0, ink: 1.4 }),
+  ].join('');
+
+const nanite = () => {
+  const cells: [number, number][] = [[16.5, 18], [31.5, 18], [24, 31]];
+  return [
+    ...cells.map(([x, y]) =>
+      cel(ngon(x, y, 8.6, 6), P.green, [x, y, 8], {
+        hl: 0.42,
+        detail: fill(ngon(x, y, 4, 6), P.green.ink) + fill(circ(x, y, 2.3), '#d9ffc2') + fill(circ(x - 0.7, y - 0.7, 0.8), '#fff'),
+      }),
+    ),
+    line('M22.6 18H25.4M20 24.6L21.3 26.6M28 24.6L26.7 26.6', P.green.base, 1.4, ' opacity=".9"'),
+    ...[[7, 33, 2.2], [40, 31, 2], [38, 40, 1.4], [9, 9, 1.5], [41, 7.5, 1.7], [24, 6, 1.3], [12, 43, 1.3]].map(([x, y, r]) =>
+      fill(circ(x, y, r + 1), P.green.ink) + fill(circ(x, y, r), P.green.base) + fill(circ(x - r * 0.3, y - r * 0.3, r * 0.4), '#fff'),
+    ),
+  ].join('');
+};
+
+const gate = () =>
+  [
+    fill(circ(24, 24, 14.5), '#24186e'),
+    glow(24, 24, 12, P.violet.base, 0.5),
+    line('M24 24m-1 -7a8 8 0 1 1 -7 9M24 24m1 7a8 8 0 1 1 7 -9', P.violet.hi, 1.8, ' opacity=".85"'),
+    line('M24 24m-.5 -3.6a3.8 3.8 0 1 1 -3.4 4.4', '#fff', 1.4, ' opacity=".8"'),
+    fill(circ(24, 24, 2.2), '#fff'),
+    line(circ(24, 24, 16.5), P.violet.ink, 9.5),
+    line(circ(24, 24, 16.5), P.violet.lo, 7),
+    line('M10.2 33A16.5 16.5 0 0 1 33 10.2', P.violet.base, 5.4, ' transform="translate(-.6 -.6)"'),
+    line('M10.5 20A15 15 0 0 1 20 10.5', P.violet.hi, 1.6, ' opacity=".85"'),
+    ...[[24, 7.5], [40.5, 24], [24, 40.5], [7.5, 24]].map(([x, y]) =>
+      cel(rrect(x - 3.6, y - 3.6, 7.2, 7.2, 1.6), P.steel, [x, y, 3.6], { hl: 0, ink: 1.6, detail: fill(circ(x, y, 1.2), P.teal.base) }),
+    ),
+  ].join('');
+
+const dyson = () => {
+  const panels = [0, 1, 2, 3, 4, 5].map((i) => {
+    const a = -90 + i * 60;
+    const rad = (a * Math.PI) / 180;
+    const x = 24 + Math.cos(rad) * 16.5;
+    const y = 24 + Math.sin(rad) * 16.5;
+    return (
+      `<g transform="translate(${n(x)} ${n(y)}) rotate(${a + 90})">` +
+      cel(rrect(-5.5, -3.8, 11, 7.6, 1.4), P.gold, [0, 0, 4.5], {
+        hl: 0,
+        ink: 1.6,
+        detail: fill(rrect(-4, -2.4, 8, 4.8, 0.8), '#22306e') + line('M0 -2.4V2.4M-4 0H4', '#5a78d8', 0.7),
+      }) +
+      `</g>`
+    );
+  });
+  return [
+    line(circ(24, 24, 16.5), P.sun.lo, 1.2, ' stroke-dasharray="2 2.5" opacity=".7"'),
+    glow(24, 24, 12, '#ffb547', 0.4),
+    fill(circ(24, 24, 8.5), P.sun.lo),
+    fill(circ(23.2, 23.2, 7.4), P.sun.base),
+    fill(circ(22.4, 22.4, 4.6), P.sun.hi),
+    fill(circ(21.6, 21.6, 1.8), '#fff'),
+    outline(circ(24, 24, 8.5), P.sun.ink, 1.6),
+    ...panels,
+  ].join('');
+};
+
+const RAW_GEN_ICONS: Record<GeneratorId, string> = {
+  drone: svg(drone()),
+  hauler: svg(hauler()),
+  smelter: svg(smelter()),
+  fabricator: svg(fabricator()),
+  dock: svg(dock()),
+  laser: svg(laser()),
+  gravity: svg(gravity()),
+  nanite: svg(nanite()),
+  gate: svg(gate()),
+  dyson: svg(dyson()),
+};
+
+// ---------------------------------------------------------------- currencies and pickups
+
+const SCRAP_GEAR =
+  'M24 3 l4.2 6.3 7.4-1.7 1 7.5 7 2.9-3 6.9 4.6 6-6.4 4-0.3 7.6-7.4-1.1-4.7 5.9-4.6-6-7.4 1.3-0.4-7.6-6.5-3.9 4.5-6.1-3-6.8 7-3 0.9-7.5 7.4 1.6z';
+
+const scrap = () =>
+  cel(SCRAP_GEAR, P.gold, [24, 24, 19], {
+    hl: 0.45,
+    detail: fill(circ(24, 24, 8), P.gold.lo) + fill(circ(24, 24, 6.4), '#3a2405') + fill(circ(25, 25, 3.4), '#5a3a0a') + line('M18.5 19.5A7.5 7.5 0 0 1 22 17', P.gold.hi, 1.4),
+  }) + glint(13, 12, 2.6);
+
+const crystal = () => {
+  const ramp = P.ice;
+  return [
+    fill(poly(16, 5, 32, 5, 41, 17, 24, 44, 7, 17), ramp.lo),
+    fill(poly(16, 5, 32, 5, 28, 17, 20, 17), ramp.hi),
+    fill(poly(16, 5, 20, 17, 7, 17), '#b8eeff'),
+    fill(poly(32, 5, 41, 17, 28, 17), ramp.base),
+    fill(poly(7, 17, 20, 17, 24, 44), ramp.base),
+    fill(poly(20, 17, 28, 17, 24, 44), '#a8e9ff'),
+    fill(poly(28, 17, 41, 17, 24, 44), ramp.lo),
+    line('M7 17H41M16 5L20 17L24 44L28 17L32 5', '#fff', 1, ' opacity=".55"'),
+    outline(poly(16, 5, 32, 5, 41, 17, 24, 44, 7, 17), ramp.ink),
+    glint(14, 10, 3.2),
+  ].join('');
+};
+
+/** A faceted star: alternating light and dark wedges, like a cut gem. */
+function facetStar(cx: number, cy: number, r1: number, r2: number, k: number, c: Ramp): string {
+  const pts = starPts(cx, cy, r1, r2, k);
+  const m = pts.length / 2;
+  let out = '';
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    // Wedges whose outer edge faces the upper left catch the light.
+    const mx = (pts[i * 2] + pts[j * 2]) / 2 - cx;
+    const my = (pts[i * 2 + 1] + pts[j * 2 + 1]) / 2 - cy;
+    const lit = -(mx * 0.62 + my * 0.78) / Math.hypot(mx, my);
+    const color = lit > 0.35 ? c.hi : lit > -0.35 ? c.base : c.lo;
+    out += fill(poly(cx, cy, pts[i * 2], pts[i * 2 + 1], pts[j * 2], pts[j * 2 + 1]), color);
+  }
+  return out + outline(poly(...pts), c.ink);
+}
+
+const star = () => fill(circ(24, 25, 19), P.gold.base, ' opacity=".14"') + facetStar(24, 25.5, 21, 9, 5, P.gold) + glint(17, 17, 2.4);
+
+const core = () =>
+  glow(24, 24, 21, P.violet.base, 0.45) + facetStar(24, 24, 20, 6.5, 4, P.violet) + fill(circ(24, 24, 5.2), P.violet.hi) + fill(circ(24, 24, 3.4), '#fff') + glint(36, 13, 2.2, '#fff', 0.9);
+
+const claw = () =>
+  [
+    tube('M24 44V27', P.steel, 5),
+    tube('M21.5 23L12 13L16.5 6M26.5 23L36 13L31.5 6', P.gold, 3.8),
+    cel(circ(24, 24.5, 5.5), P.steel, [24, 24.5, 5.5], { detail: fill(circ(24, 24.5, 2), P.steel.ink) }),
+  ].join('');
+
+const meteor = () =>
+  [
+    line('M5 5L25 23', P.orange.base, 8, ' opacity=".35"'),
+    line('M8 5L26 21', '#ffb547', 4.5, ' opacity=".7"'),
+    line('M11 6L26 19', '#fff1c4', 1.8),
+    cel(ngon(31, 30, 12, 7, -10), P.rock, [31, 30, 11.5], {
+      detail: fill(circ(27, 27, 2.8), P.rock.lo) + fill(circ(35.5, 33.5, 2.2), P.rock.lo) + fill(circ(33, 25, 1.4), P.rock.lo) + line('M24 31A8 8 0 0 1 27 24', '#ffb547', 1.6, ' opacity=".8"'),
+    }),
+  ].join('');
+
+const flare = () =>
+  [
+    ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+      const a = (i * 45 * Math.PI) / 180;
+      const r1 = 13;
+      const r2 = i % 2 ? 19 : 21.5;
+      return line(`M${n(24 + Math.cos(a) * r1)} ${n(24 + Math.sin(a) * r1)}L${n(24 + Math.cos(a) * r2)} ${n(24 + Math.sin(a) * r2)}`, P.orange.base, 3.4);
+    }),
+    glow(24, 24, 14, '#ffb547', 0.6),
+    cel(circ(24, 24, 10), P.gold, [24, 24, 10], { hl: 0.5, hlOp: 0.8 }),
+    glint(20.5, 20.5, 2.4),
+  ].join('');
+
+// ---------------------------------------------------------------- glyphs
+
+/** A plain glyph: one `color` attribute drives every part, so CSS or `.replace` can tint it. */
+const glyph = (body: string) => svg(`<g color="currentColor">${body}</g>`);
+const cf = (d: string, op = 1) => `<path d="${d}" fill="currentColor"${op < 1 ? ` opacity="${op}"` : ''}/>`;
+const cs = (d: string, w: number, op = 1) =>
+  `<path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"${op < 1 ? ` opacity="${op}"` : ''}/>`;
+/** Punches a dark detail into a glyph (works on any tint because it is a translucent shade). */
+const cut = (d: string, op = 0.45) => `<path d="${d}" fill="#0b0e2a" opacity="${op}"/>`;
+
 const RAW_ICONS = {
-  scrap: svg(`
-    <defs><linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1c4"/><stop offset=".5" stop-color="#ffb547"/><stop offset="1" stop-color="#c4701a"/></linearGradient></defs>
-    <path d="M24 3 l4.2 6.3 7.4-1.7 1 7.5 7 2.9-3 6.9 4.6 6-6.4 4-0.3 7.6-7.4-1.1-4.7 5.9-4.6-6-7.4 1.3-0.4-7.6-6.5-3.9 4.5-6.1-3-6.8 7-3 0.9-7.5 7.4 1.6z" fill="url(#gb)" stroke="#7a4a08" stroke-width="1.5" stroke-linejoin="round"/>
-    <circle cx="24" cy="24" r="7" fill="#2b1a05" opacity=".75"/><circle cx="22" cy="22" r="2" fill="#fff" opacity=".5"/>`),
-  bolt: svg(`<path d="M27 3 L10 27 h11 l-3 18 L38 20 H26 Z" fill="currentColor" stroke="rgba(0,0,0,.25)" stroke-width="1.5" stroke-linejoin="round"/>`),
-  build: svg(`<path d="M30 6a10 10 0 0 0-9.4 13.4L7 33a3.5 3.5 0 0 0 5 5l13.6-13.6A10 10 0 0 0 39 15l-6 2-3-3 2-6a10 10 0 0 0-2-2z" fill="currentColor"/>`),
-  upgrades: svg(`<path d="M24 5 L28 15 L39 15 L30 22 L33.5 33 L24 26.5 L14.5 33 L18 22 L9 15 L20 15 Z" fill="currentColor"/><rect x="12" y="37" width="24" height="5" rx="2.5" fill="currentColor" opacity=".6"/>`),
-  station: svg(`<circle cx="24" cy="24" r="9" fill="currentColor"/><circle cx="24" cy="24" r="16" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="8 4"/><rect x="2" y="22" width="8" height="4" rx="1" fill="currentColor"/><rect x="38" y="22" width="8" height="4" rx="1" fill="currentColor"/>`),
-  soundOn: svg(`<path d="M8 18h8l10-8v28l-10-8H8z" fill="currentColor"/><path d="M32 17a9 9 0 0 1 0 14M36 12a15 15 0 0 1 0 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`),
-  soundOff: svg(`<path d="M8 18h8l10-8v28l-10-8H8z" fill="currentColor"/><path d="M32 18l10 12M42 18L32 30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>`),
-  claw: svg(`
-    <path d="M24 44V26" stroke="#c5cbff" stroke-width="6" stroke-linecap="round"/>
-    <circle cx="24" cy="24" r="5" fill="#fff"/>
-    <path d="M21 22 L11 12 L16 6 M27 22 L37 12 L32 6" fill="none" stroke="#e6e9ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`),
-  star: svg(`
-    <defs><radialGradient id="gst"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#ffd166"/><stop offset="1" stop-color="#ff6b9a"/></radialGradient></defs>
-    <path d="M24 3 L29 18 L45 18 L32 28 L37 44 L24 34 L11 44 L16 28 L3 18 L19 18 Z" fill="url(#gst)" stroke="#7a3a50" stroke-width="1.5" stroke-linejoin="round"/>`),
-  core: svg(`
-    <defs><radialGradient id="ic" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#d9d0ff"/><stop offset="1" stop-color="#6a4cff"/></radialGradient></defs>
-    <circle cx="24" cy="24" r="20" fill="#8f7bff" opacity=".18"/>
-    <path d="M24 4 L28.5 19.5 L44 24 L28.5 28.5 L24 44 L19.5 28.5 L4 24 L19.5 19.5 Z" fill="url(#ic)"/>
-    <circle cx="24" cy="24" r="6" fill="#fff"/>`),
-  trophy: svg(`<path d="M14 6h20v10a10 10 0 0 1-20 0z" fill="currentColor"/><path d="M14 9H7a7 7 0 0 0 7 9M34 9h7a7 7 0 0 1-7 9" fill="none" stroke="currentColor" stroke-width="3"/><rect x="21" y="25" width="6" height="8" fill="currentColor"/><rect x="14" y="33" width="20" height="6" rx="2" fill="currentColor"/>`),
-  warp: svg(`<circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="9" fill="none" stroke="currentColor" stroke-width="3" opacity=".6"/><circle cx="24" cy="24" r="3" fill="currentColor"/>`),
-  crystal: svg(`
-    <defs><linearGradient id="icr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6fbff"/><stop offset=".5" stop-color="#5cd6ff"/><stop offset="1" stop-color="#2a5fd0"/></linearGradient></defs>
-    <path d="M24 4 L38 17 L24 44 L10 17 Z" fill="url(#icr)" stroke="#0b1a40" stroke-width="1.5" stroke-linejoin="round"/>
-    <path d="M10 17 H38 M24 4 L18 17 L24 44 L30 17 Z" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linejoin="round"/>`),
-  missions: svg(`<rect x="10" y="7" width="28" height="36" rx="4" fill="currentColor" opacity=".9"/><rect x="17" y="3" width="14" height="8" rx="2" fill="currentColor"/><path d="M16 20l3 3 6-6M16 32l3 3 6-6" fill="none" stroke="#141838" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><rect x="28" y="19" width="6" height="3" rx="1.5" fill="#141838"/><rect x="28" y="31" width="6" height="3" rx="1.5" fill="#141838"/>`),
-  crew: svg(`<circle cx="18" cy="16" r="7" fill="currentColor"/><path d="M5 40c0-9 6-14 13-14s13 5 13 14z" fill="currentColor"/><circle cx="33" cy="18" r="5.5" fill="currentColor" opacity=".6"/><path d="M27 29c2-1 4-2 6-2 6 0 10 4 10 11h-11" fill="currentColor" opacity=".6"/>`),
-  lab: svg(`<path d="M19 5h10M21 5v13L9 39a3 3 0 0 0 3 4h24a3 3 0 0 0 3-4L27 18V5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M14 31h20l4 8H10z" fill="currentColor"/><circle cx="21" cy="25" r="2" fill="currentColor"/><circle cx="27" cy="21" r="1.5" fill="currentColor"/>`),
-  meteor: svg(`<path d="M6 6 L26 22" stroke="#ffb547" stroke-width="5" stroke-linecap="round" opacity=".5"/><path d="M12 4 L28 18" stroke="#ff6b3d" stroke-width="3" stroke-linecap="round" opacity=".6"/><circle cx="31" cy="30" r="11" fill="#8a7a6a"/><circle cx="28" cy="27" r="3" fill="#6a5a4a"/><circle cx="35" cy="34" r="2" fill="#6a5a4a"/>`),
-  flare: svg(`<circle cx="24" cy="24" r="10" fill="#ffd166"/><g stroke="#ff8a4c" stroke-width="3.5" stroke-linecap="round"><path d="M24 3v6M24 39v6M3 24h6M39 24h6M9 9l4 4M35 35l4 4M9 39l4-4M35 13l4-4"/></g>`),
-  check: svg(`<path d="M10 25l9 9 19-20" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
-  clock: svg(`<circle cx="24" cy="24" r="18" fill="none" stroke="currentColor" stroke-width="4"/><path d="M24 13v12l8 5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`),
-  palette: svg(`<path d="M24 5C13 5 5 13 5 23c0 9 7 15 14 15 3 0 3-3 2-5s0-5 3-5h6c7 0 13-4 13-11C43 10 34 5 24 5z" fill="currentColor"/><circle cx="15" cy="20" r="3" fill="#ff6b9a"/><circle cx="22" cy="13" r="3" fill="#ffd166"/><circle cx="31" cy="14" r="3" fill="#4fe3c1"/><circle cx="35" cy="22" r="3" fill="#7aa7ff"/>`),
-  gear: svg(`<path d="M41.7 17.2 L43.0 23.5 L38.5 22.9 L36.9 30.5 L41.4 31.7 L37.8 37.1 L35.0 33.4 L28.5 37.8 L30.8 41.7 L24.5 43.0 L25.1 38.5 L17.5 36.9 L16.3 41.4 L10.9 37.8 L14.6 35.0 L10.2 28.5 L6.3 30.8 L5.0 24.5 L9.5 25.1 L11.1 17.5 L6.6 16.3 L10.2 10.9 L13.0 14.6 L19.5 10.2 L17.2 6.3 L23.5 5.0 L22.9 9.5 L30.5 11.1 L31.7 6.6 L37.1 10.2 L33.4 13.0 L37.8 19.5 Z" fill="currentColor"/><circle cx="24" cy="24" r="6" fill="#141838"/>`),
-  lock: svg(`<rect x="11" y="21" width="26" height="20" rx="4" fill="currentColor"/><path d="M16 21v-5a8 8 0 0 1 16 0v5" fill="none" stroke="currentColor" stroke-width="4"/>`),
+  scrap: svg(scrap()),
+  crystal: svg(crystal()),
+  star: svg(star()),
+  core: svg(core()),
+  claw: svg(claw()),
+  meteor: svg(meteor()),
+  flare: svg(flare()),
+  bolt: glyph(
+    cf('M28 3L9.5 27.5H21.5L18 45L38.5 19.5H26.5Z') +
+      `<path d="M26 8L14 24.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".5"/>` +
+      `<path d="M28 3L9.5 27.5H21.5L18 45L38.5 19.5H26.5Z" fill="none" stroke="#0b0e2a" stroke-opacity=".35" stroke-width="2" stroke-linejoin="round"/>`,
+  ),
+  build: glyph(
+    cf('M31 5a11 11 0 0 0-10.3 14.6L6.5 33.8a4 4 0 0 0 5.7 5.7l14.2-14.2A11 11 0 0 0 41.2 13l-6.6 2.2-3.3-3.3L33.5 5.3A11 11 0 0 0 31 5z') +
+      cut(circ(9.6, 36.6, 1.8), 0.5) +
+      cs('M33 34l7 7', 4.5, 0.5) +
+      cf(rrect(26, 26, 8, 8, 2), 0.5),
+  ),
+  upgrades: glyph(cf(rrect(6, 6, 36, 36, 10), 0.35) + cs('M15 25L24 16L33 25M15 34L24 25L33 34', 4.5)),
+  station: glyph(
+    cs(circ(24, 24, 15.5), 3.4, 0.55) +
+      cf(circ(24, 24, 9)) +
+      cut(circ(24, 24, 3.6)) +
+      cf(rrect(1.5, 19.5, 9, 9, 2)) +
+      cf(rrect(37.5, 19.5, 9, 9, 2)) +
+      cf(rrect(22, 3, 4, 7, 1.5), 0.8),
+  ),
+  soundOn: glyph(cf('M7 18h8l10-8.5v29L15 30H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z') + cs('M31.5 17.5a9 9 0 0 1 0 13', 3.4) + cs('M36 12a16 16 0 0 1 0 24', 3.4, 0.55)),
+  soundOff: glyph(cf('M7 18h8l10-8.5v29L15 30H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z') + cs('M32 18.5l10 11M42 18.5l-10 11', 3.6)),
+  trophy: glyph(
+    cs('M14.5 10H7.5a7.5 7.5 0 0 0 8.5 9.5M33.5 10h7a7.5 7.5 0 0 1-8.5 9.5', 3.4, 0.6) +
+      cf('M13.5 5h21v11.5a10.5 10.5 0 0 1-21 0z') +
+      cs('M18.5 9.5v7a5.5 5.5 0 0 0 2.5 4.6', 2.2, 0.3) +
+      cf(rrect(21, 26, 6, 7, 1)) +
+      cf(rrect(13, 33, 22, 8, 2.5)) +
+      cut(rrect(18, 35.5, 12, 3, 1.5), 0.35),
+  ),
+  warp: glyph(cs(circ(24, 24, 17), 4) + cs('M24 13a11 11 0 1 1-10.4 14.6', 3.2, 0.6) + cs('M24 19a5 5 0 1 1-4.8 6.4', 2.6, 0.8) + cf(circ(24, 24, 2.2))),
+  missions: glyph(
+    cf(rrect(9, 7, 30, 37, 5)) +
+      cf(rrect(17, 3, 14, 8, 3)) +
+      cut(rrect(20.5, 5.5, 7, 3, 1.5), 0.5) +
+      `<path d="M15.5 21l3 3 6-6M15.5 33l3 3 6-6" fill="none" stroke="#0b0e2a" stroke-opacity=".75" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` +
+      cut(rrect(28, 19.5, 6.5, 3, 1.5), 0.6) +
+      cut(rrect(28, 31.5, 6.5, 3, 1.5), 0.6),
+  ),
+  crew: glyph(
+    cf(circ(33, 15.5, 6), 0.5) +
+      cf('M26 28.5c2-1.3 4.5-2 7-2 6.5 0 10.5 4.5 10.5 11.5a2 2 0 0 1-2 2H31z', 0.5) +
+      cf(circ(18, 15, 7.5)) +
+      cf('M4 40c0-9.5 6-15 14-15s14 5.5 14 15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z'),
+  ),
+  lab: glyph(
+    cs('M18.5 5h11M21 5v13L9 38.5a3.5 3.5 0 0 0 3 5.5h24a3.5 3.5 0 0 0 3-5.5L27 18V5', 3.4) +
+      cf('M14.5 30h19l5 8.5a3.5 3.5 0 0 1-3 5.5H12.5a3.5 3.5 0 0 1-3-5.5z', 0.85) +
+      cf(circ(21, 24.5, 2.2), 0.7) +
+      cf(circ(27.5, 20.5, 1.6), 0.5) +
+      cut(circ(19, 37, 1.6), 0.35) +
+      cut(circ(28, 35, 2.2), 0.35),
+  ),
+  check: glyph(cs('M10 25l9 9 19-20', 5.5)),
+  clock: glyph(cf(circ(24, 25, 19), 0.3) + cs(circ(24, 25, 17), 4) + cs('M24 14v11.5l7.5 4.5', 4) + cf(rrect(20, 2, 8, 5, 2))),
+  palette: glyph(
+    cf('M24 5C13 5 5 13 5 23c0 9 7 15 14 15 3 0 3.4-3 2-5.4-1.4-2.4 0-4.6 3-4.6h6c7.4 0 13-4 13-11C43 10 34 5 24 5z') +
+      '<circle cx="14.5" cy="20.5" r="3.2" fill="#ff6b9a"/><circle cx="21.5" cy="13" r="3.2" fill="#ffd166"/><circle cx="31" cy="13.5" r="3.2" fill="#4fe3c1"/><circle cx="35.5" cy="22" r="3.2" fill="#7aa7ff"/>',
+  ),
+  gear: glyph(
+    cf(
+      'M41.7 17.2 L43.0 23.5 L38.5 22.9 L36.9 30.5 L41.4 31.7 L37.8 37.1 L35.0 33.4 L28.5 37.8 L30.8 41.7 L24.5 43.0 L25.1 38.5 L17.5 36.9 L16.3 41.4 L10.9 37.8 L14.6 35.0 L10.2 28.5 L6.3 30.8 L5.0 24.5 L9.5 25.1 L11.1 17.5 L6.6 16.3 L10.2 10.9 L13.0 14.6 L19.5 10.2 L17.2 6.3 L23.5 5.0 L22.9 9.5 L30.5 11.1 L31.7 6.6 L37.1 10.2 L33.4 13.0 L37.8 19.5 Z',
+    ) +
+      cut(circ(24, 24, 7.5), 0.75) +
+      cf(circ(24, 24, 3)),
+  ),
+  lock: glyph(cs('M16 21v-5a8 8 0 0 1 16 0v5', 4.2, 0.6) + cf(rrect(10, 20, 28, 22, 5)) + cut(circ(24, 29.5, 3), 0.55) + cut(rrect(22.5, 30, 3, 6.5, 1.5), 0.55)),
 };
 
 /**
- * Icons with gradients carry ids, and a page can show the same icon many times, some copies
- * inside hidden tabs. A gradient defined in a hidden copy doesn't render, so every read hands
- * out a copy with its own ids.
+ * Icons that still use gradients (none in this set today) need unique ids per copy: a gradient
+ * defined in a hidden copy doesn't render. Every read hands out a copy with its own ids.
  */
 let uid = 0;
 function uniqueIds(svgText: string): string {
   if (!svgText.includes('id="')) return svgText;
-  const n = ++uid;
-  return svgText.replace(/id="([^"]+)"/g, `id="$1-${n}"`).replace(/url\(#([^)]+)\)/g, `url(#$1-${n})`);
+  const k = ++uid;
+  return svgText.replace(/id="([^"]+)"/g, `id="$1-${k}"`).replace(/url\(#([^)]+)\)/g, `url(#$1-${k})`);
 }
 
 function fresh<T extends Record<string, string>>(raw: T): T {
