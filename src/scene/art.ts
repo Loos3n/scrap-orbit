@@ -1,4 +1,6 @@
 import { CanvasSource, Texture } from 'pixi.js';
+import * as sprites from './sprites';
+import { drawMarkup } from './vector';
 
 /**
  * All of the station's art is painted once at startup with Canvas 2D (gradients, soft light,
@@ -140,6 +142,17 @@ function paintCanvas(w: number, h: number, draw: (ctx: Ctx) => void, res: number
 
 export function paint(w: number, h: number, draw: (ctx: Ctx) => void, res = RES, finish?: Finish): Texture {
   return new Texture({ source: new CanvasSource({ resource: paintCanvas(w, h, draw, res, finish), resolution: res, autoGenerateMipmaps: true }) });
+}
+
+/**
+ * A hard-surface sprite from the art kit (sprites.ts), in the same style as the menu icons.
+ * The finish adds only fine grain and faint wear: the kit already draws the light and outlines.
+ */
+function vector(art: sprites.SpriteArt): Texture {
+  return paint(art.w, art.h, (ctx) => {
+    ctx.scale(1 / art.scale, 1 / art.scale);
+    drawMarkup(ctx, art.markup);
+  }, art.res ?? Math.max(RES, art.scale * 2), art.plain ? undefined : { bevel: 0.3, light: 0, grain: 0.12, grime: 0.12, seed: 5 });
 }
 
 /** The same painting as a PNG data URL, for the menus. Empty if the canvas can't be read. */
@@ -392,183 +405,11 @@ export function planet(size: number, bands = ['#e8a37a', '#b0627a', '#6a3d8a', '
 
 // ---------- The station ----------
 
-function rivetRing(ctx: Ctx, c: number, r: number, n: number, color: string) {
-  ctx.fillStyle = color;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    ctx.beginPath();
-    ctx.arc(c + Math.cos(a) * r, c + Math.sin(a) * r, 0.7, 0, TAU);
-    ctx.fill();
-  }
-}
-
-/** Brushed-metal sheen: a conic sweep of light and dark, where the browser supports it. */
-function sheen(ctx: Ctx, c: number, alpha: number): CanvasGradient | string {
-  if (!('createConicGradient' in ctx)) return 'rgba(0,0,0,0)';
-  const g = ctx.createConicGradient(-0.6, c, c);
-  const stops: [number, number][] = [[0, 0.5], [0.08, 1], [0.17, 0.3], [0.3, 0.05], [0.45, 0.6], [0.55, 0.15], [0.7, 0.02], [0.85, 0.35], [1, 0.5]];
-  for (const [o, v] of stops) g.addColorStop(o, `rgba(255,255,255,${(v * alpha).toFixed(3)})`);
-  return g;
-}
-
 /**
  * The main hull disc: a bevelled outer rim, a ring of armour plates with vents and greebles,
  * a lit window band and a recessed socket for the reactor. Lit from the upper left.
  */
-export const hull = () =>
-  paint(140, 140, (ctx) => {
-    const c = 70;
-    const r = rng(11);
-    // Drop shadow, cast down and to the right.
-    ctx.fillStyle = radial(ctx, c + 5, c + 7, 72, [
-      [0.78, 'rgba(0,0,12,0.55)'],
-      [1, 'rgba(0,0,12,0)'],
-    ]);
-    ctx.fillRect(0, 0, 140, 140);
-    // Base metal.
-    ctx.fillStyle = radial(ctx, c - 24, c - 28, 100, [
-      [0, '#a9b0e8'],
-      [0.4, '#5b63b0'],
-      [1, '#1c2052'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 62, 0, TAU);
-    ctx.fill();
-
-    // Armour plates between the rim and the window band, in two tones.
-    const plates = 18;
-    for (let i = 0; i < plates; i++) {
-      const a0 = (i / plates) * TAU + 0.02;
-      const a1 = a0 + TAU / plates - 0.04;
-      const tone = i % 3 === 0 ? 'rgba(10,14,50,0.22)' : i % 3 === 1 ? 'rgba(255,255,255,0.05)' : 'rgba(10,14,50,0.1)';
-      ctx.fillStyle = tone;
-      ctx.beginPath();
-      ctx.arc(c, c, 54, a0, a1);
-      ctx.arc(c, c, 49.5, a1, a0, true);
-      ctx.closePath();
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(c, c, 42.5, a0, a1);
-      ctx.arc(c, c, 38.5, a1, a0, true);
-      ctx.closePath();
-      ctx.fill();
-    }
-    // Hazard stripes where the claw and antenna mount (top and bottom).
-    for (const mid of [-Math.PI / 2, Math.PI / 2]) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(c, c, 54, mid - 0.2, mid + 0.2);
-      ctx.arc(c, c, 49.5, mid + 0.2, mid - 0.2, true);
-      ctx.closePath();
-      ctx.clip();
-      ctx.fillStyle = '#ffcf5a';
-      ctx.fillRect(0, 0, 140, 140);
-      ctx.strokeStyle = '#2a1e10';
-      ctx.lineWidth = 2;
-      for (let k = -140; k < 280; k += 5) {
-        ctx.beginPath();
-        ctx.moveTo(k, 0);
-        ctx.lineTo(k + 140, 140);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
-    // Greebles: small boxes and vent slits on the plate ring.
-    for (let i = 0; i < 26; i++) {
-      const a = r() * TAU;
-      if (Math.abs(Math.sin(a)) > 0.93) continue; // keep the hazard plates clean
-      const rad = 50 + r() * 3;
-      ctx.save();
-      ctx.translate(c + Math.cos(a) * rad, c + Math.sin(a) * rad);
-      ctx.rotate(a + Math.PI / 2);
-      if (r() < 0.5) {
-        const w = 2 + r() * 3;
-        ctx.fillStyle = 'rgba(14,16,48,0.6)';
-        ctx.fillRect(-w / 2 + 0.4, -0.6, w, 2);
-        ctx.fillStyle = 'rgba(200,208,255,0.55)';
-        ctx.fillRect(-w / 2, -1, w, 1.6);
-      } else {
-        ctx.fillStyle = 'rgba(10,12,40,0.7)';
-        for (let k = -1; k <= 1; k++) ctx.fillRect(k * 1.3 - 0.4, -1.2, 0.7, 2.4);
-      }
-      ctx.restore();
-    }
-    // Panel seams.
-    ctx.strokeStyle = 'rgba(8,10,36,0.6)';
-    ctx.lineWidth = 0.7;
-    for (const rad of [54, 49.5, 42.5, 38.5]) {
-      ctx.beginPath();
-      ctx.arc(c, c, rad, 0, TAU);
-      ctx.stroke();
-    }
-    // Light catches the upper-left edge of each seam.
-    ctx.strokeStyle = 'rgba(220,226,255,0.35)';
-    for (const rad of [54.6, 43.1]) {
-      ctx.beginPath();
-      ctx.arc(c, c, rad, Math.PI * 1.0, Math.PI * 1.55);
-      ctx.stroke();
-    }
-    // The window band: lit and dark windows set into a dark strip.
-    ctx.fillStyle = 'rgba(10,12,40,0.75)';
-    ctx.beginPath();
-    ctx.arc(c, c, 48, 0, TAU);
-    ctx.arc(c, c, 44, 0, TAU, true);
-    ctx.fill();
-    for (let i = 0; i < 44; i++) {
-      const a = (i / 44) * TAU;
-      if (r() < 0.2) continue;
-      const lit = r() < 0.78;
-      ctx.fillStyle = lit ? (r() < 0.8 ? `rgba(255,${205 + Math.floor(r() * 40)},130,0.95)` : 'rgba(150,230,255,0.95)') : 'rgba(40,46,100,0.9)';
-      ctx.save();
-      ctx.translate(c + Math.cos(a) * 46, c + Math.sin(a) * 46);
-      ctx.rotate(a);
-      ctx.fillRect(-1, -1.4, 2, 2.8);
-      ctx.restore();
-    }
-    rivetRing(ctx, c, 58, 56, 'rgba(190,198,255,0.4)');
-    // Brushed-metal sheen over everything outside the socket.
-    ctx.save();
-    ctx.globalCompositeOperation = 'overlay';
-    ctx.fillStyle = sheen(ctx, c, 0.5);
-    ctx.beginPath();
-    ctx.arc(c, c, 62, 0, TAU);
-    ctx.arc(c, c, 38, 0, TAU, true);
-    ctx.fill();
-    ctx.restore();
-    // Bevelled rim: bright on the lit side, dark on the far side.
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = linear(ctx, 20, 20, 120, 120, [
-      [0, 'rgba(240,244,255,0.95)'],
-      [0.45, 'rgba(140,150,220,0.55)'],
-      [1, 'rgba(20,22,70,0.9)'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 60.5, 0, TAU);
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(5,6,24,0.7)';
-    ctx.beginPath();
-    ctx.arc(c, c, 62.3, 0, TAU);
-    ctx.stroke();
-    // Recessed socket for the reactor, with an inner shadow.
-    ctx.fillStyle = radial(ctx, c, c, 38, [
-      [0, '#05061a'],
-      [0.7, '#0e1038'],
-      [0.92, '#1d2160'],
-      [1, '#3a40a0'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 38, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = linear(ctx, 30, 30, 110, 110, [
-      [0, 'rgba(0,0,10,0.8)'],
-      [1, 'rgba(160,170,255,0.6)'],
-    ]);
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.arc(c, c, 37.4, 0, TAU);
-    ctx.stroke();
-  }, 4, { bevel: 1.4, light: 0.45, grain: 0.3, grime: 0.3, seed: 2 });
+export const hull = () => vector(sprites.hull());
 
 /**
  * Light and shade laid over the hub after the rotating parts, so the light stays put while
@@ -605,57 +446,7 @@ export const hubShade = (kind: 'dark' | 'light') =>
   }, 2);
 
 /** The rotating habitat ring with lit modules. Lit evenly; the hub shade adds direction. */
-export const habitatRing = () =>
-  paint(124, 124, (ctx) => {
-    const c = 62;
-    ctx.lineCap = 'butt';
-    for (let i = 0; i < 8; i++) {
-      const a0 = (i / 8) * TAU + 0.07;
-      const a1 = a0 + TAU / 8 - 0.14;
-      // Module body, rounded by a gradient across its width.
-      const g = ctx.createRadialGradient(c, c, 52, c, c, 60);
-      g.addColorStop(0, '#5a62b0');
-      g.addColorStop(0.45, '#d4d9ff');
-      g.addColorStop(1, '#4a52a0');
-      ctx.strokeStyle = g;
-      ctx.lineWidth = 7;
-      ctx.beginPath();
-      ctx.arc(c, c, 56, a0, a1);
-      ctx.stroke();
-      // End caps.
-      for (const a of [a0, a1]) {
-        ctx.fillStyle = '#2b3170';
-        ctx.save();
-        ctx.translate(c + Math.cos(a) * 56, c + Math.sin(a) * 56);
-        ctx.rotate(a);
-        ctx.fillRect(-4, -1, 8, 2);
-        ctx.restore();
-      }
-      ctx.strokeStyle = 'rgba(20,22,60,0.55)';
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.arc(c, c, 56, a0 + 0.04, a1 - 0.04);
-      ctx.stroke();
-      // Lit windows along each module.
-      for (let k = 1; k < 7; k++) {
-        const a = a0 + ((a1 - a0) * k) / 7;
-        ctx.fillStyle = k % 3 === 0 ? 'rgba(150,230,255,0.95)' : 'rgba(255,214,140,0.95)';
-        ctx.beginPath();
-        ctx.arc(c + Math.cos(a) * 57.5, c + Math.sin(a) * 57.5, 0.75, 0, TAU);
-        ctx.fill();
-      }
-    }
-    // Spokes to the hub.
-    ctx.strokeStyle = 'rgba(150,158,230,0.7)';
-    ctx.lineWidth = 1.4;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU + TAU / 16;
-      ctx.beginPath();
-      ctx.moveTo(c + Math.cos(a) * 46, c + Math.sin(a) * 46);
-      ctx.lineTo(c + Math.cos(a) * 52.5, c + Math.sin(a) * 52.5);
-      ctx.stroke();
-    }
-  }, 4, { bevel: 1, light: 0.5, grain: 0.3, grime: 0.25, seed: 3 });
+export const habitatRing = () => vector(sprites.habitatRing());
 
 /** The reactor core: a glossy sphere. Painted white so it can be tinted for Overdrive. */
 export const core = () =>
@@ -764,491 +555,27 @@ export const vignette = () =>
   }, 2);
 
 /** A solar array wing: a braced truss and two panels of cells, each catching the light. */
-export const solarWing = () =>
-  paint(64, 30, (ctx) => {
-    // Strut: a solid boom with a lit top edge and bolted collars.
-    ctx.fillStyle = linear(ctx, 0, 12, 0, 18, [
-      [0, '#c5cbff'],
-      [0.5, '#6a72c0'],
-      [1, '#2b3170'],
-    ]);
-    ctx.fillRect(0, 12.5, 19, 5);
-    ctx.fillStyle = '#20264f';
-    for (const x of [4, 10]) ctx.fillRect(x, 12, 1.6, 6);
-    const r = rng(19);
-    for (const [x0, w] of [[19, 21], [42, 21]] as const) {
-      // Frame.
-      ctx.fillStyle = '#c9a24a';
-      ctx.fillRect(x0, 0.5, w, 29);
-      // Cells, each a slightly different blue so the panel shimmers.
-      const cols = 4;
-      const rows = 6;
-      const cw = (w - 2) / cols;
-      const ch = 27 / rows;
-      for (let i = 0; i < cols; i++) {
-        for (let j = 0; j < rows; j++) {
-          const x = x0 + 1 + i * cw;
-          const y = 1.5 + j * ch;
-          const v = r() * 0.25;
-          ctx.fillStyle = linear(ctx, x, y, x + cw, y + ch, [
-            [0, `rgb(${70 + v * 80},${110 + v * 80},255)`],
-            [1, `rgb(${20 + v * 40},${40 + v * 50},${130 + v * 60})`],
-          ]);
-          ctx.fillRect(x + 0.25, y + 0.25, cw - 0.5, ch - 0.5);
-          ctx.fillStyle = 'rgba(200,220,255,0.18)';
-          ctx.fillRect(x + cw / 2 - 0.1, y + 0.25, 0.2, ch - 0.5);
-        }
-      }
-      // Sheen across the panel.
-      ctx.fillStyle = linear(ctx, x0, 0, x0 + w, 30, [
-        [0, 'rgba(255,255,255,0.4)'],
-        [0.3, 'rgba(255,255,255,0.06)'],
-        [0.55, 'rgba(255,255,255,0)'],
-        [0.75, 'rgba(255,255,255,0.12)'],
-        [1, 'rgba(255,255,255,0)'],
-      ]);
-      ctx.fillRect(x0 + 1, 1.5, w - 2, 27);
-    }
-    // Hinge between the panels.
-    ctx.fillStyle = '#5b63b0';
-    ctx.fillRect(40, 12, 2, 6);
-  }, 4, { bevel: 0.6, light: 0.5, grain: 0.25, grime: 0.2, seed: 4 });
+export const solarWing = () => vector(sprites.solarWing());
 
 /** The salvage claw that sits on top of the station. Anchored at its base. */
-export const claw = () =>
-  paint(40, 46, (ctx) => {
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    // Arm.
-    ctx.fillStyle = linear(ctx, 15, 0, 25, 0, [
-      [0, '#c5cbff'],
-      [1, '#4a52a0'],
-    ]);
-    ctx.fillRect(16, 18, 8, 28);
-    ctx.fillStyle = '#2b3170';
-    ctx.fillRect(16, 28, 8, 2);
-    // Joint.
-    ctx.fillStyle = radial(ctx, 18, 16, 7, [
-      [0, '#ffffff'],
-      [1, '#7a84d8'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(20, 18, 5, 0, TAU);
-    ctx.fill();
-    // Pincers.
-    for (const s of [-1, 1]) {
-      ctx.strokeStyle = '#e6e9ff';
-      ctx.lineWidth = 3.4;
-      ctx.beginPath();
-      ctx.moveTo(20 + s * 3, 16);
-      ctx.lineTo(20 + s * 12, 6);
-      ctx.lineTo(20 + s * 6, 1.5);
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(60,70,150,0.6)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(20 + s * 4, 17);
-      ctx.lineTo(20 + s * 12.5, 7.5);
-      ctx.stroke();
-    }
-  }, RES, { bevel: 0.8, light: 0.7, grain: 0.3, grime: 0.3, seed: 5 });
+export const claw = () => vector(sprites.claw());
 
 // ---------- Machines ----------
 
-/** Thin dark seam with a lit lip below it, like a panel join catching light from above. */
-function seam(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, w = 0.35) {
-  ctx.lineCap = 'round';
-  ctx.lineWidth = w;
-  ctx.strokeStyle = 'rgba(8,12,40,0.55)';
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.28)';
-  ctx.beginPath();
-  ctx.moveTo(x0 + w * 0.7, y0 + w * 0.7);
-  ctx.lineTo(x1 + w * 0.7, y1 + w * 0.7);
-  ctx.stroke();
-}
-
-/** A small status light with a soft halo. */
-function lamp(ctx: Ctx, x: number, y: number, r: number, color: string) {
-  ctx.fillStyle = radial(ctx, x, y, r * 3, [
-    [0, rgba(color, 0.55)],
-    [1, rgba(color, 0)],
-  ]);
-  ctx.fillRect(x - r * 3, y - r * 3, r * 6, r * 6);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.beginPath();
-  ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.4, 0, TAU);
-  ctx.fill();
-}
-
 /** Small salvage drone, pointing right: a rounded pod with a glass dome, fins and a grabber. */
-export const drone = () =>
-  paint(18, 14, (ctx) => {
-    // Fins, with a darker trailing edge.
-    for (const s of [-1, 1]) {
-      ctx.fillStyle = linear(ctx, 2, 7, 9, 7, [
-        [0, '#0f5e50'],
-        [1, '#22a98d'],
-      ]);
-      ctx.beginPath();
-      ctx.moveTo(6, 7 + s * 2);
-      ctx.lineTo(2, 7 + s * 6.2);
-      ctx.lineTo(4.5, 7 + s * 6.2);
-      ctx.lineTo(9, 7 + s * 2.5);
-      ctx.fill();
-      ctx.fillStyle = '#ffcf5a';
-      ctx.fillRect(2.4, 7 + s * 6.2 - (s > 0 ? 0.7 : 0), 1.8, 0.7);
-    }
-    // Body.
-    ctx.fillStyle = linear(ctx, 0, 2, 0, 12, [
-      [0, '#e2fff8'],
-      [0.35, '#5ff0cd'],
-      [0.7, '#22a98d'],
-      [1, '#0f5e50'],
-    ]);
-    ctx.beginPath();
-    ctx.ellipse(9, 7, 6.5, 4.2, 0, 0, TAU);
-    ctx.fill();
-    // Panel seams and a belly plate.
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(9, 7, 6.5, 4.2, 0, 0, TAU);
-    ctx.clip();
-    ctx.fillStyle = 'rgba(6,40,40,0.28)';
-    ctx.fillRect(2, 8.6, 14, 3);
-    seam(ctx, 5.6, 3, 5.6, 11, 0.25);
-    seam(ctx, 13.2, 3.5, 13.2, 10.5, 0.25);
-    ctx.restore();
-    // Grabber arms at the nose, with jointed tips.
-    ctx.lineCap = 'round';
-    for (const s of [-1, 1]) {
-      ctx.strokeStyle = '#3a4380';
-      ctx.lineWidth = 0.9;
-      ctx.beginPath();
-      ctx.moveTo(14.6, 7 + s * 1.1);
-      ctx.lineTo(16.4, 7 + s * 2.3);
-      ctx.lineTo(17.5, 7 + s * 1.3);
-      ctx.stroke();
-      ctx.strokeStyle = '#dfe4ff';
-      ctx.lineWidth = 0.45;
-      ctx.beginPath();
-      ctx.moveTo(14.6, 7 + s * 1.1);
-      ctx.lineTo(16.4, 7 + s * 2.3);
-      ctx.lineTo(17.5, 7 + s * 1.3);
-      ctx.stroke();
-    }
-    // Glass dome with a frame and a reflected window glint.
-    ctx.fillStyle = '#163a4a';
-    ctx.beginPath();
-    ctx.ellipse(10.5, 6.6, 3, 2.6, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = radial(ctx, 10, 5.4, 3.4, [
-      [0, '#f2fdff'],
-      [0.35, '#6fdcff'],
-      [1, '#0a3046'],
-    ]);
-    ctx.beginPath();
-    ctx.ellipse(10.5, 6.6, 2.5, 2.1, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath();
-    ctx.ellipse(9.7, 5.6, 0.9, 0.45, -0.5, 0, TAU);
-    ctx.fill();
-    // Engine nozzle with a hot core.
-    ctx.fillStyle = linear(ctx, 0, 5.4, 0, 8.6, [
-      [0, '#8c96d8'],
-      [1, '#1a1f48'],
-    ]);
-    ctx.fillRect(1.6, 5.4, 1.9, 3.2);
-    ctx.fillStyle = '#ffb36a';
-    ctx.fillRect(1.6, 6.4, 0.6, 1.2);
-    // Specular highlight along the top.
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.beginPath();
-    ctx.ellipse(7, 4.2, 2.6, 0.7, -0.1, 0, TAU);
-    ctx.fill();
-    lamp(ctx, 12.8, 9.4, 0.45, '#ff6a7a');
-  }, 6, { bevel: 0.6, light: 0.6, grain: 0.18, grime: 0.12, seed: 6 });
+export const drone = () => vector(sprites.drone());
 
 /** Cargo hauler, pointing right: a cab, a spine of containers and a big engine. */
-export const hauler = () =>
-  paint(32, 16, (ctx) => {
-    // Engine bell with cooling rings and a glowing throat.
-    ctx.fillStyle = linear(ctx, 0, 3.5, 0, 12.5, [
-      [0, '#b8c0f4'],
-      [0.4, '#6670c4'],
-      [1, '#1f2460'],
-    ]);
-    ctx.beginPath();
-    ctx.moveTo(4.5, 5);
-    ctx.lineTo(1, 3.5);
-    ctx.lineTo(1, 12.5);
-    ctx.lineTo(4.5, 11);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(10,12,40,0.5)';
-    ctx.lineWidth = 0.3;
-    for (const x of [2.2, 3.4]) {
-      ctx.beginPath();
-      ctx.moveTo(x, 4.1 + (x - 1) * 0.3);
-      ctx.lineTo(x, 11.9 - (x - 1) * 0.3);
-      ctx.stroke();
-    }
-    ctx.fillStyle = radial(ctx, 1, 8, 2.4, [
-      [0, '#fff1c8'],
-      [0.5, '#ff9a4c'],
-      [1, 'rgba(255,90,40,0)'],
-    ]);
-    ctx.fillRect(0, 5, 3, 6);
-    // Spine truss.
-    ctx.fillStyle = linear(ctx, 0, 6.8, 0, 9.2, [
-      [0, '#8a92dc'],
-      [1, '#2c3274'],
-    ]);
-    ctx.fillRect(4, 6.8, 20, 2.4);
-    ctx.strokeStyle = 'rgba(12,14,46,0.6)';
-    ctx.lineWidth = 0.25;
-    for (let x = 4.5; x < 24; x += 1.5) {
-      ctx.beginPath();
-      ctx.moveTo(x, 6.8);
-      ctx.lineTo(x + 1.5, 9.2);
-      ctx.stroke();
-    }
-    // Containers, two stacks, with ridges, a stencilled band and corner castings.
-    const colors = ['#ff8a4c', '#ffd166', '#4fe3c1', '#c58cff'];
-    for (let i = 0; i < 4; i++) {
-      for (const y of [2.3, 9.2]) {
-        const x = 5 + i * 4.6;
-        const col = colors[(i + (y > 5 ? 2 : 0)) % 4];
-        ctx.fillStyle = linear(ctx, 0, y, 0, y + 4.5, [
-          [0, '#ffffff'],
-          [0.12, col],
-          [0.7, col],
-          [1, 'rgba(40,20,60,1)'],
-        ]);
-        ctx.fillRect(x, y, 4.2, 4.5);
-        ctx.fillStyle = 'rgba(0,0,0,0.22)';
-        for (let k = 1; k < 5; k++) ctx.fillRect(x + k * 0.84 - 0.12, y + 0.5, 0.24, 3.5);
-        ctx.fillStyle = 'rgba(255,255,255,0.18)';
-        for (let k = 1; k < 5; k++) ctx.fillRect(x + k * 0.84 + 0.12, y + 0.5, 0.18, 3.5);
-        ctx.fillStyle = 'rgba(20,14,40,0.45)';
-        ctx.fillRect(x, y + 2, 4.2, 0.6);
-        ctx.fillStyle = 'rgba(30,24,60,0.9)';
-        for (const [cx, cy] of [[x, y], [x + 3.7, y], [x, y + 4], [x + 3.7, y + 4]]) ctx.fillRect(cx, cy, 0.5, 0.5);
-      }
-    }
-    // Cab with a window frame, seams and a nose light.
-    ctx.fillStyle = linear(ctx, 0, 3, 0, 13, [
-      [0, '#f4f7ff'],
-      [0.4, '#86b0ff'],
-      [1, '#26408f'],
-    ]);
-    ctx.beginPath();
-    ctx.moveTo(23.5, 3.5);
-    ctx.lineTo(27, 3.5);
-    ctx.quadraticCurveTo(32, 8, 27, 12.5);
-    ctx.lineTo(23.5, 12.5);
-    ctx.closePath();
-    ctx.fill();
-    seam(ctx, 25.2, 3.8, 25.2, 12.2, 0.25);
-    ctx.fillStyle = '#16224a';
-    ctx.beginPath();
-    ctx.ellipse(28, 7.2, 2.1, 2.5, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = radial(ctx, 27.6, 6.2, 3, [
-      [0, '#f2fdff'],
-      [0.4, '#6fd2ff'],
-      [1, '#1a6a9a'],
-    ]);
-    ctx.beginPath();
-    ctx.ellipse(28, 7.2, 1.7, 2.1, 0, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillRect(27.2, 5.6, 0.5, 1.3);
-    lamp(ctx, 30.6, 8, 0.4, '#ffe08a');
-    lamp(ctx, 23.9, 12.1, 0.35, '#ff6a7a');
-  }, 5, { bevel: 0.5, light: 0.6, grain: 0.25, grime: 0.3, seed: 8 });
+export const hauler = () => vector(sprites.hauler());
 
 /** Smelter pod: a squat furnace with a glowing grill, a chimney and side vents. Points outward (right). */
-export const smelter = () =>
-  paint(22, 22, (ctx) => {
-    // Chimney stacks behind the body.
-    for (const y of [2.2, 16.6]) {
-      ctx.fillStyle = linear(ctx, 0, y, 0, y + 3.2, [
-        [0, '#8a8fb8'],
-        [1, '#33365c'],
-      ]);
-      ctx.fillRect(2.5, y, 5, 3.2);
-      ctx.fillStyle = '#1a1b30';
-      ctx.fillRect(3.2, y + (y < 10 ? 0 : 2.4), 3.6, 0.8);
-    }
-    // Furnace body.
-    ctx.fillStyle = linear(ctx, 0, 3, 0, 19, [
-      [0, '#ffd9bd'],
-      [0.25, '#e07a3e'],
-      [0.7, '#9a4220'],
-      [1, '#4a1c0e'],
-    ]);
-    ctx.beginPath();
-    ctx.roundRect(1, 3, 20, 16, 5);
-    ctx.fill();
-    // Heat-scorched band around the grill.
-    ctx.fillStyle = radial(ctx, 11, 11, 10, [
-      [0.4, 'rgba(40,10,0,0.45)'],
-      [1, 'rgba(40,10,0,0)'],
-    ]);
-    ctx.fillRect(1, 3, 20, 16);
-    // Bolted frame around the firebox.
-    ctx.fillStyle = '#3a1a10';
-    ctx.beginPath();
-    ctx.roundRect(4, 6, 14, 10, 2.5);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,220,190,0.75)';
-    for (const [x, y] of [[5, 7], [17, 7], [5, 15], [17, 15]]) {
-      ctx.beginPath();
-      ctx.arc(x, y, 0.45, 0, TAU);
-      ctx.fill();
-    }
-    // Molten glow.
-    ctx.fillStyle = radial(ctx, 11, 11, 7, [
-      [0, '#fffbe0'],
-      [0.35, '#ffd36a'],
-      [0.75, '#ff7a2a'],
-      [1, '#c4301a'],
-    ]);
-    ctx.beginPath();
-    ctx.roundRect(5.4, 7.4, 11.2, 7.2, 1.6);
-    ctx.fill();
-    // Grill bars with a lit top edge.
-    for (let x = 7.6; x < 16; x += 2.4) {
-      ctx.fillStyle = '#4a160c';
-      ctx.fillRect(x - 0.5, 7.4, 1, 7.2);
-      ctx.fillStyle = 'rgba(255,190,120,0.7)';
-      ctx.fillRect(x - 0.5, 7.4, 0.3, 7.2);
-    }
-    // Vent slits on the outer face.
-    ctx.fillStyle = 'rgba(40,12,4,0.7)';
-    for (let k = 0; k < 4; k++) ctx.fillRect(19, 6.5 + k * 2.6, 1.2, 1.4);
-    // Outline glint.
-    ctx.strokeStyle = 'rgba(255,236,220,0.55)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.roundRect(1.5, 3.5, 19, 15, 4.6);
-    ctx.stroke();
-    lamp(ctx, 3, 5.4, 0.45, '#7dffb0');
-  }, 5, { bevel: 0.9, light: 0.6, grain: 0.3, grime: 0.4, seed: 9 });
+export const smelter = () => vector(sprites.smelter());
 
 /** Fabricator module: a hex block with a working printer eye, panel facets and status lights. */
-export const fabricator = () =>
-  paint(20, 20, (ctx) => {
-    const hex = (r: number) => {
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * TAU + Math.PI / 6;
-        ctx.lineTo(10 + Math.cos(a) * r, 10 + Math.sin(a) * r);
-      }
-      ctx.closePath();
-    };
-    ctx.fillStyle = linear(ctx, 0, 0, 20, 20, [
-      [0, '#f4e6ff'],
-      [0.4, '#b27cf0'],
-      [1, '#3e1f72'],
-    ]);
-    hex(9.5);
-    ctx.fill();
-    // Facets: each of the six faces gets its own tone from the light.
-    for (let i = 0; i < 6; i++) {
-      const a0 = (i / 6) * TAU + Math.PI / 6;
-      const a1 = a0 + TAU / 6;
-      const mid = (a0 + a1) / 2;
-      const lit = -(Math.cos(mid) * -0.62 + Math.sin(mid) * -0.78);
-      ctx.fillStyle = lit < 0 ? `rgba(255,255,255,${(-lit * 0.22).toFixed(3)})` : `rgba(20,6,50,${(lit * 0.3).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.moveTo(10 + Math.cos(a0) * 9.5, 10 + Math.sin(a0) * 9.5);
-      ctx.lineTo(10 + Math.cos(a1) * 9.5, 10 + Math.sin(a1) * 9.5);
-      ctx.lineTo(10 + Math.cos(a1) * 6.2, 10 + Math.sin(a1) * 6.2);
-      ctx.lineTo(10 + Math.cos(a0) * 6.2, 10 + Math.sin(a0) * 6.2);
-      ctx.closePath();
-      ctx.fill();
-    }
-    ctx.strokeStyle = 'rgba(30,10,60,0.5)';
-    ctx.lineWidth = 0.35;
-    hex(6.2);
-    ctx.stroke();
-    // Printer eye.
-    ctx.fillStyle = '#1c0e38';
-    ctx.beginPath();
-    ctx.arc(10, 10, 4.6, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = linear(ctx, 6, 6, 14, 14, [
-      [0, 'rgba(0,0,0,0.6)'],
-      [1, 'rgba(230,200,255,0.7)'],
-    ]);
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.arc(10, 10, 4.3, 0, TAU);
-    ctx.stroke();
-    ctx.fillStyle = radial(ctx, 10, 10, 3.2, [
-      [0, '#ffffff'],
-      [0.3, '#f0d8ff'],
-      [0.7, '#b46cff'],
-      [1, 'rgba(120,50,220,0)'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(10, 10, 3.2, 0, TAU);
-    ctx.fill();
-    lamp(ctx, 15.4, 6.6, 0.45, '#7dffb0');
-    lamp(ctx, 15.4, 13.4, 0.45, '#ffcf5a');
-  }, 6, { bevel: 0.8, light: 0.6, grain: 0.2, grime: 0.15, seed: 10 });
+export const fabricator = () => vector(sprites.fabricator());
 
 /** One 30-degree section of the gold orbital dock ring, centred on a canvas the size of the ring. */
-export const dockSegment = (radius: number) =>
-  paint(radius * 2 + 20, radius * 2 + 20, (ctx) => {
-    const c = radius + 10;
-    const a0 = -Math.PI / 12 + 0.03;
-    const a1 = Math.PI / 12 - 0.03;
-    ctx.lineCap = 'round';
-    // Truss: two rails with cross bracing.
-    for (const [r, w] of [[radius - 4, 2.2], [radius + 4, 2.2]] as const) {
-      ctx.strokeStyle = linear(ctx, c, c - radius, c, c + radius, [
-        [0, '#fff1c4'],
-        [1, '#c8902a'],
-      ]);
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.arc(c, c, r, a0, a1);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(255,209,102,0.85)';
-    ctx.lineWidth = 0.9;
-    const n = 7;
-    for (let i = 0; i < n; i++) {
-      const t0 = a0 + ((a1 - a0) * i) / n;
-      const t1 = a0 + ((a1 - a0) * (i + 1)) / n;
-      ctx.beginPath();
-      ctx.moveTo(c + Math.cos(t0) * (radius - 4), c + Math.sin(t0) * (radius - 4));
-      ctx.lineTo(c + Math.cos(t1) * (radius + 4), c + Math.sin(t1) * (radius + 4));
-      ctx.stroke();
-    }
-    // Docking clamp at the middle, with a landing light.
-    ctx.fillStyle = linear(ctx, c + radius - 8, c - 6, c + radius + 8, c + 6, [
-      [0, '#fff1c4'],
-      [1, '#a8741a'],
-    ]);
-    ctx.beginPath();
-    ctx.roundRect(c + radius - 7, c - 5, 14, 10, 2);
-    ctx.fill();
-    ctx.fillStyle = '#ff6b9a';
-    ctx.beginPath();
-    ctx.arc(c + radius + 5, c, 1.3, 0, TAU);
-    ctx.fill();
-  }, 2.5);
+export const dockSegment = (radius: number) => vector(sprites.dockSegment(radius));
 
 // ---------- Space junk ----------
 
@@ -1292,132 +619,15 @@ export function debris(seed: number): Texture {
 }
 
 /** The rare golden scrap crate: polished gold with a star emblem and bright edges. */
-export const goldenCrate = () =>
-  paint(32, 32, (ctx) => {
-    ctx.fillStyle = linear(ctx, 0, 2, 0, 30, [
-      [0, '#fffbe6'],
-      [0.25, '#ffe27a'],
-      [0.6, '#f0a818'],
-      [1, '#8a5404'],
-    ]);
-    ctx.beginPath();
-    ctx.roundRect(3, 3, 26, 26, 6);
-    ctx.fill();
-    // Bevelled inner panel.
-    ctx.strokeStyle = 'rgba(255,255,230,0.85)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.roundRect(5.5, 5.5, 21, 21, 4);
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(120,70,0,0.6)';
-    ctx.beginPath();
-    ctx.roundRect(6.6, 6.6, 18.8, 18.8, 3.4);
-    ctx.stroke();
-    // Star emblem.
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * TAU - Math.PI / 2;
-      const rr = i % 2 ? 3.2 : 7.4;
-      ctx.lineTo(16 + Math.cos(a) * rr, 16.4 + Math.sin(a) * rr);
-    }
-    ctx.closePath();
-    ctx.fillStyle = radial(ctx, 14.5, 14, 8, [
-      [0, '#ffffff'],
-      [0.5, '#fff1b0'],
-      [1, '#ffbf2e'],
-    ]);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(140,80,0,0.7)';
-    ctx.lineWidth = 0.7;
-    ctx.stroke();
-    // Specular streak across the top-left corner.
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(3, 3, 26, 26, 6);
-    ctx.clip();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath();
-    ctx.moveTo(3, 12);
-    ctx.lineTo(12, 3);
-    ctx.lineTo(16, 3);
-    ctx.lineTo(3, 16);
-    ctx.fill();
-    ctx.restore();
-  }, 4, { bevel: 1, light: 0.6, grain: 0.15, grime: 0.05, seed: 31 });
+export const goldenCrate = () => vector(sprites.goldenCrate());
 
 /** The golden salvage crate. */
-export const crate = () =>
-  paint(28, 28, (ctx) => {
-    ctx.fillStyle = linear(ctx, 0, 0, 28, 28, [
-      [0, '#fff1c4'],
-      [0.45, '#ffd166'],
-      [1, '#b07a12'],
-    ]);
-    ctx.beginPath();
-    ctx.roundRect(3, 3, 22, 22, 4);
-    ctx.fill();
-    ctx.strokeStyle = '#7a5208';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.roundRect(3.7, 3.7, 20.6, 20.6, 3.5);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(122,82,8,0.55)';
-    ctx.fillRect(12, 3, 4, 22);
-    ctx.fillRect(3, 12, 22, 4);
-    ctx.fillStyle = '#fff8e0';
-    ctx.beginPath();
-    ctx.arc(14, 14, 3.2, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.fillRect(5, 5, 6, 2);
-  }, 4, { bevel: 1, light: 0.7, grain: 0.4, grime: 0.4, seed: 12 });
+export const crate = () => vector(sprites.crate());
 
 // ---------- Extra detail ----------
 
 /** Comms mast with a dish, hanging below the hull. Anchored at its top. */
-export const antenna = () =>
-  paint(40, 40, (ctx) => {
-    ctx.fillStyle = linear(ctx, 17, 0, 23, 0, [
-      [0, '#c5cbff'],
-      [1, '#3a4090'],
-    ]);
-    ctx.fillRect(18, 0, 4, 20);
-    ctx.strokeStyle = 'rgba(200,206,255,0.7)';
-    ctx.lineWidth = 0.7;
-    for (let y = 2; y < 20; y += 4) {
-      ctx.beginPath();
-      ctx.moveTo(18, y);
-      ctx.lineTo(22, y + 4);
-      ctx.stroke();
-    }
-    // Dish, facing down-left.
-    ctx.save();
-    ctx.translate(20, 26);
-    ctx.rotate(0.5);
-    ctx.fillStyle = linear(ctx, -12, -4, 12, 6, [
-      [0, '#f2f4ff'],
-      [0.6, '#9aa2e8'],
-      [1, '#3a4090'],
-    ]);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 12, 5, 0, 0, Math.PI);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#2b3170';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-    ctx.strokeStyle = '#c5cbff';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, 9);
-    ctx.stroke();
-    ctx.fillStyle = '#ff6b9a';
-    ctx.beginPath();
-    ctx.arc(0, 9.5, 1.4, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-  }, 5, { bevel: 0.6, light: 0.6, grain: 0.25, grime: 0.25, seed: 13 });
+export const antenna = () => vector(sprites.antenna());
 
 /** A cratered grey moon, lit from the upper left. */
 export const moon = () =>
@@ -1460,116 +670,13 @@ export const bigRock = (seed: number) =>
   }, 3);
 
 /** A small laser turret on a strut, barrel pointing up (rotate to aim). */
-export const laserTurret = () =>
-  paint(28, 34, (ctx) => {
-    // Base plate.
-    ctx.fillStyle = linear(ctx, 4, 24, 24, 34, [
-      [0, '#6a6f9c'],
-      [1, '#262a4e'],
-    ]);
-    ctx.beginPath();
-    ctx.roundRect(3, 24, 22, 8, 3);
-    ctx.fill();
-    // Turret dome.
-    ctx.fillStyle = radial(ctx, 11, 18, 12, [
-      [0, '#f1f3ff'],
-      [0.5, '#9aa0d0'],
-      [1, '#3a3f70'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(14, 22, 9, Math.PI, 0);
-    ctx.closePath();
-    ctx.fill();
-    // Barrel.
-    ctx.fillStyle = linear(ctx, 11, 0, 17, 0, [
-      [0, '#2e3260'],
-      [0.5, '#c8ccf0'],
-      [1, '#2e3260'],
-    ]);
-    ctx.fillRect(11.5, 3, 5, 15);
-    ctx.fillStyle = '#ff5d6c';
-    ctx.fillRect(11.5, 2, 5, 2.5);
-    ctx.fillStyle = radial(ctx, 14, 3, 5, [
-      [0, 'rgba(255,200,200,1)'],
-      [1, 'rgba(255,93,108,0)'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(14, 3, 5, 0, TAU);
-    ctx.fill();
-  }, 4, { bevel: 0.8, light: 0.7, grain: 0.3, grime: 0.3, seed: 14 });
+export const laserTurret = () => vector(sprites.laserTurret());
 
-/** A swirling gravity vortex: a dark eye with bright spiral arms. Spin it. */
-export const vortex = () =>
-  paint(90, 90, (ctx) => {
-    const c = 45;
-    ctx.fillStyle = radial(ctx, c, c, 44, [
-      [0, 'rgba(92,225,255,0.35)'],
-      [0.5, 'rgba(60,120,255,0.12)'],
-      [1, 'rgba(60,120,255,0)'],
-    ]);
-    ctx.fillRect(0, 0, 90, 90);
-    ctx.lineCap = 'round';
-    for (let arm = 0; arm < 4; arm++) {
-      for (let i = 0; i < 40; i++) {
-        const t = i / 40;
-        const a = (arm / 4) * TAU + t * Math.PI * 2.2;
-        const d = 6 + t * 36;
-        ctx.strokeStyle = `rgba(${170 + 85 * (1 - t)},${230},255,${0.65 * (1 - t)})`;
-        ctx.lineWidth = 2.6 * (1 - t) + 0.4;
-        ctx.beginPath();
-        ctx.arc(c, c, d, a, a + 0.12);
-        ctx.stroke();
-      }
-    }
-    ctx.fillStyle = radial(ctx, c, c, 9, [
-      [0, '#000008'],
-      [0.75, '#05061a'],
-      [1, 'rgba(160,240,255,0.9)'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 9, 0, TAU);
-    ctx.fill();
-  }, 3);
+/** A gravity well: a dark eye with spiral arms. Spin it (drawn with normal blending). */
+export const vortex = () => vector(sprites.vortex());
 
 /** A warp gate: a heavy segmented ring with lights. The portal is a separate sprite. */
-export const warpGate = () =>
-  paint(120, 120, (ctx) => {
-    const c = 60;
-    ctx.lineWidth = 11;
-    ctx.strokeStyle = linear(ctx, 0, 0, 120, 120, [
-      [0, '#b9b2ff'],
-      [0.5, '#4b3f9a'],
-      [1, '#1e1846'],
-    ]);
-    ctx.beginPath();
-    ctx.arc(c, c, 48, 0, TAU);
-    ctx.stroke();
-    ctx.lineWidth = 1.2;
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath();
-    ctx.arc(c, c, 53, Math.PI * 1.05, Math.PI * 1.7);
-    ctx.stroke();
-    // Clamps around the ring.
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * TAU;
-      ctx.save();
-      ctx.translate(c + Math.cos(a) * 48, c + Math.sin(a) * 48);
-      ctx.rotate(a);
-      ctx.fillStyle = linear(ctx, -7, 0, 7, 0, [
-        [0, '#2a2460'],
-        [0.5, '#9d94ff'],
-        [1, '#2a2460'],
-      ]);
-      ctx.beginPath();
-      ctx.roundRect(-7, -5, 14, 10, 2);
-      ctx.fill();
-      ctx.fillStyle = i % 2 ? '#ffe9a8' : '#8f7bff';
-      ctx.beginPath();
-      ctx.arc(4, 0, 1.6, 0, TAU);
-      ctx.fill();
-      ctx.restore();
-    }
-  }, 4, { bevel: 1.2, light: 0.5, grain: 0.3, grime: 0.3, seed: 15 });
+export const warpGate = () => vector(sprites.warpGate());
 
 /** The shimmering inside of a warp gate. Spin and pulse it with additive blending. */
 export const portal = () =>
@@ -1610,29 +717,7 @@ export const sun = () =>
   }, 3);
 
 /** One curved collector panel of a Dyson swarm, centred on its arc. */
-export const dysonPanel = () =>
-  paint(30, 12, (ctx) => {
-    ctx.fillStyle = linear(ctx, 0, 0, 30, 0, [
-      [0, '#3b3220'],
-      [0.5, '#ffe9a8'],
-      [1, '#3b3220'],
-    ]);
-    ctx.beginPath();
-    ctx.moveTo(1, 9);
-    ctx.quadraticCurveTo(15, 1, 29, 9);
-    ctx.lineTo(27, 11);
-    ctx.quadraticCurveTo(15, 4, 3, 11);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 0.5;
-    for (let x = 6; x < 26; x += 5) {
-      ctx.beginPath();
-      ctx.moveTo(x, 9 - Math.sin((x / 30) * Math.PI) * 5);
-      ctx.lineTo(x, 11 - Math.sin((x / 30) * Math.PI) * 5);
-      ctx.stroke();
-    }
-  }, 4, { bevel: 0.5, light: 0.5, grain: 0.2, grime: 0.15, seed: 16 });
+export const dysonPanel = () => vector(sprites.dysonPanel());
 
 /** A glowing meteor head: molten rock with a hot rim. The tail is a stretched streak. */
 export const meteor = () =>

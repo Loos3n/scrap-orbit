@@ -778,7 +778,6 @@ export class StationScene {
       const i = this.wells.length;
       const a = [Math.PI * 0.82, Math.PI * 0.18, Math.PI * 1.12, Math.PI * 1.88][i];
       const s = this.sprite(t.vortex, this.farLayer, Math.cos(a) * WELL_RADIUS, Math.sin(a) * WELL_RADIUS * 0.8);
-      s.blendMode = 'add';
       this.wells.push({ s, x: s.x, y: s.y, spin: i % 2 ? 1 : -1 });
     }
     while (this.wells.length > wellCount) this.wells.pop()!.s.destroy();
