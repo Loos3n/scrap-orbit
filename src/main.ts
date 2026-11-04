@@ -353,6 +353,20 @@ async function boot(): Promise<void> {
         sfx.achievement();
         break;
       }
+      case 'star': {
+        const p = e.prize;
+        const icon = ICONS.star.replace('currentColor', '#ffe27a');
+        if (p.kind === 'jackpot') {
+          fanfare.cheer({ icon, kicker: 'Lucky star', title: 'Jackpot!', sub: `An hour of scrap at once: +${fmt(p.amount)}`, color: '#ffd166' });
+          sfx.fanfare();
+        } else {
+          const what = p.kind === 'crystals' ? `+${p.amount} crystals` : p.kind === 'overdrive' ? `a free Overdrive for ${p.seconds}s` : `ten minutes of scrap, +${fmt(p.amount)}`;
+          ui.toast(icon, `<b>Lucky star!</b> It brought ${what}`);
+          sfx.achievement();
+        }
+        if (p.kind === 'overdrive') sfx.boost();
+        break;
+      }
       case 'weeklyClaim':
         if (e.paint) {
           const p = allPaints().find((x) => x.id === e.paint)!;
@@ -728,6 +742,13 @@ async function boot(): Promise<void> {
       buzz(15);
       return;
     }
+    if (hit === 'star') {
+      const p = game.catchStar();
+      const text = p.kind === 'crystals' ? `+${p.amount} crystals` : p.kind === 'overdrive' ? 'Free Overdrive!' : `+${fmt(p.amount)}`;
+      scene.floatText(scene.lastHit.x, scene.lastHit.y, text, true);
+      buzz([20, 40, 60]);
+      return;
+    }
     if (hit === 'golden') {
       game.collectGolden();
       buzz(40);
@@ -769,6 +790,7 @@ async function boot(): Promise<void> {
     game.update(now);
     scene.setBoost(eco.boostActive(game.state, now));
     scene.holdCrate = game.tutorialStep === 'crate';
+    scene.starsAllowed = game.state.tutorial < 0;
     scene.setBossHealth(meta.bossHealth(game.state));
     ui.renderHud((t - lastFrame) / 1000);
     lastFrame = t;

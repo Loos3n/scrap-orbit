@@ -107,6 +107,7 @@ export interface GameState {
     golden?: number;
     trades?: number;
     safes?: number;
+    stars?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;

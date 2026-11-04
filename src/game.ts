@@ -1,3 +1,4 @@
+import { catchStar, type StarPrize } from './core/lucky';
 import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
 import { sectorCrateMult } from './core/sectors';
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
@@ -69,6 +70,7 @@ export type GameEvent =
   | { type: 'trade'; result: meta.TradeResult }
   | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
   | { type: 'reset' }
+  | { type: 'star'; prize: StarPrize }
   | { type: 'weekly'; phase: 'start' | 'tier'; id: WeeklyId }
   | { type: 'weeklyClaim'; crystals: number; paint?: string };
 
@@ -243,6 +245,13 @@ export class Game {
   }
 
   /** Tapping the golden crate starts a golden rush. */
+  /** A lucky shooting star was tapped: rolls and pays its surprise. */
+  catchStar(): StarPrize {
+    const prize = catchStar(this.state, Date.now());
+    this.emit({ type: 'star', prize });
+    return prize;
+  }
+
   collectGolden(): void {
     meta.claimGolden(this.state, Date.now());
     this.emit({ type: 'golden' });
