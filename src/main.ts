@@ -1,6 +1,17 @@
+import { askPermission, cancelReminders, notificationsAvailable, scheduleReminders } from './notify';
+import { WEEKLIES, allPaints, weeklyOn } from './core/weekly';
+import { GROWTH, growthStage } from './core/growth';
+import { GROUP_NAMES } from './ui/panes';
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
 // Content-Security-Policy hosts (embedded pages, some app stores' web views).
 import 'pixi.js/unsafe-eval';
+// Fonts ship with the game (no network needed), which the phone app relies on.
+import '@fontsource/fredoka/latin-500.css';
+import '@fontsource/fredoka/latin-600.css';
+import '@fontsource/fredoka/latin-700.css';
+import '@fontsource/rubik/latin-400.css';
+import '@fontsource/rubik/latin-500.css';
+import '@fontsource/rubik/latin-600.css';
 import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
@@ -13,13 +24,13 @@ import { D, format } from './core/num';
 import { Game } from './game';
 import * as art from './scene/art';
 import { StationScene } from './scene/station';
-import { timeStretch } from './core/sectors';
+import { sectorCrateMult, timeStretch } from './core/sectors';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
 import { tradeText } from './ui/trade-ui';
-import { UI } from './ui/ui';
+import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
 import { blockPageZoom } from './ui/nozoom';
 import { ORNAMENTS } from './core/ornaments';
@@ -47,7 +58,10 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 /** Names the sector (or galaxy) the station just warped into. */
-function showSectorCard(relocations: number, galaxy = 0): void {
+function showSectorCard(relocations: number, galaxy = 0, speed = 0): void {
+  const fast = document.getElementById('sector-speed')!;
+  fast.hidden = speed < 1.05;
+  fast.textContent = `Everything runs ${fmtSpeed(speed)} faster`;
   const card = document.getElementById('sector-card')!;
   document.getElementById('sector-num')!.textContent = galaxy ? `Galaxy ${galaxy} · Sector ${relocations + 1}` : `Sector ${relocations + 1}`;
   const sector = sectorFor(relocations);
@@ -62,6 +76,15 @@ function showSectorCard(relocations: number, galaxy = 0): void {
   card.style.animationDuration = sector.twist ? '6.5s' : '';
   window.setTimeout(() => (card.hidden = true), sector.twist ? 6500 : 4000);
 }
+
+/** The card after the very first relocation, so the player sees what prestige bought them. */
+const FIRST_JUMP = (cores: number, speed: number) => ({
+  icon: ICONS.core,
+  kicker: 'First relocation',
+  title: `${fmtSpeed(speed)} faster`,
+  sub: `${cores.toLocaleString('en-US')} Star Cores now power every machine and tap. Earn more before your next jump to go even faster.`,
+  color: '#8f7bff',
+});
 
 const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
@@ -86,7 +109,9 @@ async function boot(): Promise<void> {
   ui.onRelocate = () => game.relocate();
   ui.syncSettings();
   const scene = new StationScene();
+  if (import.meta.env.DEV) (window as unknown as { __scene: StationScene }).__scene = scene;
   ui.onComfortChange = (reduceFlash, reduceShake) => scene.setComfort(reduceFlash, reduceShake);
+  ui.onPowerChange = (saver) => scene.setBatterySaver(saver);
   ui.syncSettings();
   const sceneEl = document.getElementById('scene')!;
   const stage = document.getElementById('stage')!;
@@ -107,12 +132,14 @@ async function boot(): Promise<void> {
   if (scene.ready) ui.coach.crate = () => scene.crateOnScreen();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
+  scene.setViewZoom(game.state.settings.viewZoom);
+  scene.setBatterySaver(game.state.settings.batterySaver);
   const syncPerks = () =>
-    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1));
+    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state) * (weeklyOn(game.state, 'comets') ? 2 : 1));
   syncPerks();
   const syncDecor = () => {
     const s = game.state;
-    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (PAINTS.find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint, SKINS.find((k) => k.id === s.skin) ?? null);
+    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (allPaints().find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint, SKINS.find((k) => k.id === s.skin) ?? null);
     document.documentElement.style.setProperty('--theme-core', '#' + (THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0]).core.toString(16).padStart(6, '0'));
   };
   syncDecor();
@@ -132,6 +159,21 @@ async function boot(): Promise<void> {
   window.addEventListener('pointerdown', unlock, { capture: true });
 
   const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  /** Grows the station's hull to match the machines owned, with a card when it gets bigger. */
+  const syncGrowth = () => {
+    const stage = growthStage(game.state.owned);
+    if (!scene.setGrowth(stage)) return;
+    const g = GROWTH[stage];
+    fanfare.whenIdle(() => fanfare.cheer({ icon: ICONS.station, kicker: 'Station expanded', title: g.name, sub: g.desc, color: '#9fb0ff' }));
+    scene.fireworks([0x9fb0ff, 0xffd98a, 0xffffff]);
+    sfx.fanfare();
+    buzz([20, 40, 20]);
+  };
+  syncGrowth();
+  ui.onUnlock = (u) =>
+    fanfare.whenIdle(() =>
+      fanfare.cheer({ icon: ICONS[u.tab === 'prestige' ? 'core' : u.tab], kicker: 'New tab unlocked', title: GROUP_NAMES[u.tab], sub: u.news, color: '#4fe3c1' }),
+    );
   // Decorations earned together (an old save catching up) share one toast.
   let freshOrnaments: string[] = [];
 
@@ -146,6 +188,7 @@ async function boot(): Promise<void> {
         if (first) game.state.collection.add(`gen:${e.gen}`);
         ui.flyToStation(e.gen, hexColor(color), scene.hubOnScreen(), () => {
           scene.setOwned(game.state.owned);
+          syncGrowth();
           scene.arrive(color);
           if (!first) return;
           fanfare.cheer({ icon: GEN_ICONS[e.gen], kicker: 'New machine', title: g.name, sub: g.blurb, color: hexColor(color) });
@@ -154,8 +197,8 @@ async function boot(): Promise<void> {
           buzz([30, 60, 30]);
         });
         ui.flashRow(e.gen);
-        sfx.buy();
-        buzz(5);
+        sfx.buy(GENERATORS.findIndex((x) => x.id === e.gen), e.count);
+        buzz(e.count >= 10 ? [8, 30, 12] : 5);
         if (e.gen === 'drone') {
           game.advanceTutorial('drone');
           if (game.state.owned.drone >= TUTORIAL_DRONES) game.advanceTutorial('more');
@@ -202,9 +245,11 @@ async function boot(): Promise<void> {
         // Swap the station and the sector over at the brightest moment of the flash.
         setTimeout(() => {
           scene.setOwned(game.state.owned);
+          syncGrowth();
           scene.setSector(sectorFor(game.state.stats.relocations));
-          showSectorCard(game.state.stats.relocations);
+          showSectorCard(game.state.stats.relocations, 0, e.speed);
           fanfare.confetti();
+          if (game.state.stats.relocations === 1) window.setTimeout(() => fanfare.cheer(FIRST_JUMP(e.cores, e.speed)), 4200);
           scene.fireworks([0x8f7bff, 0x5cd6ff, 0xffd166]);
           sfx.fanfare();
         }, 1500);
@@ -217,6 +262,7 @@ async function boot(): Promise<void> {
         scene.galaxyJump();
         setTimeout(() => {
           scene.setOwned(game.state.owned);
+          syncGrowth();
           scene.setSector(sectorFor(game.state.stats.relocations));
           scene.setGalaxy(game.state.galaxy.shifts);
           showSectorCard(game.state.stats.relocations, game.state.galaxy.shifts + 1);
@@ -231,6 +277,7 @@ async function boot(): Promise<void> {
         break;
       case 'starNode':
         scene.setOwned(game.state.owned);
+        syncGrowth();
         sfx.upgrade();
         scene.celebrate(0xffe9a8);
         buzz(15);
@@ -255,11 +302,16 @@ async function boot(): Promise<void> {
         }
         break;
       case 'reset':
+        // Also used when a backup code is loaded, so everything follows the new save.
         scene.setOwned(game.state.owned);
-        scene.setPet(null);
-        scene.setBoss(null);
-        scene.setSector(sectorFor(0));
-        scene.setGalaxy(0);
+        syncGrowth();
+        scene.setPet(game.state.pets.active, petTint());
+        scene.setBoss(game.state.boss?.name ?? null);
+        scene.setSector(sectorFor(game.state.stats.relocations));
+        scene.setRig(game.state.rig);
+        scene.setGalaxy(game.state.galaxy.shifts);
+        scene.setTrader(meta.traderHere(game.state, Date.now()));
+        scene.setOrnaments(game.state.ornaments.on);
         syncPerks();
         syncDecor();
         break;
@@ -290,6 +342,37 @@ async function boot(): Promise<void> {
         break;
       case 'mission':
         ui.toast(ICONS.crystal, `<b>Mission complete!</b> +${e.crystals} crystals`);
+        sfx.coins();
+        buzz(20);
+        break;
+      case 'weekly': {
+        const w = WEEKLIES.find((x) => x.id === e.id)!;
+        syncPerks();
+        if (e.phase === 'start') ui.toast(ICONS.star.replace('currentColor', w.color), `<b>${w.name}</b> this week! ${w.rule} Open the mission board for rewards`);
+        else ui.toast(ICONS.star.replace('currentColor', w.color), `<b>${w.name}</b> reward ready on the mission board`);
+        sfx.achievement();
+        break;
+      }
+      case 'star': {
+        const p = e.prize;
+        const icon = ICONS.star.replace('currentColor', '#ffe27a');
+        if (p.kind === 'jackpot') {
+          fanfare.cheer({ icon, kicker: 'Lucky star', title: 'Jackpot!', sub: `An hour of scrap at once: +${fmt(p.amount)}`, color: '#ffd166' });
+          sfx.fanfare();
+        } else {
+          const what = p.kind === 'crystals' ? `+${p.amount} crystals` : p.kind === 'overdrive' ? `a free Overdrive for ${p.seconds}s` : `ten minutes of scrap, +${fmt(p.amount)}`;
+          ui.toast(icon, `<b>Lucky star!</b> It brought ${what}`);
+          sfx.achievement();
+        }
+        if (p.kind === 'overdrive') sfx.boost();
+        break;
+      }
+      case 'weeklyClaim':
+        if (e.paint) {
+          const p = allPaints().find((x) => x.id === e.paint)!;
+          fanfare.cheer({ icon: ICONS.station, kicker: 'Weekly event reward', title: `${p.name} paint`, sub: 'Only this event gives it. Put it on in Station, Decor.', color: '#' + p.tint.toString(16).padStart(6, '0') });
+          sfx.fanfare();
+        } else ui.toast(ICONS.crystal, `<b>Weekly event!</b> +${e.crystals} crystals`);
         sfx.coins();
         buzz(20);
         break;
@@ -489,6 +572,7 @@ async function boot(): Promise<void> {
           scene.warpJump();
           setTimeout(() => {
             scene.setOwned(game.state.owned);
+            syncGrowth();
             scene.setSector(sectorFor(game.state.stats.relocations));
           }, 1500);
           syncPerks();
@@ -525,7 +609,69 @@ async function boot(): Promise<void> {
   // only becomes a drag once it has moved, so taps and holds work as before.
   let drag: { id: number; x: number; y: number; moving: boolean } | null = null;
   const DRAG_START = 10;
+  // Two fingers pinch to zoom the station. The zoom stays when they lift; the view still glides back
+  // to the middle like after a drag. A mouse wheel does the same on a computer.
+  const fingers = new Map<number, { x: number; y: number }>();
+  let pinch: { a: number; b: number } | null = null;
+  const pinchSpan = () => {
+    const [p, q] = [fingers.get(pinch!.a)!, fingers.get(pinch!.b)!];
+    return { d: Math.max(1, Math.hypot(p.x - q.x, p.y - q.y)), x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+  };
+  const keepZoom = () => {
+    game.state.settings.viewZoom = scene.getViewZoom();
+  };
+  const endPinch = () => {
+    pinch = null;
+    sceneEl.classList.remove('panning');
+    scene.panEnd();
+    keepZoom();
+  };
+  // Zooming is for the full station screen, so it is off while the menu is up.
+  const menuBtn = document.getElementById('menu-btn')!;
+  const menuOpen = () => menuBtn.getAttribute('aria-expanded') === 'true';
+  sceneEl.addEventListener('pointerdown', (ev) => {
+    fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pinch || fingers.size !== 2 || menuOpen()) return;
+    const [a, b] = [...fingers.keys()];
+    pinch = { a, b };
+    cancelHold();
+    drag = null;
+    sceneEl.classList.add('panning');
+  });
   sceneEl.addEventListener('pointermove', (ev) => {
+    if (!pinch || !fingers.has(ev.pointerId)) return;
+    const before = pinchSpan();
+    fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (ev.pointerId !== pinch.a && ev.pointerId !== pinch.b) return;
+    const after = pinchSpan();
+    const rect = sceneEl.getBoundingClientRect();
+    scene.panBy(after.x - before.x, after.y - before.y);
+    scene.zoomAt(after.d / before.d, after.x - rect.left, after.y - rect.top);
+  });
+  for (const type of ['pointerup', 'pointercancel'] as const) {
+    sceneEl.addEventListener(type, (ev) => {
+      fingers.delete(ev.pointerId);
+      if (pinch && (ev.pointerId === pinch.a || ev.pointerId === pinch.b)) endPinch();
+    });
+  }
+  let wheelDone = 0;
+  sceneEl.addEventListener(
+    'wheel',
+    (ev) => {
+      ev.preventDefault();
+      if (menuOpen()) return;
+      const rect = sceneEl.getBoundingClientRect();
+      scene.zoomAt(Math.exp(-ev.deltaY * 0.0015), ev.clientX - rect.left, ev.clientY - rect.top);
+      clearTimeout(wheelDone);
+      wheelDone = window.setTimeout(() => {
+        scene.panEnd();
+        keepZoom();
+      }, 250);
+    },
+    { passive: false },
+  );
+  sceneEl.addEventListener('pointermove', (ev) => {
+    if (pinch) return;
     if (hold && Math.hypot(ev.clientX - holdAt.x, ev.clientY - holdAt.y) > 12) cancelHold();
     if (!drag || ev.pointerId !== drag.id) return;
     const dx = ev.clientX - drag.x;
@@ -565,7 +711,7 @@ async function boot(): Promise<void> {
       return;
     }
     cancelHold();
-    if (!drag) {
+    if (!drag && !pinch) {
       drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moving: false };
       try {
         sceneEl.setPointerCapture(ev.pointerId);
@@ -574,7 +720,7 @@ async function boot(): Promise<void> {
       }
     }
     holdAt = { x: ev.clientX, y: ev.clientY };
-    hold = window.setTimeout(() => {
+    if (!pinch) hold = window.setTimeout(() => {
       hold = 0;
       const id = scene.machineAt(x, y);
       if (id && game.state.owned[id] > 0) {
@@ -594,6 +740,13 @@ async function boot(): Promise<void> {
       const v = game.smashMeteor();
       scene.floatText(scene.lastHit.x, scene.lastHit.y, `+${fmt(v)}`);
       buzz(15);
+      return;
+    }
+    if (hit === 'star') {
+      const p = game.catchStar();
+      const text = p.kind === 'crystals' ? `+${p.amount} crystals` : p.kind === 'overdrive' ? 'Free Overdrive!' : `+${fmt(p.amount)}`;
+      scene.floatText(scene.lastHit.x, scene.lastHit.y, text, true);
+      buzz([20, 40, 60]);
       return;
     }
     if (hit === 'golden') {
@@ -632,10 +785,15 @@ async function boot(): Promise<void> {
     requestAnimationFrame(loop);
     const now = Date.now();
     const t = performance.now();
+    // While idle (or on battery saver) the HUD keeps pace with the station at 30 fps.
+    if (scene.idle && t - lastFrame < 30) return;
     game.update(now);
     scene.setBoost(eco.boostActive(game.state, now));
     scene.holdCrate = game.tutorialStep === 'crate';
+    scene.starsAllowed = game.state.tutorial < 0;
     scene.setBossHealth(meta.bossHealth(game.state));
+    // A relocation, challenge or galaxy shift clears the wreck without a goodbye; send it off here.
+    if (!game.state.boss) scene.setBoss(null);
     ui.renderHud((t - lastFrame) / 1000);
     lastFrame = t;
     if (now - lastUi > 100) {
@@ -647,8 +805,23 @@ async function boot(): Promise<void> {
 
   const save = () => game.save();
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') save();
+    if (document.visibilityState === 'hidden') {
+      save();
+      void scheduleReminders(game.state);
+    } else void cancelReminders();
   });
+  void cancelReminders();
+  // In the Android app, ask once for notification permission a minute after the tutorial.
+  if (notificationsAvailable()) {
+    const ask = window.setInterval(() => {
+      const s = game.state;
+      if (s.tips.has('notify-asked')) return window.clearInterval(ask);
+      if (s.tutorial >= 0 || s.stats.playSec < 60) return;
+      s.tips.add('notify-asked');
+      window.clearInterval(ask);
+      void askPermission().then((ok) => (s.settings.notifications = ok));
+    }, 10_000);
+  }
   window.addEventListener('pagehide', save);
 }
 

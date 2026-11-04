@@ -27,11 +27,23 @@ describe('Buy best', () => {
     expect(baseIncome(s).toNumber()).toBe(before);
   });
 
-  it('never picks an upgrade that only helps taps', () => {
+  it('weighs tap upgrades and the claw too', () => {
     const s = newState(NOW);
     s.owned.drone = 5;
     s.scrap = D(1e9);
-    for (const p of incomePurchases(s)) expect(['claw1', 'grip1']).not.toContain(p.id);
+    const ids = incomePurchases(s).map((p) => p.id);
+    expect(ids).toContain('claw1');
+    expect(ids).toContain('claw');
+  });
+
+  it('never leaves a cheap tap upgrade behind late in a run', () => {
+    const s = newState(NOW);
+    s.owned.drone = 100;
+    s.owned.hauler = 100;
+    s.owned.smelter = 60;
+    s.scrap = D(6e10);
+    const p = bestPurchase(s)!;
+    expect(p.cost.toNumber()).toBeLessThan(1e6);
   });
 
   it('grabs a cheap upgrade that doubles a big stack', () => {
@@ -59,6 +71,7 @@ describe('Buy best', () => {
       expect(p).not.toBeNull();
       s.scrap = s.scrap.add(p!.cost);
       if (p!.kind === 'upgrade') s.upgrades.add(p!.id);
+      else if (p!.kind === 'claw') s.claw++;
       else buyGenerator(s, p!.id, p!.count);
     }
     expect(s.owned.smelter).toBeGreaterThan(0);

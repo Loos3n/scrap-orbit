@@ -1,5 +1,5 @@
 import { GENERATORS, UPGRADES, type GeneratorId } from './config';
-import { baseIncome, coreTotal, costDiscount, costFor, genById, lastCoreAt, nextCoreAt, nextMilestone, upgradeVisible } from './economy';
+import { baseIncome, clawCost, coreTotal, costDiscount, costFor, genById, lastCoreAt, nextCoreAt, nextMilestone, tapValue, upgradeVisible } from './economy';
 import { challengeOn } from './expansion';
 import { D, Decimal } from './num';
 import type { GameState } from './state';
@@ -11,7 +11,19 @@ import type { GameState } from './state';
 
 export type Purchase =
   | { kind: 'machine'; id: GeneratorId; count: number; cost: Decimal; gain: Decimal }
-  | { kind: 'upgrade'; id: string; count: 1; cost: Decimal; gain: Decimal };
+  | { kind: 'upgrade'; id: string; count: 1; cost: Decimal; gain: Decimal }
+  | { kind: 'claw'; id: 'claw'; count: 1; cost: Decimal; gain: Decimal };
+
+/**
+ * Taps per second the helpers assume, so tap upgrades and the claw can be weighed against
+ * machines. Kept low on purpose: an idle player taps rarely, but cheap tap upgrades still win.
+ */
+export const TAP_RATE = 1;
+
+/** What the station earns per second for a player tapping at TAP_RATE. */
+export function worth(state: GameState): Decimal {
+  return baseIncome(state).add(tapValue(state, 0, true).mul(TAP_RATE));
+}
 
 /** Machines on show in the Build tab: everything owned plus the next new one. */
 export function visibleMachines(state: GameState): GeneratorId[] {
@@ -26,14 +38,14 @@ export function visibleMachines(state: GameState): GeneratorId[] {
 /** Income per second a change would add, found by making it on the save and undoing it. */
 function gainOf(state: GameState, before: Decimal, apply: () => void, undo: () => void): Decimal {
   apply();
-  const after = baseIncome(state);
+  const after = worth(state);
   undo();
   return after.sub(before);
 }
 
-/** Every purchase that adds income: one of each machine, enough to reach its next milestone, and each upgrade. */
+/** Every purchase that adds income: one of each machine, enough to reach its next milestone, each upgrade and a claw level. */
 export function incomePurchases(state: GameState): Purchase[] {
-  const before = baseIncome(state);
+  const before = worth(state);
   const discount = costDiscount(state);
   const out: Purchase[] = [];
   for (const id of visibleMachines(state)) {
@@ -54,6 +66,11 @@ export function incomePurchases(state: GameState): Purchase[] {
       if (gain.gt(0)) out.push({ kind: 'upgrade', id: u.id, count: 1, cost: D(u.cost), gain });
     }
   }
+  if (state.owned.drone > 0) {
+    const level = state.claw;
+    const gain = gainOf(state, before, () => (state.claw = level + 1), () => (state.claw = level));
+    if (gain.gt(0)) out.push({ kind: 'claw', id: 'claw', count: 1, cost: D(clawCost(state)), gain });
+  }
   return out;
 }
 
@@ -62,7 +79,7 @@ export function incomePurchases(state: GameState): Purchase[] {
  * income to earn back its price. Waiting counts, so a far-off bargain loses to something buyable now.
  */
 export function bestPurchase(state: GameState): Purchase | null {
-  const income = baseIncome(state);
+  const income = worth(state);
   let best: Purchase | null = null;
   let bestScore = Infinity;
   for (const p of incomePurchases(state)) {

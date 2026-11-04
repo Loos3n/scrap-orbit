@@ -163,7 +163,7 @@ export class ChallengePanel {
       setText($('challenge-line-pct'), `${Math.floor(progress * 100)}%`);
       ($('challenge-line-bar') as HTMLElement).style.width = `${(progress * 100).toFixed(1)}%`;
     }
-    if ($('tab-cores').hidden) return;
+    if ($('tab-challenges').hidden) return;
     // Goals follow the station's power, so a new core or research changes them.
     const key = `${open}${s.challenge}${[...s.challengesDone].join()}${this.arming}${Math.floor(progress * 200)}${meta.stationPower(s).toFixed(3)}${s.cores + claimableCores(s)}`;
     if (key === this.key) return;

@@ -1,3 +1,7 @@
+import { recordIncome, recordRun } from './core/history';
+import { catchStar, type StarPrize } from './core/lucky';
+import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
+import { sectorCrateMult } from './core/sectors';
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { bestPurchase } from './core/advisor';
 import { checkOrnaments, toggleOrnament } from './core/ornaments';
@@ -15,6 +19,8 @@ const AUTOSAVE_MS = 30_000;
 const AWAY_THRESHOLD_SEC = 5;
 const ACHIEVEMENT_CHECK_MS = 1_000;
 const AUTOBUY_MS = 2_000;
+/** Seconds of play before the first daily reward pops up. */
+const STREAK_SETTLE_SEC = 240;
 /** Crystals for each relocation. */
 const RELOCATE_CRYSTALS = 5;
 
@@ -27,7 +33,7 @@ export type GameEvent =
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
   | { type: 'bonus'; value: Decimal }
   | { type: 'achievement'; def: AchievementDef }
-  | { type: 'relocate'; cores: number; crystals: number }
+  | { type: 'relocate'; cores: number; crystals: number; speed: number }
   | { type: 'crew'; id: CrewId; level: number }
   | { type: 'research'; id: string; phase: 'start' | 'done' }
   | { type: 'decor'; id: string }
@@ -64,7 +70,10 @@ export type GameEvent =
   | { type: 'starNode'; id: string }
   | { type: 'trade'; result: meta.TradeResult }
   | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
-  | { type: 'reset' };
+  | { type: 'reset' }
+  | { type: 'star'; prize: StarPrize }
+  | { type: 'weekly'; phase: 'start' | 'tier'; id: WeeklyId }
+  | { type: 'weeklyClaim'; crystals: number; paint?: string };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -141,6 +150,15 @@ export class Game {
       this.state.stats.runSec += dt;
     }
     this.updateBoss(now, Math.min(dt, 1));
+    if (this.state.tutorial < 0) recordIncome(this.state, now);
+    // A new week brings a new weekly event (after a new captain has settled in, so it isn't lost).
+    if (this.state.tutorial < 0 && this.state.stats.playSec >= STREAK_SETTLE_SEC) {
+      const started = updateWeekly(this.state, now);
+      if (started) this.emit({ type: 'weekly', phase: 'start', id: started.id });
+      const tier = weeklyProgress(this.state).tier;
+      if (tier > this.weeklyTier && this.weeklyTier >= 0) this.emit({ type: 'weekly', phase: 'tier', id: this.state.weekly.id as WeeklyId });
+      this.weeklyTier = tier;
+    }
     if (meta.catDue(this.state, this.lastPounce, now)) {
       this.lastPounce = now;
       const value = eco.tap(this.state, now);
@@ -192,8 +210,9 @@ export class Game {
     }
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
-    // A new day's reward waits until the tutorial is over, then is offered once per day.
-    if (s.tutorial < 0 && meta.checkLogin(s, now) && this.streakShown !== s.login.day) {
+    // A new day's reward waits until the tutorial is over and a brand-new captain has had a few
+    // minutes to settle in, then is offered once per day.
+    if (s.tutorial < 0 && s.stats.playSec >= STREAK_SETTLE_SEC && meta.checkLogin(s, now) && this.streakShown !== s.login.day) {
       this.streakShown = s.login.day;
       this.emit({ type: 'streak' });
     }
@@ -228,6 +247,13 @@ export class Game {
   }
 
   /** Tapping the golden crate starts a golden rush. */
+  /** A lucky shooting star was tapped: rolls and pays its surprise. */
+  catchStar(): StarPrize {
+    const prize = catchStar(this.state, Date.now());
+    this.emit({ type: 'star', prize });
+    return prize;
+  }
+
   collectGolden(): void {
     meta.claimGolden(this.state, Date.now());
     this.emit({ type: 'golden' });
@@ -331,6 +357,14 @@ export class Game {
     if (meta.useDecor(this.state, id)) this.emit({ type: 'decor', id });
   }
 
+  private weeklyTier = -1;
+
+  /** Claims the next weekly event tier reached. */
+  claimWeekly(): void {
+    const r = claimWeekly(this.state);
+    if (r) this.emit({ type: 'weeklyClaim', crystals: r.crystals, paint: r.paint });
+  }
+
   claimMission(index: number): void {
     const crystals = meta.claimMission(this.state, index);
     if (crystals > 0) {
@@ -393,7 +427,7 @@ export class Game {
     const a = eco.income(this.state, now).mul(30);
     const b = eco.tapValue(this.state, now).mul(25);
     // The Orbit Pup doubles what crates are worth.
-    const value = (a.gt(b) ? a : b).mul(meta.petActive(this.state, 'pup') ? 2 : 1);
+    const value = (a.gt(b) ? a : b).mul(meta.petActive(this.state, 'pup') ? 2 : 1).mul(sectorCrateMult(this.state));
     eco.earn(this.state, value);
     this.state.stats.crates++;
     this.emit({ type: 'bonus', value });
@@ -416,6 +450,7 @@ export class Game {
     const p = bestPurchase(this.state);
     if (!p || p.cost.gt(this.state.scrap)) return false;
     if (p.kind === 'upgrade') this.buyUpgrade(p.id);
+    else if (p.kind === 'claw') this.levelClaw();
     else this.buy(p.id, p.count);
     return true;
   }
@@ -445,11 +480,14 @@ export class Game {
 
   /** Prestige: trades this run for Star Cores. Returns the cores gained. */
   relocate(): number {
+    const speed = eco.relocateSpeedup(this.state);
+    const claim = eco.claimableCores(this.state);
+    if (claim > 0) recordRun(this.state, claim, Date.now());
     const cores = eco.relocate(this.state, Date.now());
     if (cores > 0) {
       meta.addCrystals(this.state, RELOCATE_CRYSTALS);
       this.save();
-      this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS });
+      this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS, speed });
     }
     return cores;
   }
@@ -470,6 +508,21 @@ export class Game {
     if (ok) this.emit({ type: 'starNode', id });
   }
 
+  /** Swaps in a save loaded from a backup code and stores it straight away. */
+  load(state: GameState): void {
+    const now = Date.now();
+    state.settings = this.state.settings;
+    state.lastSeen = now;
+    this.state = state;
+    this.lastFrame = now;
+    this.tripsReady.clear();
+    this.streakShown = '';
+    this.readyMissions = 0;
+    this.weeklyTier = -1;
+    this.save();
+    this.emit({ type: 'reset' });
+  }
+
   reset(): void {
     const now = Date.now();
     const settings = this.state.settings;
@@ -480,6 +533,7 @@ export class Game {
     this.tripsReady.clear();
     this.streakShown = '';
     this.readyMissions = 0;
+    this.weeklyTier = -1;
     this.emit({ type: 'reset' });
   }
 

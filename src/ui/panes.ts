@@ -1,18 +1,32 @@
 /*
- * The menu has four tabs along its top. Some tabs hold more than one pane, picked from a
- * segment bar at the top of the sheet: Build has Machines and Upgrades, Progress has the Lab,
- * Star Cores and the Galaxy. Each pane keeps its own `tab-<pane>` element.
+ * The menu has five tabs along its top. A tab that holds more than one pane shows a segment bar
+ * at the top of the sheet, all in the same style: Build has Machines and Upgrades, Crew has Crew,
+ * Trips and Pets, Prestige has Star Cores, Challenges and the Galaxy, Station has Rooms and Decor.
+ * Each pane keeps its own `tab-<pane>` element.
  */
 
 export const GROUPS: Record<string, readonly string[]> = {
   build: ['build', 'upgrades'],
-  crew: ['crew'],
-  progress: ['lab', 'cores', 'galaxy'],
-  station: ['station'],
+  crew: ['crew', 'trips', 'pets'],
+  lab: ['lab'],
+  prestige: ['cores', 'challenges', 'galaxy'],
+  station: ['station', 'decor'],
 };
 
-export const GROUP_NAMES: Record<string, string> = { build: 'Build', crew: 'Crew', progress: 'Progress', station: 'Station' };
-export const PANE_NAMES: Record<string, string> = { build: 'Machines', upgrades: 'Upgrades', crew: 'Crew', lab: 'Lab', cores: 'Cores', galaxy: 'Galaxy', station: 'Station' };
+export const GROUP_NAMES: Record<string, string> = { build: 'Build', crew: 'Crew', lab: 'Lab', prestige: 'Prestige', station: 'Station' };
+export const PANE_NAMES: Record<string, string> = {
+  build: 'Machines',
+  upgrades: 'Upgrades',
+  crew: 'Crew',
+  trips: 'Trips',
+  pets: 'Pets',
+  lab: 'Lab',
+  cores: 'Cores',
+  challenges: 'Challenges',
+  galaxy: 'Galaxy',
+  station: 'Rooms',
+  decor: 'Decor',
+};
 
 export const ALL_PANES = Object.values(GROUPS).flat();
 
@@ -38,7 +52,7 @@ export function paneTarget(pane: string): string {
 /** How to ask the player to open a pane. */
 export function paneHint(pane: string): string {
   const group = groupOf(pane);
-  if (menuHidden()) return GROUPS[group].length === 1 || group === 'build' && pane === 'build' ? `Tap the menu square, then ${GROUP_NAMES[group]}.` : `Tap the menu square, then ${GROUP_NAMES[group]} and ${PANE_NAMES[pane]}.`;
+  if (menuHidden()) return GROUPS[group].length === 1 || GROUPS[group][0] === pane ? `Tap the menu square, then ${GROUP_NAMES[group]}.` : `Tap the menu square, then ${GROUP_NAMES[group]} and ${PANE_NAMES[pane]}.`;
   if (GROUPS[group].length === 1) return `Open the ${GROUP_NAMES[group]} tab.`;
   return groupOpen(group) ? `Tap ${PANE_NAMES[pane]} at the top.` : `Open the ${GROUP_NAMES[group]} tab, then ${PANE_NAMES[pane]}.`;
 }

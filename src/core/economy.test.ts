@@ -3,6 +3,7 @@ import { GENERATORS, OFFLINE_CAP_SEC } from './config';
 import {
   activateBoost,
   applyOffline,
+  offlineCapSec,
   baseIncome,
   buyClaw,
   buyGenerator,
@@ -22,7 +23,7 @@ import {
 } from './economy';
 import { checkAchievements } from './achievements';
 import { D, format } from './num';
-import { deserialize, newState, serialize } from './state';
+import { deserialize, exportCode, importCode, newState, serialize } from './state';
 
 const NOW = 1_000_000;
 
@@ -94,9 +95,9 @@ describe('income', () => {
     const s = newState(NOW);
     s.owned.drone = 5;
     expect(activateBoost(s, NOW)).toBe(true);
-    expect(income(s, NOW + 1000).toNumber()).toBeCloseTo(4);
+    expect(income(s, NOW + 1000).toNumber()).toBeCloseTo(6);
     expect(tap(s, NOW + 1000).toNumber()).toBe(2);
-    expect(income(s, NOW + 31_000).toNumber()).toBeCloseTo(2);
+    expect(income(s, NOW + 31_000).toNumber()).toBeCloseTo(3);
     expect(activateBoost(s, NOW + 60_000)).toBe(false);
   });
 
@@ -112,12 +113,18 @@ describe('income', () => {
     expect(buyClaw(s)).toBe(false);
   });
 
+  it('offline time never stretches past a day', () => {
+    const s = newState(NOW);
+    s.owned.drone = 5;
+    expect(offlineCapSec(s)).toBe(8 * 3600);
+  });
+
   it('offline earnings are capped', () => {
     const s = newState(NOW);
-    s.owned.drone = 5; // 2 scrap/s
+    s.owned.drone = 5; // 3 scrap/s
     const { seconds, earned } = applyOffline(s, NOW + 10 * 60 * 60 * 1000);
     expect(seconds).toBe(OFFLINE_CAP_SEC);
-    expect(earned.toNumber()).toBeCloseTo(OFFLINE_CAP_SEC * 2);
+    expect(earned.toNumber()).toBeCloseTo(OFFLINE_CAP_SEC * 3);
   });
 });
 
@@ -180,10 +187,10 @@ describe('prestige', () => {
 
   it('cores and achievements multiply income and taps', () => {
     const s = newState(NOW);
-    s.owned.drone = 5; // 2 scrap/s before bonuses
+    s.owned.drone = 5; // 3 scrap/s before bonuses
     s.cores = 10; // +100%
     s.achievements.add('a').add('b'); // +2%
-    expect(baseIncome(s).toNumber()).toBeCloseTo(4 * 1.02);
+    expect(baseIncome(s).toNumber()).toBeCloseTo(6 * 1.02);
     expect(tapValue(s, NOW).toNumber()).toBeCloseTo(2 * 1.02);
   });
 
@@ -211,5 +218,20 @@ describe('save migration', () => {
     expect(s.cores).toBe(0);
     expect(s.owned.laser).toBe(0);
     expect(s.settings.sound).toBe(true);
+  });
+});
+
+describe('save codes', () => {
+  it('round-trips a station through a code', () => {
+    const s = newState(1000);
+    s.owned.drone = 42;
+    s.crystals = 7;
+    const back = importCode(`  ${exportCode(s)}\n`, 2000)!;
+    expect(back.owned.drone).toBe(42);
+    expect(back.crystals).toBe(7);
+  });
+  it('turns away text that is not a code', () => {
+    expect(importCode('hello', 0)).toBeNull();
+    expect(importCode('SCRAP1-!!!', 0)).toBeNull();
   });
 });
