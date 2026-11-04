@@ -1370,3 +1370,19 @@ button.gen-icon:active { transform: scale(0.94); }
   100% { background: transparent; box-shadow: none; }
 }
 .reduce-flash .tab.fresh { animation: none; }
+
+/* Weekly event card at the top of the mission board. */
+.weekly-event { --c: #7fd8ff; margin: 26px 0 16px; padding: 12px 14px 14px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--c) 22%, transparent), rgb(10 12 36 / 0.5)); }
+.weekly-event .eyebrow { color: var(--c); }
+.weekly-event h3 { margin: 2px 0 4px; font-family: var(--font-display); font-size: 20px; }
+.weekly-event p { margin: 0; color: var(--ink-dim); font-size: 13px; line-height: 1.4; }
+.weekly-event p b { color: var(--ink); }
+.wk-bar { position: relative; height: 10px; margin: 14px 4px 28px; border-radius: 99px; background: rgb(255 255 255 / 0.1); }
+.wk-bar > b { display: block; height: 100%; border-radius: inherit; background: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent); }
+.wk-mark { position: absolute; top: -3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #20244e; border: 2px solid rgb(255 255 255 / 0.3); }
+.wk-mark.ready { border-color: var(--c); background: color-mix(in srgb, var(--c) 40%, #20244e); }
+.wk-mark.got { border-color: var(--go); background: var(--go); }
+.wk-mark span { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; font-style: normal; color: var(--ink-dim); }
+.wk-mark:last-child span { left: auto; right: -2px; transform: none; }
+.wk-claim { width: 100%; margin-top: 2px; }
+.wk-done { margin-top: 4px !important; color: var(--go) !important; }

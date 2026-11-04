@@ -1,3 +1,4 @@
+import { WEEKLIES, allPaints, weeklyOn } from './core/weekly';
 import { GROWTH, growthStage } from './core/growth';
 import { GROUP_NAMES } from './ui/panes';
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
@@ -133,11 +134,11 @@ async function boot(): Promise<void> {
   scene.setViewZoom(game.state.settings.viewZoom);
   scene.setBatterySaver(game.state.settings.batterySaver);
   const syncPerks = () =>
-    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state));
+    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state) * (weeklyOn(game.state, 'comets') ? 2 : 1));
   syncPerks();
   const syncDecor = () => {
     const s = game.state;
-    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (PAINTS.find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint, SKINS.find((k) => k.id === s.skin) ?? null);
+    scene.setTheme(THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0], (allPaints().find((p) => p.id === s.decor.paint) ?? PAINTS[0]).tint, SKINS.find((k) => k.id === s.skin) ?? null);
     document.documentElement.style.setProperty('--theme-core', '#' + (THEMES.find((t) => t.id === s.decor.theme) ?? THEMES[0]).core.toString(16).padStart(6, '0'));
   };
   syncDecor();
@@ -340,6 +341,23 @@ async function boot(): Promise<void> {
         break;
       case 'mission':
         ui.toast(ICONS.crystal, `<b>Mission complete!</b> +${e.crystals} crystals`);
+        sfx.coins();
+        buzz(20);
+        break;
+      case 'weekly': {
+        const w = WEEKLIES.find((x) => x.id === e.id)!;
+        syncPerks();
+        if (e.phase === 'start') ui.toast(ICONS.star.replace('currentColor', w.color), `<b>${w.name}</b> this week! ${w.rule} Open the mission board for rewards`);
+        else ui.toast(ICONS.star.replace('currentColor', w.color), `<b>${w.name}</b> reward ready on the mission board`);
+        sfx.achievement();
+        break;
+      }
+      case 'weeklyClaim':
+        if (e.paint) {
+          const p = allPaints().find((x) => x.id === e.paint)!;
+          fanfare.cheer({ icon: ICONS.station, kicker: 'Weekly event reward', title: `${p.name} paint`, sub: 'Only this event gives it. Put it on in Station, Decor.', color: '#' + p.tint.toString(16).padStart(6, '0') });
+          sfx.fanfare();
+        } else ui.toast(ICONS.crystal, `<b>Weekly event!</b> +${e.crystals} crystals`);
         sfx.coins();
         buzz(20);
         break;

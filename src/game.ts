@@ -1,3 +1,4 @@
+import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
 import { sectorCrateMult } from './core/sectors';
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { bestPurchase } from './core/advisor';
@@ -67,7 +68,9 @@ export type GameEvent =
   | { type: 'starNode'; id: string }
   | { type: 'trade'; result: meta.TradeResult }
   | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
-  | { type: 'reset' };
+  | { type: 'reset' }
+  | { type: 'weekly'; phase: 'start' | 'tier'; id: WeeklyId }
+  | { type: 'weeklyClaim'; crystals: number; paint?: string };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -144,6 +147,14 @@ export class Game {
       this.state.stats.runSec += dt;
     }
     this.updateBoss(now, Math.min(dt, 1));
+    // A new week brings a new weekly event (after the tutorial, so it isn't lost in it).
+    if (this.state.tutorial < 0) {
+      const started = updateWeekly(this.state, now);
+      if (started) this.emit({ type: 'weekly', phase: 'start', id: started.id });
+      const tier = weeklyProgress(this.state).tier;
+      if (tier > this.weeklyTier && this.weeklyTier >= 0) this.emit({ type: 'weekly', phase: 'tier', id: this.state.weekly.id as WeeklyId });
+      this.weeklyTier = tier;
+    }
     if (meta.catDue(this.state, this.lastPounce, now)) {
       this.lastPounce = now;
       const value = eco.tap(this.state, now);
@@ -335,6 +346,14 @@ export class Game {
     if (meta.useDecor(this.state, id)) this.emit({ type: 'decor', id });
   }
 
+  private weeklyTier = -1;
+
+  /** Claims the next weekly event tier reached. */
+  claimWeekly(): void {
+    const r = claimWeekly(this.state);
+    if (r) this.emit({ type: 'weeklyClaim', crystals: r.crystals, paint: r.paint });
+  }
+
   claimMission(index: number): void {
     const crystals = meta.claimMission(this.state, index);
     if (crystals > 0) {
@@ -486,6 +505,7 @@ export class Game {
     this.tripsReady.clear();
     this.streakShown = '';
     this.readyMissions = 0;
+    this.weeklyTier = -1;
     this.save();
     this.emit({ type: 'reset' });
   }
@@ -500,6 +520,7 @@ export class Game {
     this.tripsReady.clear();
     this.streakShown = '';
     this.readyMissions = 0;
+    this.weeklyTier = -1;
     this.emit({ type: 'reset' });
   }
 

@@ -61,6 +61,7 @@ import { GENERATORS } from './config';
 import { GALAXY, STAR_NODES, forgeCost, starsForCores } from './galaxy';
 import { D, Decimal } from './num';
 import { sectorBossRules, sectorHappenings, timeStretch } from './sectors';
+import { EVENT_PAINTS, weeklyOn } from './weekly';
 import type { GameState, Mission } from './state';
 
 // ---------- Crystals ----------
@@ -140,7 +141,7 @@ export function rushResearch(state: GameState, now: number): string | null {
 // ---------- Decorations ----------
 
 export function decorCost(id: string): number | null {
-  return (THEMES.find((t) => t.id === id) ?? PAINTS.find((p) => p.id === id))?.cost ?? null;
+  return (THEMES.find((t) => t.id === id) ?? PAINTS.find((p) => p.id === id) ?? EVENT_PAINTS.find((p) => p.id === id))?.cost ?? null;
 }
 
 /** Buys a decoration if needed, then puts it on. */
@@ -148,7 +149,8 @@ export function useDecor(state: GameState, id: string): boolean {
   const cost = decorCost(id);
   if (cost === null) return false;
   if (!state.decor.owned.has(id)) {
-    if (!spend(state, cost)) return false;
+    // Event paints are won, never bought.
+    if (EVENT_PAINTS.some((p) => p.id === id) || !spend(state, cost)) return false;
     state.decor.owned.add(id);
   }
   if (THEMES.some((t) => t.id === id)) state.decor.theme = id;
@@ -507,7 +509,7 @@ function rollLoot(state: GameState, rand: () => number): string | undefined {
 
 function scheduleBoss(state: GameState, now: number, rand: () => number): void {
   const [lo, hi] = BOSS.gap;
-  state.nextBossAt = now + (lo + rand() * (hi - lo)) * 60_000 * sectorBossRules(state).gap;
+  state.nextBossAt = now + (lo + rand() * (hi - lo)) * 60_000 * sectorBossRules(state).gap * (weeklyOn(state, 'wrecks') ? 0.5 : 1);
 }
 
 function damageBoss(state: GameState, amount: Decimal, now: number, rand: () => number = Math.random): BossUpdate['defeated'] {

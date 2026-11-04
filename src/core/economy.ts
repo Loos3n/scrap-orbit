@@ -17,6 +17,7 @@ import {
 } from './config';
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
+import { weeklyOn } from './weekly';
 import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { D, Decimal } from './num';
@@ -205,6 +206,7 @@ export function tapValue(state: GameState, now: number, plain = false): Decimal 
       if (e.kind === 'tapIncomeShare') share += e.share;
     }
   }
+  if (weeklyOn(state, 'taps')) mult *= 2;
   const value = D(mult * globalMult(state) * (1 + bonuses(state).tap)).add(baseIncome(state).mul(share));
   if (plain) return value;
   const boosted = boostActive(state, now) ? value.mul(BOOST.mult) : value;
@@ -262,7 +264,7 @@ export function activateBoost(state: GameState, now: number): boolean {
   if (now < state.boostReadyAt) return false;
   const duration = boostDurationSec(state);
   state.boostUntil = now + duration * 1000;
-  state.boostReadyAt = now + (duration + BOOST.cooldownSec) * 1000;
+  state.boostReadyAt = now + (duration + BOOST.cooldownSec * (weeklyOn(state, 'solar') ? 0.5 : 1)) * 1000;
   state.stats.boosts++;
   return true;
 }

@@ -37,6 +37,8 @@ export interface GameState {
   research: { done: Set<string>; active: { id: string; endsAt: number } | null };
   decor: { owned: Set<string>; theme: string; paint: string };
   missions: { day: string; daily: Mission[]; week: string; weekly: Mission | null };
+  /** This week's event (core/weekly.ts): which week, which event, its counter at the start, tiers claimed. */
+  weekly: { week: string; id: string; start: number; claimed: number };
   event: { kind: EventKind; endsAt: number } | null;
   nextEventAt: number;
   /** Tutorial step; -1 when finished. */
@@ -149,6 +151,7 @@ interface SaveData {
   research?: { done?: string[]; active?: { id: string; endsAt: number } | null };
   decor?: { owned?: string[]; theme?: string; paint?: string };
   missions?: GameState['missions'];
+  weekly?: GameState['weekly'];
   event?: GameState['event'];
   nextEventAt?: number;
   tutorial?: number;
@@ -213,6 +216,7 @@ export function newState(now: number): GameState {
     research: { done: new Set(), active: null },
     decor: { owned: new Set(['classic', 'standard']), theme: 'classic', paint: 'standard' },
     missions: { day: '', daily: [], week: '', weekly: null },
+    weekly: { week: '', id: '', start: 0, claimed: 0 },
     event: null,
     nextEventAt: 0,
     tutorial: 0,
@@ -279,6 +283,7 @@ export function serialize(state: GameState): string {
     research: { done: [...state.research.done], active: state.research.active },
     decor: { owned: [...state.decor.owned], theme: state.decor.theme, paint: state.decor.paint },
     missions: state.missions,
+    weekly: state.weekly,
     event: state.event,
     nextEventAt: state.nextEventAt,
     tutorial: state.tutorial,
@@ -356,6 +361,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   if (data.decor?.theme && state.decor.owned.has(data.decor.theme)) state.decor.theme = data.decor.theme;
   if (data.decor?.paint && state.decor.owned.has(data.decor.paint)) state.decor.paint = data.decor.paint;
   if (data.missions && Array.isArray(data.missions.daily)) state.missions = data.missions;
+  if (data.weekly && typeof data.weekly.week === 'string') state.weekly = { week: data.weekly.week, id: String(data.weekly.id ?? ''), start: int(data.weekly.start), claimed: Math.min(3, int(data.weekly.claimed)) };
   state.event = data.event && typeof data.event.endsAt === 'number' ? data.event : null;
   state.nextEventAt = Number(data.nextEventAt) || 0;
   // Players from before the tutorial existed already know the basics. Saves from before the

@@ -1,3 +1,5 @@
+import { WEEKLY_CRYSTALS, currentWeekly, weekEnds, weeklyClaimable, weeklyProgress } from '../core/weekly';
+import { EVENT_PAINTS } from '../core/weekly';
 import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
 import { paneHint, paneTarget } from './panes';
 import { GENERATORS } from '../core/config';
@@ -224,7 +226,7 @@ export class DecorPanel {
         `<span class="sky" style="background:radial-gradient(circle at 30% 30%, ${t.nebula[0]}, transparent 60%), radial-gradient(circle at 75% 70%, ${t.nebula[2]}, transparent 55%), linear-gradient(${t.sky[0]}, ${t.sky[1]}, ${t.sky[2]})"><i style="background:${hex(t.core)};box-shadow:0 0 10px ${hex(t.core)}"></i></span>`,
       ),
     ).join('');
-    $('paint-list').innerHTML = PAINTS.map((p) =>
+    $('paint-list').innerHTML = [...PAINTS, ...EVENT_PAINTS.filter((p) => s.decor.owned.has(p.id))].map((p) =>
       card(p.id, p.name, p.cost, `<span class="hull" style="--t:${hex(p.tint)}"><i></i></span>`),
     ).join('');
   }
@@ -275,20 +277,50 @@ export class MissionsPanel {
     $('missions-close').addEventListener('click', () => ($('missions').hidden = true));
     $('missions').addEventListener('click', (e) => {
       if (e.target === $('missions')) $('missions').hidden = true;
+      if ((e.target as HTMLElement).closest('[data-weekly-claim]')) this.game.claimWeekly();
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-claim]');
       if (btn) this.game.claimMission(Number(btn.dataset.claim));
     });
   }
 
+  private weeklyKey = '';
+
+  /** This week's event: its rule, a bar with three tier marks, and a claim button. */
+  private renderWeekly(): void {
+    const s = this.game.state;
+    const def = currentWeekly(s);
+    const box = $('weekly-event');
+    box.hidden = !def;
+    if (!def) return;
+    const p = weeklyProgress(s);
+    const can = weeklyClaimable(s) > 0;
+    const top = def.tiers[2];
+    const left = weekEnds(Date.now());
+    const ends = left >= 86_400 ? `${Math.floor(left / 86_400)}d ${Math.floor((left % 86_400) / 3600)}h` : formatDuration(left);
+    const key = `${def.id}|${p.done}|${s.weekly.claimed}|${ends}`;
+    if (key === this.weeklyKey) return;
+    this.weeklyKey = key;
+    const marks = def.tiers
+      .map((t, i) => `<i class="wk-mark${s.weekly.claimed > i ? ' got' : p.done >= t ? ' ready' : ''}" style="left:${(t / top) * 100}%"><span>${i === 2 ? esc(def.paint.name) : `${WEEKLY_CRYSTALS[i]}`}</span></i>`)
+      .join('');
+    const claimLabel = s.weekly.claimed === 2 && !s.decor.owned.has(def.paint.id) ? `Claim ${esc(def.paint.name)} paint` : `Claim ${WEEKLY_CRYSTALS[s.weekly.claimed] ?? ''} crystals`;
+    box.style.setProperty('--c', def.color);
+    box.innerHTML = `<div class="eyebrow">This week's event · ends in ${ends}</div>
+      <h3>${esc(def.name)}</h3><p>${esc(def.rule)} ${esc(def.goal)}: <b>${p.done.toLocaleString('en-US')}</b> / ${top.toLocaleString('en-US')}</p>
+      <div class="wk-bar"><b style="width:${Math.min(100, (p.done / top) * 100).toFixed(1)}%"></b>${marks}</div>
+      ${can ? `<button type="button" class="primary wk-claim" data-weekly-claim>${claimLabel}</button>` : s.weekly.claimed >= 3 ? '<p class="wk-done">All rewards claimed. See you next week!</p>' : ''}`;
+  }
+
   open(): void {
     $('missions').hidden = false;
+    this.weeklyKey = '';
     this.key = '';
     this.render();
   }
 
   render(): void {
     const s = this.game.state;
-    const ready = meta.claimableMissions(s);
+    const ready = meta.claimableMissions(s) + weeklyClaimable(s);
     const dot = $('missions-dot');
     dot.hidden = ready === 0;
     setText(dot, String(ready));
@@ -312,6 +344,7 @@ export class MissionsPanel {
       setHtml($('mission-list'), s.missions.daily.map((m, i) => row(m, i)).join(''));
       setHtml($('weekly-list'), s.missions.weekly ? row(s.missions.weekly, -1) : '');
     }
+    this.renderWeekly();
     const midnight = new Date();
     midnight.setHours(24, 0, 0, 0);
     setText($('mission-reset'), `New missions in ${formatDuration((midnight.getTime() - Date.now()) / 1000)}`);
