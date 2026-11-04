@@ -128,6 +128,8 @@ export interface GameState {
     autoBuy: boolean;
     /** How far the player has pinched the station view in (1 = normal). */
     viewZoom: number;
+    /** Battery saver: 30 frames a second, lower resolution, no soft-focus blur. */
+    batterySaver: boolean;
   };
 }
 
@@ -256,7 +258,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1 },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false },
   };
 }
 

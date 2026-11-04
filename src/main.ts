@@ -106,7 +106,9 @@ async function boot(): Promise<void> {
   ui.onRelocate = () => game.relocate();
   ui.syncSettings();
   const scene = new StationScene();
+  if (import.meta.env.DEV) (window as unknown as { __scene: StationScene }).__scene = scene;
   ui.onComfortChange = (reduceFlash, reduceShake) => scene.setComfort(reduceFlash, reduceShake);
+  ui.onPowerChange = (saver) => scene.setBatterySaver(saver);
   ui.syncSettings();
   const sceneEl = document.getElementById('scene')!;
   const stage = document.getElementById('stage')!;
@@ -128,6 +130,7 @@ async function boot(): Promise<void> {
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
   scene.setViewZoom(game.state.settings.viewZoom);
+  scene.setBatterySaver(game.state.settings.batterySaver);
   const syncPerks = () =>
     scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state));
   syncPerks();
@@ -724,6 +727,8 @@ async function boot(): Promise<void> {
     requestAnimationFrame(loop);
     const now = Date.now();
     const t = performance.now();
+    // While idle (or on battery saver) the HUD keeps pace with the station at 30 fps.
+    if (scene.idle && t - lastFrame < 30) return;
     game.update(now);
     scene.setBoost(eco.boostActive(game.state, now));
     scene.holdCrate = game.tutorialStep === 'crate';

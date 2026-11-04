@@ -128,6 +128,7 @@ export class UI {
   /** Called when the sound or music setting changes, so main can update the synth. */
   onSoundChange: ((sfx: number, music: number) => void) | null = null;
   onComfortChange: ((reduceFlash: boolean, reduceShake: boolean) => void) | null = null;
+  onPowerChange: ((saver: boolean) => void) | null = null;
   /** Called after the player confirms a relocation. */
   onRelocate: (() => void) | null = null;
 
@@ -398,6 +399,7 @@ export class UI {
       const o = settings();
       auto.checked = o.autoBuy;
       hap.checked = o.haptics;
+      ($('opt-battery') as HTMLInputElement).checked = o.batterySaver;
       sfxVol.value = String(Math.round(o.sfxVol * 100));
       musVol.value = String(Math.round(o.musicVol * 100));
       setText($('opt-sfx-val'), pct(o.sfxVol));
@@ -433,6 +435,11 @@ export class UI {
       }),
     );
     hap.addEventListener('change', () => (settings().haptics = hap.checked));
+    const battery = $('opt-battery') as HTMLInputElement;
+    battery.addEventListener('change', () => {
+      settings().batterySaver = battery.checked;
+      this.onPowerChange?.(battery.checked);
+    });
     auto.addEventListener('change', () => (settings().autoBuy = auto.checked));
     const volume = (input: HTMLInputElement, key: 'sfxVol' | 'musicVol', flag: 'sound' | 'music') =>
       input.addEventListener('input', () => {

@@ -81,6 +81,13 @@ class Pool {
   }
 }
 
+/** Highest drawing resolution, and the one battery saver uses. */
+const MAX_RES = 2;
+const SAVER_RES = 1.25;
+/** After this long without a touch the station draws at IDLE_FPS. */
+const IDLE_MS = 12_000;
+const IDLE_FPS = 30;
+
 export class StationScene {
   readonly app = new Application();
 
@@ -232,8 +239,8 @@ export class StationScene {
       resizeTo: el,
       backgroundAlpha: 0,
       antialias: true,
-      // Full sharpness on 3x phone screens.
-      resolution: Math.min(window.devicePixelRatio || 1, 3),
+      // 2x is sharp on every phone; 3x costs more than twice the pixels for little gain.
+      resolution: Math.min(window.devicePixelRatio || 1, MAX_RES),
       autoDensity: true,
       // Skip WebGPU: when WebGL is unavailable, probing for WebGPU can hang some phone web
       // views. Canvas is a slower but dependable fallback.
@@ -296,7 +303,8 @@ export class StationScene {
     this.moon.texture = this.tex.moon;
     this.moon.anchor.set(0.5);
     // Foreground rocks are drawn soft, as if close to the camera and out of focus.
-    this.fgLayer.filters = [new BlurFilter({ strength: 2, quality: 2 })];
+    this.fgBlur = new BlurFilter({ strength: 2, quality: 2 });
+    this.fgLayer.filters = [this.fgBlur];
     this.flash.alpha = 0;
     this.vignette.texture = this.tex.vignette;
     this.keyLight.texture = this.tex.glow;
@@ -323,7 +331,38 @@ export class StationScene {
       this.resizeTimer = window.setTimeout(() => this.layout(), 120);
     });
     this.app.ticker.add((t) => this.frame(Math.min(t.deltaMS / 1000, 0.1)));
+    window.addEventListener('pointerdown', () => this.wake(), { capture: true, passive: true });
+    window.addEventListener('wheel', () => this.wake(), { capture: true, passive: true });
     this.ready = true;
+    this.setBatterySaver(this.saver);
+  }
+
+  private fgBlur: BlurFilter | null = null;
+  private saver = false;
+  private lastInput = performance.now();
+
+  /** True while nobody has touched the screen for a while: the station then draws at half rate. */
+  get idle(): boolean {
+    return this.saver || performance.now() - this.lastInput > IDLE_MS;
+  }
+
+  /** A touch: back to full frame rate straight away. */
+  wake(): void {
+    this.lastInput = performance.now();
+    if (this.ready && !this.saver) this.app.ticker.maxFPS = 0;
+  }
+
+  /** Battery saver: 30 fps, a lower resolution and no soft-focus blur on the foreground rocks. */
+  setBatterySaver(on: boolean): void {
+    this.saver = on;
+    if (!this.ready) return;
+    this.app.ticker.maxFPS = on ? IDLE_FPS : 0;
+    this.fgLayer.filters = on || !this.fgBlur ? [] : [this.fgBlur];
+    const res = Math.min(window.devicePixelRatio || 1, on ? SAVER_RES : MAX_RES);
+    if (this.app.renderer.resolution !== res) {
+      this.app.renderer.resolution = res;
+      this.app.renderer.resize(this.app.screen.width, this.app.screen.height);
+    }
   }
 
   /** False until init finishes; every public method is a no-op before then. */
@@ -1614,6 +1653,8 @@ export class StationScene {
   }
 
   private frame(dt: number): void {
+    // Drop to half rate when idle; wake() restores it on the next touch.
+    if (!this.saver && this.app.ticker.maxFPS === 0 && this.idle) this.app.ticker.maxFPS = IDLE_FPS;
     this.time += dt;
     this.jump = Math.max(0, this.jump - dt);
     const warpTarget = this.jump > 0.6 ? 2.6 : this.boosting ? 1 : 0;
