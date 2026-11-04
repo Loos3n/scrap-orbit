@@ -1,3 +1,4 @@
+import { askPermission, notificationsAvailable } from '../notify';
 import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
@@ -415,6 +416,8 @@ export class UI {
       auto.checked = o.autoBuy;
       hap.checked = o.haptics;
       ($('opt-battery') as HTMLInputElement).checked = o.batterySaver;
+      ($('opt-notify') as HTMLInputElement).checked = o.notifications;
+      $('opt-notify-row').hidden = !notificationsAvailable();
       sfxVol.value = String(Math.round(o.sfxVol * 100));
       musVol.value = String(Math.round(o.musicVol * 100));
       setText($('opt-sfx-val'), pct(o.sfxVol));
@@ -450,6 +453,18 @@ export class UI {
       }),
     );
     hap.addEventListener('change', () => (settings().haptics = hap.checked));
+    const notify = $('opt-notify') as HTMLInputElement;
+    notify.addEventListener('change', () => {
+      if (!notify.checked) {
+        settings().notifications = false;
+        return;
+      }
+      void askPermission().then((ok) => {
+        settings().notifications = ok;
+        notify.checked = ok;
+        if (!ok) this.toast(ICONS.gear, 'Notifications are off for Scrap Orbit in your phone settings.');
+      });
+    });
     const battery = $('opt-battery') as HTMLInputElement;
     battery.addEventListener('change', () => {
       settings().batterySaver = battery.checked;

@@ -147,8 +147,8 @@ export class Game {
       this.state.stats.runSec += dt;
     }
     this.updateBoss(now, Math.min(dt, 1));
-    // A new week brings a new weekly event (after the tutorial, so it isn't lost in it).
-    if (this.state.tutorial < 0) {
+    // A new week brings a new weekly event (after a new captain has settled in, so it isn't lost).
+    if (this.state.tutorial < 0 && this.state.stats.playSec >= STREAK_SETTLE_SEC) {
       const started = updateWeekly(this.state, now);
       if (started) this.emit({ type: 'weekly', phase: 'start', id: started.id });
       const tier = weeklyProgress(this.state).tier;

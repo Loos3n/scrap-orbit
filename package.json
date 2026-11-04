@@ -19,6 +19,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
+    "@capacitor/local-notifications": "^8.3.0",
     "@fontsource/fredoka": "^5.3.0",
     "@fontsource/rubik": "^5.3.0",
     "break_infinity.js": "^2.2.0",

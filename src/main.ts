@@ -1,3 +1,4 @@
+import { askPermission, cancelReminders, notificationsAvailable, scheduleReminders } from './notify';
 import { WEEKLIES, allPaints, weeklyOn } from './core/weekly';
 import { GROWTH, growthStage } from './core/growth';
 import { GROUP_NAMES } from './ui/panes';
@@ -780,8 +781,23 @@ async function boot(): Promise<void> {
 
   const save = () => game.save();
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') save();
+    if (document.visibilityState === 'hidden') {
+      save();
+      void scheduleReminders(game.state);
+    } else void cancelReminders();
   });
+  void cancelReminders();
+  // In the Android app, ask once for notification permission a minute after the tutorial.
+  if (notificationsAvailable()) {
+    const ask = window.setInterval(() => {
+      const s = game.state;
+      if (s.tips.has('notify-asked')) return window.clearInterval(ask);
+      if (s.tutorial >= 0 || s.stats.playSec < 60) return;
+      s.tips.add('notify-asked');
+      window.clearInterval(ask);
+      void askPermission().then((ok) => (s.settings.notifications = ok));
+    }, 10_000);
+  }
   window.addEventListener('pagehide', save);
 }
 
