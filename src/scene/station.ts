@@ -1533,7 +1533,8 @@ export class StationScene {
   setBoss(kind: number | null, defeated = false): void {
     if (!this.ready) return;
     if (kind === null) {
-      if (!this.boss) return;
+      // Already on its way out: let it finish.
+      if (!this.boss || this.boss.state === 'out' || this.boss.state === 'dead') return;
       if (defeated) this.explodeBoss();
       else this.boss.state = 'out';
       this.boss.t = 0;

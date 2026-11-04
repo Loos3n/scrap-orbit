@@ -792,6 +792,8 @@ async function boot(): Promise<void> {
     scene.holdCrate = game.tutorialStep === 'crate';
     scene.starsAllowed = game.state.tutorial < 0;
     scene.setBossHealth(meta.bossHealth(game.state));
+    // A relocation, challenge or galaxy shift clears the wreck without a goodbye; send it off here.
+    if (!game.state.boss) scene.setBoss(null);
     ui.renderHud((t - lastFrame) / 1000);
     lastFrame = t;
     if (now - lastUi > 100) {
