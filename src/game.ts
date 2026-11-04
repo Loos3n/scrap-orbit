@@ -1,3 +1,4 @@
+import { recordIncome, recordRun } from './core/history';
 import { catchStar, type StarPrize } from './core/lucky';
 import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
 import { sectorCrateMult } from './core/sectors';
@@ -149,6 +150,7 @@ export class Game {
       this.state.stats.runSec += dt;
     }
     this.updateBoss(now, Math.min(dt, 1));
+    if (this.state.tutorial < 0) recordIncome(this.state, now);
     // A new week brings a new weekly event (after a new captain has settled in, so it isn't lost).
     if (this.state.tutorial < 0 && this.state.stats.playSec >= STREAK_SETTLE_SEC) {
       const started = updateWeekly(this.state, now);
@@ -479,6 +481,8 @@ export class Game {
   /** Prestige: trades this run for Star Cores. Returns the cores gained. */
   relocate(): number {
     const speed = eco.relocateSpeedup(this.state);
+    const claim = eco.claimableCores(this.state);
+    if (claim > 0) recordRun(this.state, claim, Date.now());
     const cores = eco.relocate(this.state, Date.now());
     if (cores > 0) {
       meta.addCrystals(this.state, RELOCATE_CRYSTALS);

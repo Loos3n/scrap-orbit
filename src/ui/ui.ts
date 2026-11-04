@@ -1,3 +1,4 @@
+import { Graphs } from './graphs';
 import { askPermission, notificationsAvailable } from '../notify';
 import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
@@ -120,6 +121,7 @@ export class UI {
   private shown: Decimal = D(0);
   private lastScrapText = '';
   private shownRate = D(0);
+  private graphs = new Graphs($('graphs'));
   private fmt = (v: Parameters<typeof format>[0]) => format(v, this.game.state.settings.numbers);
   private crew: CrewPanel;
   private lab: LabPanel;
@@ -689,6 +691,7 @@ export class UI {
         this.lootShelf.render();
         this.book.render();
         this.renderStats(now);
+        this.graphs.render(this.game.state, (v) => this.fmt(v));
       }
     }
     this.missions.render();

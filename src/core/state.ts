@@ -39,6 +39,8 @@ export interface GameState {
   missions: { day: string; daily: Mission[]; week: string; weekly: Mission | null };
   /** This week's event (core/weekly.ts): which week, which event, its counter at the start, tiers claimed. */
   weekly: { week: string; id: string; start: number; claimed: number };
+  /** Samples for the Stats graphs (core/history.ts). */
+  history: { income: { t: number; log: number }[]; runs: { t: number; sector: number; minutes: number; cores: number }[] };
   event: { kind: EventKind; endsAt: number } | null;
   nextEventAt: number;
   /** Tutorial step; -1 when finished. */
@@ -155,6 +157,7 @@ interface SaveData {
   decor?: { owned?: string[]; theme?: string; paint?: string };
   missions?: GameState['missions'];
   weekly?: GameState['weekly'];
+  history?: GameState['history'];
   event?: GameState['event'];
   nextEventAt?: number;
   tutorial?: number;
@@ -220,6 +223,7 @@ export function newState(now: number): GameState {
     decor: { owned: new Set(['classic', 'standard']), theme: 'classic', paint: 'standard' },
     missions: { day: '', daily: [], week: '', weekly: null },
     weekly: { week: '', id: '', start: 0, claimed: 0 },
+    history: { income: [], runs: [] },
     event: null,
     nextEventAt: 0,
     tutorial: 0,
@@ -287,6 +291,7 @@ export function serialize(state: GameState): string {
     decor: { owned: [...state.decor.owned], theme: state.decor.theme, paint: state.decor.paint },
     missions: state.missions,
     weekly: state.weekly,
+    history: state.history,
     event: state.event,
     nextEventAt: state.nextEventAt,
     tutorial: state.tutorial,
@@ -364,6 +369,11 @@ export function deserialize(json: string | null, now: number): GameState | null 
   if (data.decor?.theme && state.decor.owned.has(data.decor.theme)) state.decor.theme = data.decor.theme;
   if (data.decor?.paint && state.decor.owned.has(data.decor.paint)) state.decor.paint = data.decor.paint;
   if (data.missions && Array.isArray(data.missions.daily)) state.missions = data.missions;
+  if (data.history) {
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
+    if (Array.isArray(data.history.income)) state.history.income = data.history.income.filter((x) => x && ok(x.t) && ok(x.log)).slice(-144);
+    if (Array.isArray(data.history.runs)) state.history.runs = data.history.runs.filter((x) => x && ok(x.t) && ok(x.cores) && ok(x.minutes) && ok(x.sector)).slice(-12);
+  }
   if (data.weekly && typeof data.weekly.week === 'string') state.weekly = { week: data.weekly.week, id: String(data.weekly.id ?? ''), start: int(data.weekly.start), claimed: Math.min(3, int(data.weekly.claimed)) };
   state.event = data.event && typeof data.event.endsAt === 'number' ? data.event : null;
   state.nextEventAt = Number(data.nextEventAt) || 0;

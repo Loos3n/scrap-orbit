@@ -1387,3 +1387,20 @@ button.gen-icon:active { transform: scale(0.94); }
 .wk-claim { width: 100%; margin-top: 2px; }
 .wk-done { margin-top: 4px !important; color: var(--go) !important; }
 .modal-report .away-flavour { display: block; padding: 8px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.06); color: var(--ink); font-style: italic; text-align: center; }
+
+/* Stats graphs: thin gold line, recessive grid, ink-coloured labels. */
+.graphs { display: grid; gap: 12px; }
+.graph { margin: 0; padding: 12px 12px 8px; border-radius: 14px; border: 1px solid var(--line); background: rgb(10 12 36 / 0.45); }
+.graph figcaption { display: flex; flex-direction: column; gap: 1px; margin-bottom: 6px; }
+.graph figcaption b { font-family: var(--font-display); font-weight: 600; font-size: 14px; color: var(--ink); }
+.graph figcaption span { font-size: 12px; color: var(--ink-dim); }
+.g-plot { position: relative; touch-action: pan-y; }
+.g-plot svg { display: block; width: 100%; height: auto; overflow: visible; }
+.g-grid { stroke: rgb(170 180 255 / 0.12); stroke-width: 1; }
+.g-tick { fill: var(--ink-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
+.g-line { fill: none; stroke: var(--scrap); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.g-area { fill: rgb(255 181 71 / 0.1); }
+.g-end, .g-dot { fill: var(--scrap); stroke: #141838; stroke-width: 2; }
+.g-bar { fill: #8f7bff; }
+.g-tip { position: absolute; top: 0; padding: 4px 8px; border-radius: 8px; background: #20244e; border: 1px solid var(--line); color: var(--ink); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateY(-100%); }
+.g-empty { margin: 4px 0 6px; color: var(--ink-dim); font-size: 13px; }
