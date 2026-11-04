@@ -1,3 +1,4 @@
+import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
@@ -231,6 +232,11 @@ export class UI {
     });
     document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) =>
       tab.addEventListener('click', () => {
+        if (!tabOpen(this.game.state, tab.dataset.tab!)) {
+          const u = TAB_UNLOCKS.find((x) => x.tab === tab.dataset.tab)!;
+          this.toast(ICONS.lock, u.hint);
+          return;
+        }
         // One tap does it all: the open tab hides the panel, any other tab opens it.
         if (tab.getAttribute('aria-selected') === 'true' && this.panel.open) {
           this.panel.set(false);
@@ -238,6 +244,45 @@ export class UI {
         } else this.openTab(tab.dataset.tab!);
       }),
     );
+  }
+
+  /** Called when a tab opens for the first time while playing. */
+  onUnlock?: (u: TabUnlock) => void;
+  private unlocksChecked = false;
+  /** What each dot showed when its pane was last looked at, so it stays quiet until something changes. */
+  private seen: Record<string, string> = {};
+
+  /** Locks and unlocks the tabs; the first check after loading opens tabs quietly. */
+  private syncTabs(): void {
+    const s = this.game.state;
+    const opened = openReadyTabs(s);
+    if (this.unlocksChecked) for (const u of opened) this.onUnlock?.(u);
+    if (opened.length || !this.unlocksChecked) {
+      document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => {
+        const open = tabOpen(s, t.dataset.tab!);
+        t.classList.toggle('locked', !open);
+        let lock = t.querySelector<HTMLElement>('.tab-lock');
+        if (!open && !lock) {
+          lock = document.createElement('span');
+          lock.className = 'tab-lock';
+          lock.innerHTML = ICONS.lock;
+          t.appendChild(lock);
+        } else if (open) lock?.remove();
+        if (this.unlocksChecked && opened.some((u) => u.tab === t.dataset.tab)) {
+          t.classList.remove('fresh');
+          void t.offsetWidth;
+          t.classList.add('fresh');
+        }
+      });
+    }
+    this.unlocksChecked = true;
+  }
+
+  /** True when a dot has news: something is ready, and it changed since the pane was last open. */
+  private news(pane: string, ready: boolean, sig: string): boolean {
+    if (!ready) return false;
+    if (!$(`tab-${pane}`).hidden && this.panel.open) this.seen[pane] = sig;
+    return this.seen[pane] !== sig;
   }
 
   /** The pane each tab showed last, so a tab reopens where the player left it. */
@@ -575,8 +620,10 @@ export class UI {
     $('pets-dot').hidden = !petsReady;
     const tripsReady = this.trips.anyReady();
     $('trips-dot').hidden = !tripsReady;
-    $('crew-dot').hidden = !this.crew.anyAffordable() && !petsReady && !tripsReady;
-    $('lab-dot').hidden = !this.lab.idle();
+    this.syncTabs();
+    const crewSig = `${Object.values(s.crew).join()}|${s.pets.owned.size}|${s.trips.length}|${this.crew.anyAffordable()}${petsReady}${tripsReady}`;
+    $('crew-dot').hidden = !tabOpen(s, 'crew') || !this.news('crew', this.crew.anyAffordable() || petsReady || tripsReady, crewSig);
+    $('lab-dot').hidden = !tabOpen(s, 'progress') || !this.news('lab', this.lab.idle(), String(s.research.done.size));
     if (!$('tab-crew').hidden) {
       if (!$('seg-crewlist').hidden) this.crew.render();
       else if (!$('seg-trips').hidden) this.trips.render();
@@ -586,7 +633,8 @@ export class UI {
     // Tab dots gather their panes' dots.
     $('build-dot').hidden = $('upgrade-dot').hidden;
     $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
-    $('progress-dot').hidden = $('lab-dot').hidden && $('cores-dot').hidden && $('galaxy-dot').hidden;
+    $('progress-dot').hidden = !tabOpen(s, 'progress') || ($('lab-dot').hidden && $('cores-dot').hidden && $('galaxy-dot').hidden);
+    if (!tabOpen(s, 'station')) $('station-dot').hidden = true;
     // With the menu hidden, the square carries a dot when any tab has something new.
     $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'progress-dot', 'station-dot'].every((id) => $(id).hidden);
     if (!$('tab-station').hidden) {

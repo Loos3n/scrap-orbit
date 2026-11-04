@@ -618,7 +618,8 @@ export class Coach {
     const tip = this.tip();
     let def = tip ? { text: tip.text, target: paneTarget(tip.tab), next: 'Got it' } : this.step();
     // Never sit on top of a pop-up such as the welcome-back screen.
-    const modalOpen = [...document.querySelectorAll<HTMLElement>('.modal')].some((m) => !m.hidden);
+    // Nor on a celebration card or the new-sector title.
+    const modalOpen = [...document.querySelectorAll<HTMLElement>('.modal')].some((m) => !m.hidden) || !$('fanfare').hidden || !$('sector-card').hidden;
     if (!def || modalOpen) {
       coach.hidden = spot.hidden = dim.hidden = true;
       this.shownKey = '';

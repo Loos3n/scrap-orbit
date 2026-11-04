@@ -16,6 +16,8 @@ const AUTOSAVE_MS = 30_000;
 const AWAY_THRESHOLD_SEC = 5;
 const ACHIEVEMENT_CHECK_MS = 1_000;
 const AUTOBUY_MS = 2_000;
+/** Seconds of play before the first daily reward pops up. */
+const STREAK_SETTLE_SEC = 240;
 /** Crystals for each relocation. */
 const RELOCATE_CRYSTALS = 5;
 
@@ -193,8 +195,9 @@ export class Game {
     }
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
-    // A new day's reward waits until the tutorial is over, then is offered once per day.
-    if (s.tutorial < 0 && meta.checkLogin(s, now) && this.streakShown !== s.login.day) {
+    // A new day's reward waits until the tutorial is over and a brand-new captain has had a few
+    // minutes to settle in, then is offered once per day.
+    if (s.tutorial < 0 && s.stats.playSec >= STREAK_SETTLE_SEC && meta.checkLogin(s, now) && this.streakShown !== s.login.day) {
       this.streakShown = s.login.day;
       this.emit({ type: 'streak' });
     }

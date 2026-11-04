@@ -1357,3 +1357,16 @@ button.gen-icon:active { transform: scale(0.94); }
   80% { opacity: 1; }
   100% { transform: translate(var(--dx), 105vh) rotate(var(--r)); opacity: 0; }
 }
+
+/* Tabs that have not opened yet: faded, with a small padlock. A tab that just opened glows. */
+.tab.locked { opacity: 0.42; }
+.tab.locked [data-icon] { filter: grayscale(1); }
+.tab-lock { position: absolute; top: 3px; right: calc(50% - 22px); width: 13px; height: 13px; color: var(--ink); }
+.tab-lock svg { width: 100%; height: 100%; display: block; }
+.tab.locked::before { width: 0 !important; }
+.tab.fresh { animation: tab-fresh 2.4s ease-out; }
+@keyframes tab-fresh {
+  0%, 30% { background: color-mix(in srgb, var(--go) 30%, transparent); box-shadow: 0 0 18px color-mix(in srgb, var(--go) 50%, transparent); }
+  100% { background: transparent; box-shadow: none; }
+}
+.reduce-flash .tab.fresh { animation: none; }

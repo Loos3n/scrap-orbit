@@ -1,3 +1,4 @@
+import { GROUP_NAMES } from './ui/panes';
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
 // Content-Security-Policy hosts (embedded pages, some app stores' web views).
 import 'pixi.js/unsafe-eval';
@@ -152,6 +153,10 @@ async function boot(): Promise<void> {
   window.addEventListener('pointerdown', unlock, { capture: true });
 
   const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  ui.onUnlock = (u) =>
+    fanfare.whenIdle(() =>
+      fanfare.cheer({ icon: ICONS[u.tab === 'progress' ? 'core' : u.tab], kicker: 'New tab unlocked', title: GROUP_NAMES[u.tab], sub: u.news, color: '#4fe3c1' }),
+    );
   // Decorations earned together (an old save catching up) share one toast.
   let freshOrnaments: string[] = [];
 
