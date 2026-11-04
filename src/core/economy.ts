@@ -7,6 +7,7 @@ import {
   MILESTONE_MULT,
   MILESTONES,
   OFFLINE_CAP_SEC,
+  OFFLINE_MAX_SEC,
   PRESTIGE,
   UPGRADES,
   type PerkId,
@@ -135,7 +136,8 @@ export function boostDurationSec(state: GameState): number {
 }
 
 export function offlineCapSec(state: GameState): number {
-  return (hasPerk(state, 'longshift') ? OFFLINE_CAP_SEC * 2 : OFFLINE_CAP_SEC) + researchSum(state, 'offlineSec');
+  const sec = OFFLINE_CAP_SEC + (hasPerk(state, 'longshift') ? 8 * 3600 : 0) + researchSum(state, 'offlineSec');
+  return Math.min(OFFLINE_MAX_SEC, sec);
 }
 
 export function boostActive(state: GameState, now: number): boolean {

@@ -3,6 +3,7 @@ import { GENERATORS, OFFLINE_CAP_SEC } from './config';
 import {
   activateBoost,
   applyOffline,
+  offlineCapSec,
   baseIncome,
   buyClaw,
   buyGenerator,
@@ -22,7 +23,7 @@ import {
 } from './economy';
 import { checkAchievements } from './achievements';
 import { D, format } from './num';
-import { deserialize, newState, serialize } from './state';
+import { deserialize, exportCode, importCode, newState, serialize } from './state';
 
 const NOW = 1_000_000;
 
@@ -110,6 +111,12 @@ describe('income', () => {
     s.claw = 0;
     s.scrap = D(5);
     expect(buyClaw(s)).toBe(false);
+  });
+
+  it('offline time never stretches past a day', () => {
+    const s = newState(NOW);
+    s.owned.drone = 5;
+    expect(offlineCapSec(s)).toBe(8 * 3600);
   });
 
   it('offline earnings are capped', () => {
@@ -211,5 +218,20 @@ describe('save migration', () => {
     expect(s.cores).toBe(0);
     expect(s.owned.laser).toBe(0);
     expect(s.settings.sound).toBe(true);
+  });
+});
+
+describe('save codes', () => {
+  it('round-trips a station through a code', () => {
+    const s = newState(1000);
+    s.owned.drone = 42;
+    s.crystals = 7;
+    const back = importCode(`  ${exportCode(s)}\n`, 2000)!;
+    expect(back.owned.drone).toBe(42);
+    expect(back.crystals).toBe(7);
+  });
+  it('turns away text that is not a code', () => {
+    expect(importCode('hello', 0)).toBeNull();
+    expect(importCode('SCRAP1-!!!', 0)).toBeNull();
   });
 });

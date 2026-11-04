@@ -471,6 +471,20 @@ export class Game {
     if (ok) this.emit({ type: 'starNode', id });
   }
 
+  /** Swaps in a save loaded from a backup code and stores it straight away. */
+  load(state: GameState): void {
+    const now = Date.now();
+    state.settings = this.state.settings;
+    state.lastSeen = now;
+    this.state = state;
+    this.lastFrame = now;
+    this.tripsReady.clear();
+    this.streakShown = '';
+    this.readyMissions = 0;
+    this.save();
+    this.emit({ type: 'reset' });
+  }
+
   reset(): void {
     const now = Date.now();
     const settings = this.state.settings;

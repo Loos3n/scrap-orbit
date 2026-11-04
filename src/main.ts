@@ -263,11 +263,15 @@ async function boot(): Promise<void> {
         }
         break;
       case 'reset':
+        // Also used when a backup code is loaded, so everything follows the new save.
         scene.setOwned(game.state.owned);
-        scene.setPet(null);
-        scene.setBoss(null);
-        scene.setSector(sectorFor(0));
-        scene.setGalaxy(0);
+        scene.setPet(game.state.pets.active, petTint());
+        scene.setBoss(game.state.boss?.name ?? null);
+        scene.setSector(sectorFor(game.state.stats.relocations));
+        scene.setRig(game.state.rig);
+        scene.setGalaxy(game.state.galaxy.shifts);
+        scene.setTrader(meta.traderHere(game.state, Date.now()));
+        scene.setOrnaments(game.state.ornaments.on);
         syncPerks();
         syncDecor();
         break;

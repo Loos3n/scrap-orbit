@@ -84,7 +84,7 @@ export const RESEARCH: readonly ResearchDef[] = [
   { id: 'ind3', branch: 1, name: 'Bulk Contracts', desc: 'Machines cost 10% less.', seconds: 2 * HOUR, requires: 'ind2', effect: { kind: 'costMult', mult: 0.9 } },
   { id: 'ind4', branch: 1, name: 'Fusion Lattice', desc: 'Everything produces 2x.', seconds: 8 * HOUR, requires: 'ind3', effect: { kind: 'allMult', mult: 2 } },
   { id: 'log1', branch: 2, name: 'Long-Range Scanners', desc: 'Salvage crates drift by 1.5x as often.', seconds: 5 * MIN, effect: { kind: 'crateRate', mult: 1.5 } },
-  { id: 'log2', branch: 2, name: 'Night Crew', desc: 'Offline earnings last 2 hours longer.', seconds: 30 * MIN, requires: 'log1', effect: { kind: 'offlineSec', sec: 2 * HOUR } },
+  { id: 'log2', branch: 2, name: 'Night Crew', desc: 'Offline earnings last 8 hours longer.', seconds: 30 * MIN, requires: 'log1', effect: { kind: 'offlineSec', sec: 8 * HOUR } },
   { id: 'log3', branch: 2, name: 'Event Beacon', desc: 'Events happen 1.5x as often.', seconds: HOUR, requires: 'log2', effect: { kind: 'eventRate', mult: 1.5 } },
   { id: 'log4', branch: 2, name: 'Deep Storage', desc: 'Offline earnings 2x.', seconds: 4 * HOUR, requires: 'log3', effect: { kind: 'offlineMult', mult: 2 } },
   { id: 'cmd1', branch: 3, name: 'Crew Quarters', desc: 'Crew bonuses 25% stronger.', seconds: 10 * MIN, effect: { kind: 'crewMult', mult: 1.25 } },

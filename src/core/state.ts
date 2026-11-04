@@ -478,3 +478,26 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.settings.viewZoom = typeof settings.viewZoom === 'number' && Number.isFinite(settings.viewZoom) ? settings.viewZoom : 1;
   return state;
 }
+
+const CODE_PREFIX = 'SCRAP1-';
+
+/** The save as a text code the player can copy somewhere safe: base64 of the save JSON. */
+export function exportCode(state: GameState): string {
+  const bytes = new TextEncoder().encode(serialize(state));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return CODE_PREFIX + btoa(bin);
+}
+
+/** Reads a code from exportCode back into a save, or null if it is not one. Spaces and line breaks are ignored. */
+export function importCode(code: string, now: number): GameState | null {
+  const clean = code.replace(/\s+/g, '');
+  if (!clean.startsWith(CODE_PREFIX)) return null;
+  try {
+    const bin = atob(clean.slice(CODE_PREFIX.length));
+    const json = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+    return deserialize(json, now);
+  } catch {
+    return null;
+  }
+}

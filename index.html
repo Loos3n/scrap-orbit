@@ -236,6 +236,17 @@
                 <button type="button" role="radio" data-num="engineering">15e6</button>
               </div>
             </div>
+            <button id="save-open" class="reset" type="button">Back up or move your save</button>
+            <div id="save-box" class="save-box" hidden>
+              <p>Copy this code somewhere safe. Paste it here on any phone or browser to bring your station back.</p>
+              <textarea id="save-code" readonly rows="3" aria-label="Your save code"></textarea>
+              <button id="save-copy" type="button">Copy code</button>
+              <textarea id="save-paste" rows="3" placeholder="Paste a save code here" aria-label="Save code to load"></textarea>
+              <div class="reset-confirm">
+                <button id="save-load" type="button" class="danger">Load this save</button>
+                <span id="save-msg" class="save-msg"></span>
+              </div>
+            </div>
             <button id="replay-tutorial" class="reset" type="button">Replay the tutorial</button>
             <button id="reset" class="reset" type="button">Reset progress</button>
             <div id="reset-confirm" class="reset-confirm" hidden>

@@ -99,7 +99,9 @@ export const BOOST = {
   cooldownSec: 300,
 };
 
-export const OFFLINE_CAP_SEC = 2 * 60 * 60;
+/** Offline earnings run this long at the start; perks and research stretch it up to OFFLINE_MAX_SEC. */
+export const OFFLINE_CAP_SEC = 8 * 60 * 60;
+export const OFFLINE_MAX_SEC = 24 * 60 * 60;
 export const SAVE_VERSION = 3;
 
 /**
@@ -119,7 +121,7 @@ export type PerkId = 'headstart' | 'longshift' | 'longboost' | 'autobuy' | 'magn
 /** Permanent perks unlocked by how many Star Cores you hold. */
 export const CORE_PERKS: readonly { id: PerkId; at: number; name: string; desc: string }[] = [
   { id: 'headstart', at: 3, name: 'Head Start', desc: 'Start each run with 10 Salvage Drones.' },
-  { id: 'longshift', at: 10, name: 'Night Shift', desc: 'Offline earnings last up to 4 hours.' },
+  { id: 'longshift', at: 10, name: 'Night Shift', desc: 'Offline earnings last 8 hours longer.' },
   { id: 'longboost', at: 25, name: 'Afterburners', desc: 'Overdrive lasts 60 seconds.' },
   { id: 'autobuy', at: 50, name: 'Auto-Builder', desc: 'Buys your cheapest machine every 2 seconds.' },
   { id: 'magnet', at: 100, name: 'Crate Magnet', desc: 'Salvage crates drift by twice as often.' },

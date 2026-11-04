@@ -2,6 +2,7 @@ import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
+import { exportCode, importCode } from '../core/state';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
@@ -403,6 +404,48 @@ export class UI {
       closeSettings();
       this.game.state.tutorial = 0;
       this.showTab('build');
+    });
+    const box = $('save-box');
+    const code = $('save-code') as HTMLTextAreaElement;
+    const paste = $('save-paste') as HTMLTextAreaElement;
+    const msg = $('save-msg');
+    let armed = false;
+    paste.addEventListener('input', () => {
+      armed = false;
+      msg.textContent = '';
+    });
+    $('save-open').addEventListener('click', () => {
+      box.hidden = !box.hidden;
+      armed = false;
+      code.value = exportCode(this.game.state);
+      paste.value = '';
+      msg.textContent = '';
+    });
+    $('save-copy').addEventListener('click', () => {
+      code.select();
+      const done = () => (msg.textContent = 'Copied.');
+      navigator.clipboard?.writeText(code.value).then(done, () => (document.execCommand('copy') ? done() : (msg.textContent = 'Select the code and copy it.')));
+    });
+    $('save-load').addEventListener('click', () => {
+      const state = importCode(paste.value, Date.now());
+      if (!state) {
+        msg.textContent = 'That code does not look right.';
+        return;
+      }
+      if (!armed) {
+        armed = true;
+        msg.textContent = 'This replaces the station you have now. Tap again to load.';
+        return;
+      }
+      armed = false;
+      this.game.load(state);
+      this.shown = state.scrap;
+      this.upgradeKey = '';
+      this.lastScrapText = '';
+      msg.textContent = 'Station loaded.';
+      code.value = exportCode(state);
+      paste.value = '';
+      sync();
     });
     const confirm = $('reset-confirm');
     $('reset').addEventListener('click', () => (confirm.hidden = false));
