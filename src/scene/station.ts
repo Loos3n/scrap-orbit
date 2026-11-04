@@ -317,7 +317,7 @@ export class StationScene {
     this.flareGlow.blendMode = 'add';
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
-    this.world.addChild(this.farLayer, this.bossLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
+    this.world.addChild(this.farLayer, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
     const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
     for (const [c, i] of z) {
@@ -579,6 +579,102 @@ export class StationScene {
     s.position.set(x, y);
     parent.addChild(s);
     return s;
+  }
+
+  /** Hull pieces added as the station grows (see core/growth.ts): rings, spokes, beacons, crown. */
+  private growth = { stage: -1, inner: new Container(), outer: new Container(), crown: new Container(), beacons: [] as Sprite[], windows: [] as Graphics[] };
+
+  /** Shows the station's growth stage. Returns true when it grew. */
+  setGrowth(stage: number): boolean {
+    if (!this.ready || stage === this.growth.stage) return false;
+    const grew = this.growth.stage >= 0 && stage > this.growth.stage;
+    this.growth.stage = stage;
+    const g = this.growth;
+    for (const c of [g.inner, g.outer, g.crown]) c.removeChildren().forEach((x) => x.destroy());
+    g.beacons = [];
+    g.windows = [];
+    const INK = 0x262b58;
+    const LO = 0x4a5490;
+    const BASE = 0x8f9ad6;
+    const HI = 0xdfe5ff;
+    const WIN = 0xffd98a;
+    const ring = (r: number, w: number) => {
+      const ring = new Graphics();
+      ring.circle(0, 0, r).stroke({ width: w + 3, color: INK, alpha: 0.9 });
+      ring.circle(0, 0, r).stroke({ width: w, color: LO });
+      ring.circle(-0.6, -0.8, r).stroke({ width: w * 0.45, color: BASE });
+      ring.circle(-1, -1.4, r - w * 0.25).stroke({ width: 1, color: HI, alpha: 0.5 });
+      return ring;
+    };
+    if (stage >= 1) {
+      g.inner.addChild(ring(80, 5));
+      // Cabin modules with lit windows.
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU;
+        const m = new Graphics();
+        m.roundRect(-9, -5, 18, 10, 3).fill({ color: INK }).roundRect(-8, -4, 16, 8, 2.5).fill({ color: BASE }).roundRect(-8, -4, 16, 3, 2).fill({ color: HI, alpha: 0.5 });
+        m.position.set(Math.cos(a) * 80, Math.sin(a) * 80);
+        m.rotation = a + Math.PI / 2;
+        const w = new Graphics();
+        for (let k = -1; k <= 1; k++) w.rect(k * 4.5 - 1.2, -0.5, 2.4, 2.4).fill({ color: WIN });
+        m.addChild(w);
+        g.windows.push(w);
+        g.inner.addChild(m);
+      }
+    }
+    if (stage >= 2) {
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU + Math.PI / 4;
+        const s = new Graphics();
+        s.rect(70, -3, 44, 6).fill({ color: INK }).rect(71, -2, 42, 4).fill({ color: LO }).rect(71, -2, 42, 1.4).fill({ color: HI, alpha: 0.45 });
+        // Cargo crates stacked along the spoke.
+        for (let k = 0; k < 3; k++) s.roundRect(80 + k * 11, -7, 8, 6, 1.5).fill({ color: [0xffb547, 0x7aa7ff, 0x4fe3c1][(i + k) % 3] }).roundRect(80 + k * 11, -7, 8, 2, 1).fill({ color: 0xffffff, alpha: 0.35 });
+        s.rotation = a;
+        g.outer.addChild(s);
+      }
+    }
+    if (stage >= 3) g.outer.addChildAt(ring(114, 4), 0);
+    if (stage >= 4) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU;
+        const sp = new Graphics();
+        sp.moveTo(-3, 0).lineTo(0, -16).lineTo(3, 0).closePath().fill({ color: INK }).moveTo(-1.8, -1).lineTo(0, -13).lineTo(1.4, -1).closePath().fill({ color: BASE });
+        sp.position.set(Math.cos(a) * 116, Math.sin(a) * 116);
+        sp.rotation = a + Math.PI / 2;
+        g.outer.addChild(sp);
+        const b = this.sprite(this.tex.glow, g.outer, Math.cos(a) * 132, Math.sin(a) * 132);
+        b.blendMode = 'add';
+        b.scale.set(0.24);
+        b.tint = i % 2 ? 0xffd166 : 0xff6b9a;
+        g.beacons.push(b);
+      }
+    }
+    if (stage >= 5) {
+      // A crown of starlight: flat stacked dots, no gradients.
+      for (let i = 0; i < 48; i++) {
+        const a = (i / 48) * TAU;
+        const d = this.sprite(this.tex.glow, g.crown, Math.cos(a) * 150, Math.sin(a) * 150);
+        d.blendMode = 'add';
+        d.scale.set(i % 4 === 0 ? 0.16 : 0.08);
+        d.tint = i % 4 === 0 ? 0xffe9a8 : 0x9fd8ff;
+      }
+    }
+    if (grew) this.squash = 1;
+    return grew;
+  }
+
+  private updateGrowth(dt: number): void {
+    const g = this.growth;
+    if (g.stage <= 0) return;
+    const t = this.time;
+    g.inner.rotation = t * 0.06;
+    g.outer.rotation = -t * 0.025;
+    g.crown.rotation = t * 0.04;
+    g.inner.y = g.outer.y = g.crown.y = this.hub.y;
+    g.windows.forEach((w, i) => (w.alpha = 0.6 + 0.4 * Math.sin(t * 0.7 + i * 1.9)));
+    g.beacons.forEach((b, i) => (b.alpha = Math.sin(t * 2.2 + i) > 0.3 ? 0.95 : 0.15));
+    g.crown.alpha = 0.55 + 0.25 * Math.sin(t * 0.9);
+    void dt;
   }
 
   private buildHub(): void {
@@ -2243,6 +2339,7 @@ export class StationScene {
       l.alpha = on ? 0.9 : 0.15;
     });
     this.updatePolish(dt, color, beat);
+    this.updateGrowth(dt);
 
     // Smelter pods breathe heat and throw the odd ember.
     this.pods.forEach((p, i) => (p.alpha = 0.85 + 0.15 * Math.sin(t * 4 + i)));

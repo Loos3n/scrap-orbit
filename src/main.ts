@@ -1,3 +1,4 @@
+import { GROWTH, growthStage } from './core/growth';
 import { GROUP_NAMES } from './ui/panes';
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
 // Content-Security-Policy hosts (embedded pages, some app stores' web views).
@@ -156,6 +157,17 @@ async function boot(): Promise<void> {
   window.addEventListener('pointerdown', unlock, { capture: true });
 
   const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  /** Grows the station's hull to match the machines owned, with a card when it gets bigger. */
+  const syncGrowth = () => {
+    const stage = growthStage(game.state.owned);
+    if (!scene.setGrowth(stage)) return;
+    const g = GROWTH[stage];
+    fanfare.whenIdle(() => fanfare.cheer({ icon: ICONS.station, kicker: 'Station expanded', title: g.name, sub: g.desc, color: '#9fb0ff' }));
+    scene.fireworks([0x9fb0ff, 0xffd98a, 0xffffff]);
+    sfx.fanfare();
+    buzz([20, 40, 20]);
+  };
+  syncGrowth();
   ui.onUnlock = (u) =>
     fanfare.whenIdle(() =>
       fanfare.cheer({ icon: ICONS[u.tab === 'progress' ? 'core' : u.tab], kicker: 'New tab unlocked', title: GROUP_NAMES[u.tab], sub: u.news, color: '#4fe3c1' }),
@@ -174,6 +186,7 @@ async function boot(): Promise<void> {
         if (first) game.state.collection.add(`gen:${e.gen}`);
         ui.flyToStation(e.gen, hexColor(color), scene.hubOnScreen(), () => {
           scene.setOwned(game.state.owned);
+          syncGrowth();
           scene.arrive(color);
           if (!first) return;
           fanfare.cheer({ icon: GEN_ICONS[e.gen], kicker: 'New machine', title: g.name, sub: g.blurb, color: hexColor(color) });
@@ -230,6 +243,7 @@ async function boot(): Promise<void> {
         // Swap the station and the sector over at the brightest moment of the flash.
         setTimeout(() => {
           scene.setOwned(game.state.owned);
+          syncGrowth();
           scene.setSector(sectorFor(game.state.stats.relocations));
           showSectorCard(game.state.stats.relocations, 0, e.speed);
           fanfare.confetti();
@@ -246,6 +260,7 @@ async function boot(): Promise<void> {
         scene.galaxyJump();
         setTimeout(() => {
           scene.setOwned(game.state.owned);
+          syncGrowth();
           scene.setSector(sectorFor(game.state.stats.relocations));
           scene.setGalaxy(game.state.galaxy.shifts);
           showSectorCard(game.state.stats.relocations, game.state.galaxy.shifts + 1);
@@ -260,6 +275,7 @@ async function boot(): Promise<void> {
         break;
       case 'starNode':
         scene.setOwned(game.state.owned);
+        syncGrowth();
         sfx.upgrade();
         scene.celebrate(0xffe9a8);
         buzz(15);
@@ -286,6 +302,7 @@ async function boot(): Promise<void> {
       case 'reset':
         // Also used when a backup code is loaded, so everything follows the new save.
         scene.setOwned(game.state.owned);
+        syncGrowth();
         scene.setPet(game.state.pets.active, petTint());
         scene.setBoss(game.state.boss?.name ?? null);
         scene.setSector(sectorFor(game.state.stats.relocations));
@@ -522,6 +539,7 @@ async function boot(): Promise<void> {
           scene.warpJump();
           setTimeout(() => {
             scene.setOwned(game.state.owned);
+            syncGrowth();
             scene.setSector(sectorFor(game.state.stats.relocations));
           }, 1500);
           syncPerks();
