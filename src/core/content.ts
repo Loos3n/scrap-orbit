@@ -270,11 +270,14 @@ export interface SectorDef {
   look?: SectorLook;
   /** A rule that only holds here, shown on arrival and at the top of the Build tab. */
   twist?: { name: string; text: string };
+  /** For sectors without their own look: which twist rule in sectors.ts applies. */
+  rule?: SectorRule;
   /** A one-off machine that can only be built here, once per visit. */
   rig?: { name: string; desc: string; color: number };
 }
 
 export type SectorLook = 'ice' | 'city' | 'hole';
+export type SectorRule = 'forge' | 'crates' | 'cheap' | 'crew' | 'quiet';
 
 /**
  * Each relocation lands in a new sector with its own sky and planet, cycling after the last.
@@ -282,11 +285,11 @@ export type SectorLook = 'ice' | 'city' | 'hole';
  */
 export const SECTORS: readonly SectorDef[] = [
   { name: 'Scrapyard Belt', sky: ['#0a0b22', '#12123a', '#0b0d26'], nebula: ['#6b3fc2', '#c23f8f', '#1f7fa8', '#3f4fc2', '#2a8f9c'], planet: ['#e8a37a', '#b0627a', '#6a3d8a', '#3d2a6a'], atmosphere: '#ffaa78' },
-  { name: 'Ember Reach', sky: ['#1a0806', '#2a0f12', '#140608'], nebula: ['#c2402a', '#e07a2a', '#8f1f3f', '#c23f5a', '#a8601f'], planet: ['#d8f4ff', '#7ac8f0', '#3a7ac0', '#1f3a7a'], atmosphere: '#9fe0ff' },
-  { name: 'Verdant Drift', sky: ['#04161a', '#0a2430', '#06121c'], nebula: ['#1fa87a', '#2ac2b0', '#3f6fc2', '#1f8fa8', '#6bdf8f'], planet: ['#f0c8ff', '#b07ae0', '#6a3fa8', '#3a1f6a'], atmosphere: '#d6a8ff' },
-  { name: 'Glass Sea', sky: ['#020a20', '#06183a', '#030c22'], nebula: ['#1f5fc2', '#2ab0e0', '#3f3fc2', '#1f8fd0', '#6bc0ff'], planet: ['#fff0b0', '#f0c050', '#c07a2a', '#6a3a1a'], atmosphere: '#ffd88a' },
-  { name: 'Rose Nebula', sky: ['#18041a', '#2a0a2c', '#120416'], nebula: ['#e02a8f', '#ff6bb0', '#8f2ac2', '#c23f8f', '#ff8fa8'], planet: ['#c8fff0', '#5ce0b0', '#1f9a7a', '#0f4a4a'], atmosphere: '#8fffd8' },
-  { name: 'Hollow Expanse', sky: ['#030306', '#0a0a14', '#040408'], nebula: ['#4a4a6a', '#6a5a8a', '#3a3a5a', '#5a5a7a', '#2a2a4a'], planet: ['#f4f4ff', '#b8b8d0', '#70708a', '#3a3a4a'], atmosphere: '#e0e0ff' },
+  { name: 'Ember Reach', sky: ['#1a0806', '#2a0f12', '#140608'], nebula: ['#c2402a', '#e07a2a', '#8f1f3f', '#c23f5a', '#a8601f'], planet: ['#d8f4ff', '#7ac8f0', '#3a7ac0', '#1f3a7a'], atmosphere: '#9fe0ff', rule: 'forge', twist: { name: 'Forge heat', text: 'The heat here feeds the furnaces: Smelters and Fabricators run 3x, but Salvage Drones overheat and run at half speed.' } },
+  { name: 'Verdant Drift', sky: ['#04161a', '#0a2430', '#06121c'], nebula: ['#1fa87a', '#2ac2b0', '#3f6fc2', '#1f8fa8', '#6bdf8f'], planet: ['#f0c8ff', '#b07ae0', '#6a3fa8', '#3a1f6a'], atmosphere: '#d6a8ff', rule: 'crates', twist: { name: 'Drifting gardens', text: 'Overgrown cargo floats everywhere: salvage crates drift by twice as often and hold twice as much.' } },
+  { name: 'Glass Sea', sky: ['#020a20', '#06183a', '#030c22'], nebula: ['#1f5fc2', '#2ab0e0', '#3f3fc2', '#1f8fd0', '#6bc0ff'], planet: ['#fff0b0', '#f0c050', '#c07a2a', '#6a3a1a'], atmosphere: '#ffd88a', rule: 'cheap', twist: { name: 'Clear water', text: 'Parts are easy to spot in the glassy fields: every machine costs 40% less.' } },
+  { name: 'Rose Nebula', sky: ['#18041a', '#2a0a2c', '#120416'], nebula: ['#e02a8f', '#ff6bb0', '#8f2ac2', '#c23f8f', '#ff8fa8'], planet: ['#c8fff0', '#5ce0b0', '#1f9a7a', '#0f4a4a'], atmosphere: '#8fffd8', rule: 'crew', twist: { name: 'Shore leave', text: 'The crew love it here and work twice as hard: crew bonuses count double.' } },
+  { name: 'Hollow Expanse', sky: ['#030306', '#0a0a14', '#040408'], nebula: ['#4a4a6a', '#6a5a8a', '#3a3a5a', '#5a5a7a', '#2a2a4a'], planet: ['#f4f4ff', '#b8b8d0', '#70708a', '#3a3a4a'], atmosphere: '#e0e0ff', rule: 'quiet', twist: { name: 'Deep quiet', text: 'Nothing drifts this far out: no boss wrecks, storms or traders, but machines run 50% faster in the calm.' } },
   {
     name: 'Ice Belt',
     sky: ['#04121e', '#0a2236', '#06141f'],

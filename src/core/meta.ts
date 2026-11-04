@@ -60,7 +60,7 @@ import { SAFE, SAFE_TYPES, SETS, setComplete, skinUnlocked, type CollectionSet }
 import { GENERATORS } from './config';
 import { GALAXY, STAR_NODES, forgeCost, starsForCores } from './galaxy';
 import { D, Decimal } from './num';
-import { sectorBossRules, timeStretch } from './sectors';
+import { sectorBossRules, sectorHappenings, timeStretch } from './sectors';
 import type { GameState, Mission } from './state';
 
 // ---------- Crystals ----------
@@ -310,7 +310,7 @@ export function updateEvents(state: GameState, now: number, rand = Math.random):
     return { ended };
   }
   // Events hold off while anything else is going on, so there is always calm time between.
-  if (!state.event && now >= state.nextEventAt && calm(state, now)) {
+  if (!state.event && now >= state.nextEventAt && calm(state, now) && sectorHappenings(state)) {
     const roll = rand();
     const kind: EventKind = roll < 0.45 ? 'meteors' : roll < 0.75 ? 'flare' : 'convoy';
     const endsAt = now + EVENTS[kind].seconds * 1000;
@@ -467,7 +467,7 @@ export function updateBoss(state: GameState, now: number, dt: number, rand = Mat
   if (!b) {
     if (state.tutorial >= 0) return {};
     if (state.nextBossAt === 0) state.nextBossAt = now + Math.max(0, BOSS.firstSec - state.stats.playSec) * 1000;
-    if (now < state.nextBossAt || !calm(state, now)) return {};
+    if (now < state.nextBossAt || !calm(state, now) || !sectorHappenings(state)) return {};
     state.lastHappening = now;
     const hp = bossHp(state, now);
     state.boss = { name: state.stats.bosses % BOSS_NAMES.length, hp: hp.toString(), max: hp.toString(), endsAt: now + BOSS.seconds * 1000, reward: bossReward(state, now).toString() };
@@ -684,7 +684,7 @@ export function updateTrader(state: GameState, now: number, rand = Math.random):
     t.nextAt = now + TRADER.firstMin * 60_000;
     return null;
   }
-  if (t.until || now < t.nextAt || !calm(state, now)) return null;
+  if (t.until || now < t.nextAt || !calm(state, now) || !sectorHappenings(state)) return null;
   state.lastHappening = now;
   t.until = now + TRADER.stayMin * 60_000;
   const [lo, hi] = TRADER.gap;

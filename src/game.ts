@@ -1,3 +1,4 @@
+import { sectorCrateMult } from './core/sectors';
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { bestPurchase } from './core/advisor';
 import { checkOrnaments, toggleOrnament } from './core/ornaments';
@@ -393,7 +394,7 @@ export class Game {
     const a = eco.income(this.state, now).mul(30);
     const b = eco.tapValue(this.state, now).mul(25);
     // The Orbit Pup doubles what crates are worth.
-    const value = (a.gt(b) ? a : b).mul(meta.petActive(this.state, 'pup') ? 2 : 1);
+    const value = (a.gt(b) ? a : b).mul(meta.petActive(this.state, 'pup') ? 2 : 1).mul(sectorCrateMult(this.state));
     eco.earn(this.state, value);
     this.state.stats.crates++;
     this.emit({ type: 'bonus', value });

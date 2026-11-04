@@ -20,7 +20,7 @@ import { D, format } from './core/num';
 import { Game } from './game';
 import * as art from './scene/art';
 import { StationScene } from './scene/station';
-import { timeStretch } from './core/sectors';
+import { sectorCrateMult, timeStretch } from './core/sectors';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
@@ -128,7 +128,7 @@ async function boot(): Promise<void> {
   scene.setOwned(game.state.owned);
   scene.setViewZoom(game.state.settings.viewZoom);
   const syncPerks = () =>
-    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1));
+    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state));
   syncPerks();
   const syncDecor = () => {
     const s = game.state;

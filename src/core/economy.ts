@@ -17,7 +17,7 @@ import {
 } from './config';
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
-import { RIG, currentSector, timeStretch } from './sectors';
+import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
@@ -48,7 +48,7 @@ export function maxAffordable(gen: GeneratorDef, owned: number, scrap: Decimal, 
 
 /** Price multiplier for machines from research. */
 export function costDiscount(state: GameState): number {
-  return researchProduct(state, 'costMult') * (challengeOn(state, 'pricey') ? 3 : 1);
+  return researchProduct(state, 'costMult') * (challengeOn(state, 'pricey') ? 3 : 1) * sectorCostMult(state);
 }
 
 /** Units and price for a buy button in the given mode. Max with nothing affordable shows 1. */
@@ -108,7 +108,7 @@ export function crewMult(state: GameState, gen: GeneratorId): number {
   const def = CREW.find((c) => c.gen === gen);
   // Crew away on an expedition can't tend their machine, and the Skeleton Crew challenge benches everyone.
   const level = def && !onTrip(state, def.id) && !challengeOn(state, 'nocrew') ? state.crew[def.id] : 0;
-  return 1 + level * CREW_PER_LEVEL * researchProduct(state, 'crewMult');
+  return 1 + level * CREW_PER_LEVEL * researchProduct(state, 'crewMult') * sectorCrewMult(state);
 }
 
 export function flareActive(state: GameState, now: number): boolean {
@@ -154,7 +154,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income);
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;

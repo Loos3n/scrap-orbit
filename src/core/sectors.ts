@@ -32,6 +32,29 @@ export function sectorBonuses(state: GameState): { income: number; tap: number; 
   return b;
 }
 
+/** This sector's twist rule, if it is one of the plain-looking ones. */
+export const sectorRule = (state: GameState) => currentSector(state).rule ?? null;
+
+/** Output multiplier the twist gives one kind of machine. */
+export function sectorGenMult(state: GameState, gen: string): number {
+  const rule = sectorRule(state);
+  if (rule === 'forge') return gen === 'smelter' || gen === 'fabricator' ? 3 : gen === 'drone' ? 0.5 : 1;
+  if (rule === 'quiet') return 1.5;
+  return 1;
+}
+
+/** Machine price multiplier from the twist. */
+export const sectorCostMult = (state: GameState) => (sectorRule(state) === 'cheap' ? 0.6 : 1);
+
+/** How much more crew bonuses count here. */
+export const sectorCrewMult = (state: GameState) => (sectorRule(state) === 'crew' ? 2 : 1);
+
+/** Crate rate and crate value multipliers. */
+export const sectorCrateMult = (state: GameState) => (sectorRule(state) === 'crates' ? 2 : 1);
+
+/** False where wrecks, storms and traders never come. */
+export const sectorHappenings = (state: GameState) => sectorRule(state) !== 'quiet';
+
 /** How boss wrecks differ here: health and payout multipliers, and the gap between them. */
 export function sectorBossRules(state: GameState): { hp: number; reward: number; gap: number } {
   return currentSector(state).look === 'city' ? { hp: 2, reward: 3, gap: 0.5 } : { hp: 1, reward: 1, gap: 1 };
