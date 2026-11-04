@@ -34,10 +34,14 @@ const TAB_ACCENT: Record<string, string> = {
   build: '#4fe3c1',
   upgrades: '#ffd166',
   crew: '#ff8a4c',
+  trips: '#ff8a4c',
+  pets: '#ff8a4c',
   lab: '#7aa7ff',
   cores: '#c58cff',
-  station: '#ff7bb0',
+  challenges: '#c58cff',
   galaxy: '#ffe9a8',
+  station: '#ff7bb0',
+  decor: '#ff7bb0',
 };
 
 /** Fills every `data-icon="name"` placeholder in the static HTML. */
@@ -161,6 +165,7 @@ export class UI {
     this.bindRelocate();
     this.buildAchievements();
     this.bindSegments();
+    this.bindProfile();
     this.crew = new CrewPanel(game);
     this.lab = new LabPanel(game);
     this.decor = new DecorPanel(game);
@@ -326,6 +331,7 @@ export class UI {
     this.panel.set(true);
     this.coach.tabOpened(pane);
     this.render();
+    this.panel.fit();
   }
 
   private bindBuyModes(): void {
@@ -357,16 +363,54 @@ export class UI {
 
   private bindSegments(): void {
     document.querySelectorAll<HTMLButtonElement>('.pane-seg button').forEach((b) => b.addEventListener('click', () => this.openPane(b.dataset.pane!)));
-    // Each tab's segment bar switches only its own sections.
-    document.querySelectorAll<HTMLButtonElement>('.segments:not(.pane-seg) button').forEach((b) =>
+  }
+
+  private lastFit = 0;
+
+  /** Achievements earned when the profile was last open, so its dot only lights for new ones. */
+  private seenAch = 0;
+
+  /** The profile card: achievements and loot, the collection book, and stats with graphs. */
+  private bindProfile(): void {
+    this.seenAch = this.game.state.achievements.size;
+    const box = $('profile');
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.profile-seg button');
+    const show = (name: string) =>
+      buttons.forEach((x) => {
+        x.setAttribute('aria-selected', String(x.dataset.prof === name));
+        $(`prof-${x.dataset.prof}`).hidden = x.dataset.prof !== name;
+      });
+    buttons.forEach((b) =>
       b.addEventListener('click', () => {
-        b.parentElement!.querySelectorAll<HTMLButtonElement>('button').forEach((x) => {
-          x.setAttribute('aria-selected', String(x === b));
-          $(`seg-${x.dataset.seg}`).hidden = x !== b;
-        });
-        this.render();
+        show(b.dataset.prof!);
+        this.renderProfile(true);
       }),
     );
+    $('profile-btn').addEventListener('click', () => {
+      box.hidden = false;
+      this.renderProfile(true);
+    });
+    $('profile-close').addEventListener('click', () => (box.hidden = true));
+    box.addEventListener('click', (e) => {
+      if (e.target === box) box.hidden = true;
+    });
+  }
+
+  private renderProfile(force = false): void {
+    const s = this.game.state;
+    if ($('profile').hidden) {
+      $('profile-dot').hidden = s.achievements.size <= this.seenAch;
+      return;
+    }
+    this.seenAch = s.achievements.size;
+    $('profile-dot').hidden = true;
+    if (!$('prof-awards').hidden) this.lootShelf.render();
+    if (!$('prof-book').hidden) this.book.render();
+    if (!$('prof-stats').hidden) {
+      this.renderStats(Date.now());
+      this.graphs.render(s, (v) => this.fmt(v));
+    }
+    if (force) $('profile').querySelector('.modal-card')!.scrollTop = 0;
   }
 
   private bindRelocate(): void {
@@ -664,35 +708,33 @@ export class UI {
     const tripsReady = this.trips.anyReady();
     $('trips-dot').hidden = !tripsReady;
     this.syncTabs();
-    const crewSig = `${Object.values(s.crew).join()}|${s.pets.owned.size}|${s.trips.length}|${this.crew.anyAffordable()}${petsReady}${tripsReady}`;
-    $('crew-dot').hidden = !tabOpen(s, 'crew') || !this.news('crew', this.crew.anyAffordable() || petsReady || tripsReady, crewSig);
-    $('lab-dot').hidden = !tabOpen(s, 'progress') || !this.news('lab', this.lab.idle(), String(s.research.done.size));
-    if (!$('tab-crew').hidden) {
-      if (!$('seg-crewlist').hidden) this.crew.render();
-      else if (!$('seg-trips').hidden) this.trips.render();
-      else this.pets.render();
-    }
+    const crewReady = this.crew.anyAffordable();
+    $('crewlist-dot').hidden = !crewReady;
+    const crewSig = `${Object.values(s.crew).join()}|${s.pets.owned.size}|${s.trips.length}|${crewReady}${petsReady}${tripsReady}`;
+    $('crew-dot').hidden = !tabOpen(s, 'crew') || !this.news('crew', crewReady || petsReady || tripsReady, crewSig);
+    $('lab-dot').hidden = !tabOpen(s, 'lab') || !this.news('lab', this.lab.idle(), String(s.research.done.size));
+    if (!$('tab-crew').hidden) this.crew.render();
+    if (!$('tab-trips').hidden) this.trips.render();
+    if (!$('tab-pets').hidden) this.pets.render();
     if (!$('tab-lab').hidden) this.lab.render();
     // Tab dots gather their panes' dots.
     $('build-dot').hidden = $('upgrade-dot').hidden;
     $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
-    $('progress-dot').hidden = !tabOpen(s, 'progress') || ($('lab-dot').hidden && $('cores-dot').hidden && $('galaxy-dot').hidden);
+    $('prestige-dot').hidden = !tabOpen(s, 'prestige') || ($('cores-dot').hidden && $('galaxy-dot').hidden);
     if (!tabOpen(s, 'station')) $('station-dot').hidden = true;
     // With the menu hidden, the square carries a dot when any tab has something new.
-    $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'progress-dot', 'station-dot'].every((id) => $(id).hidden);
-    if (!$('tab-station').hidden) {
-      if (!$('seg-decor').hidden) {
-        this.ornaments.render();
-        this.decor.render();
-        this.skins.render();
-      }
-      if (!$('seg-modules').hidden) this.modules.render();
-      if (!$('seg-awards').hidden) {
-        this.lootShelf.render();
-        this.book.render();
-        this.renderStats(now);
-        this.graphs.render(this.game.state, (v) => this.fmt(v));
-      }
+    $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'lab-dot', 'prestige-dot', 'station-dot'].every((id) => $(id).hidden);
+    if (!$('tab-decor').hidden) {
+      this.ornaments.render();
+      this.decor.render();
+      this.skins.render();
+    }
+    if (!$('tab-station').hidden) this.modules.render();
+    this.renderProfile();
+    // The menu follows its pane's size as rows appear or fold away.
+    if (now - this.lastFit > 400) {
+      this.lastFit = now;
+      this.panel.fit();
     }
     this.missions.render();
     renderEventBanner(this.game);

@@ -196,7 +196,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .gen .buy { -webkit-touch-callout: none; touch-action: manipulation; }
 .gen .buy.holding { animation: hold-pulse 0.35s ease-in-out infinite alternate; }
 @keyframes hold-pulse { to { filter: brightness(1.18); transform: scale(0.97); } }
-.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px 6px 8px; gap: 2px; }
+.tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 6px 6px 8px; gap: 2px; }
 .tab {
   position: relative;
   display: flex;
@@ -247,7 +247,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
   animation: blink 1.4s ease-in-out infinite;
 }
 .tab-body {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 14px 12px 14px;
@@ -627,8 +627,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .crystal-pill svg, .cost-crystal svg { width: 100%; height: 100%; }
 .cost-crystal { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cost-crystal svg { width: 15px; height: 15px; }
-#missions-btn { position: relative; padding: 8px; color: #cfd4ff; }
-#missions-btn svg { width: 100%; height: 100%; }
 .badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--boost); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 10px var(--boost); animation: pop-in 0.3s ease-out; }
 @keyframes pop-in { from { transform: scale(0); } }
 .tab-intro { margin: 2px 4px 12px; font-size: 13px; color: var(--ink-dim); line-height: 1.4; }
@@ -1202,8 +1200,6 @@ button.gen-icon:active { transform: scale(0.94); }
 .reduce-shake .boss-banner.hit, .reduce-shake .safe-dial.miss { animation: none; }
 
 /* ---------- Settings sheet ---------- */
-#settings-btn { padding: 9px; color: #cfd4ff; }
-#settings-btn svg { width: 100%; height: 100%; }
 .settings-card { justify-items: stretch; text-align: left; max-height: min(86vh, 720px); overflow-y: auto; }
 .settings-card h2 { margin: 0 0 4px; }
 .settings-card .section-title { margin: 16px 0 8px; }
@@ -1404,3 +1400,42 @@ button.gen-icon:active { transform: scale(0.94); }
 .g-bar { fill: #8f7bff; }
 .g-tip { position: absolute; top: 0; padding: 4px 8px; border-radius: 8px; background: #20244e; border: 1px solid var(--line); color: var(--ink); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateY(-100%); }
 .g-empty { margin: 4px 0 6px; color: var(--ink-dim); font-size: 13px; }
+
+/* ---------- Labelled HUD buttons, weekly chip, profile ----------
+   Missions, Profile and Settings each carry a small word under the round button, so nobody has
+   to guess what a symbol does. */
+.hud-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0; border: 0; background: none; color: #cfd4ff; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.hud-btn .round-btn { position: relative; display: block; padding: 8px; color: inherit; }
+.hud-btn .round-btn svg { display: block; width: 100%; height: 100%; }
+.hud-btn small { font-size: 10px; font-weight: 600; line-height: 1; color: var(--ink-dim); letter-spacing: 0.02em; text-shadow: 0 1px 3px rgb(0 0 0 / 0.9); }
+.hud-btn:active .round-btn { transform: scale(0.94); }
+.hud-btn .dot { top: -1px; right: -1px; }
+/* They sit in a column down the right edge of the view, clear of the scrap counter. */
+.side-rail { position: absolute; top: 8px; right: 8px; z-index: 5; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+.event-banner, .boss-banner { right: 64px; }
+@media (max-width: 380px) {
+  .hud-btn small { font-size: 9px; }
+  .hud-btn .round-btn { width: 34px; height: 34px; padding: 7px; }
+  .side-rail { gap: 8px; }
+}
+
+.goal-row { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+.goal-row .goal-line { flex: 1; }
+.goal-row:has(> .goal-line[hidden]):has(> .weekly-chip[hidden]) { display: none; }
+.weekly-chip {
+  --c: #7fd8ff; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--c) 24%, transparent), rgb(14 16 44 / 0.75));
+  color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 12px; white-space: nowrap;
+}
+.weekly-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.weekly-chip.ready { border-color: var(--go); }
+.weekly-chip.ready i { background: var(--go); box-shadow: 0 0 8px var(--go); animation: blink 1.4s ease-in-out infinite; }
+.reduce-flash .weekly-chip.ready i { animation: none; }
+
+.tab { font-size: 11.5px; }
+.pane-seg.three, .pane-seg.two { margin-bottom: 0; }
+
+.profile-card { justify-items: stretch; text-align: left; max-height: min(86vh, 760px); overflow-y: auto; }
+.profile-card h2 { margin: 0 0 10px; }
+.profile-seg { margin: 0 0 6px; }
+.prof-body .section-title:first-child { margin-top: 10px; }

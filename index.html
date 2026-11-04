@@ -21,8 +21,6 @@
           </div>
         </div>
         <div class="hud-actions">
-          <button id="settings-btn" class="round-btn" type="button" aria-label="Settings"><span data-icon="gear"></span></button>
-          <button id="missions-btn" class="round-btn" type="button" aria-label="Missions"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></button>
           <button id="boost" class="boost" type="button">
             <span class="boost-icon" data-icon="bolt"></span>
             <span class="boost-text">
@@ -31,9 +29,17 @@
             </span>
           </button>
         </div>
-        <button id="goal" class="goal-line" type="button" hidden><span class="goal-tag"><span data-icon="trophy"></span>Next</span><span id="goal-text" class="goal-text"></span><span id="goal-ready" class="goal-ready" hidden>Ready</span><i class="goal-bar"><i id="goal-bar"></i></i></button>
+        <div class="goal-row">
+          <button id="goal" class="goal-line" type="button" hidden><span class="goal-tag"><span data-icon="trophy"></span>Next</span><span id="goal-text" class="goal-text"></span><span id="goal-ready" class="goal-ready" hidden>Ready</span><i class="goal-bar"><i id="goal-bar"></i></i></button>
+          <button id="weekly-chip" class="weekly-chip" type="button" hidden><i id="weekly-chip-dot"></i><span id="weekly-chip-text">Event</span></button>
+        </div>
       </div>
       <div id="stage">
+        <nav class="side-rail" aria-label="Missions, profile and settings">
+          <button id="missions-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></span><small>Missions</small></button>
+          <button id="profile-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="profile"></span><span id="profile-dot" class="dot" hidden></span></span><small>Profile</small></button>
+          <button id="settings-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="gear"></span></span><small>Settings</small></button>
+        </nav>
         <div id="boss-banner" class="boss-banner" hidden>
           <div class="boss-row">
             <svg class="boss-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>
@@ -56,7 +62,8 @@
         <nav class="tabs" role="tablist">
           <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build<span id="build-dot" class="dot" hidden></span></button>
           <button class="tab" role="tab" data-tab="crew" aria-selected="false" type="button"><span data-icon="crew"></span>Crew<span id="crew-dot" class="dot" hidden></span></button>
-          <button class="tab" role="tab" data-tab="progress" aria-selected="false" type="button"><span data-icon="core"></span>Progress<span id="progress-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="lab" aria-selected="false" type="button"><span data-icon="lab"></span>Lab<span id="lab-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="prestige" aria-selected="false" type="button"><span data-icon="core"></span>Prestige<span id="prestige-dot" class="dot" hidden></span></button>
           <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station<span id="station-dot" class="dot" hidden></span></button>
         </nav>
         <div id="sheet" class="sheet">
@@ -64,10 +71,19 @@
           <button type="button" data-pane="build" aria-selected="true">Machines</button>
           <button type="button" data-pane="upgrades" aria-selected="false">Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
         </div>
-        <div class="segments pane-seg three" data-group="progress" role="tablist" aria-label="Progress sections" hidden>
-          <button type="button" data-pane="lab" aria-selected="true">Lab<span id="lab-dot" class="dot" hidden></span></button>
-          <button type="button" data-pane="cores" aria-selected="false">Cores<span id="cores-dot" class="dot" hidden></span></button>
+        <div class="segments pane-seg three" data-group="crew" role="tablist" aria-label="Crew sections" hidden>
+          <button type="button" data-pane="crew" aria-selected="true">Crew<span id="crewlist-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="trips" aria-selected="false">Trips<span id="trips-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="pets" aria-selected="false">Pets<span id="pets-dot" class="dot" hidden></span></button>
+        </div>
+        <div class="segments pane-seg three" data-group="prestige" role="tablist" aria-label="Prestige sections" hidden>
+          <button type="button" data-pane="cores" aria-selected="true">Cores<span id="cores-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="challenges" aria-selected="false">Challenges</button>
           <button type="button" data-pane="galaxy" aria-selected="false">Galaxy<span id="galaxy-dot" class="dot" hidden></span></button>
+        </div>
+        <div class="segments pane-seg two" data-group="station" role="tablist" aria-label="Station sections" hidden>
+          <button type="button" data-pane="station" aria-selected="true">Rooms</button>
+          <button type="button" data-pane="decor" aria-selected="false">Decor</button>
         </div>
         <div id="tab-build" class="tab-body">
           <div id="challenge-line" class="challenge-line" hidden><span data-icon="trophy"></span><span>Challenge: <b id="challenge-line-name"></b></span><div class="bar"><i id="challenge-line-bar"></i></div><b id="challenge-line-pct"></b></div>
@@ -108,23 +124,16 @@
           <ul id="upgrade-list" class="list"></ul>
         </div>
         <div id="tab-crew" class="tab-body" hidden>
-          <div class="segments three" role="tablist" aria-label="Crew sections">
-            <button type="button" data-seg="crewlist" aria-selected="true">Crew</button>
-            <button type="button" data-seg="trips" aria-selected="false">Trips<span id="trips-dot" class="dot" hidden></span></button>
-            <button type="button" data-seg="pets" aria-selected="false">Pets<span id="pets-dot" class="dot" hidden></span></button>
-          </div>
-          <div id="seg-crewlist" class="seg">
-            <p class="tab-intro">Each crew member supercharges one machine. Recruit them and train them up with crystals from missions, events and achievements.</p>
-            <ul id="crew-list" class="crew-grid"></ul>
-          </div>
-          <div id="seg-trips" class="seg" hidden>
-            <p class="tab-intro">Send crew on expeditions. They come back with crystals, scrap and sometimes a blueprint for a new station module.</p>
-            <div id="trip-panel"></div>
-          </div>
-          <div id="seg-pets" class="seg" hidden>
-            <p class="tab-intro">Pets float around the station and lend a paw. One can come along at a time; tap an adopted pet to bring it out.</p>
-            <ul id="pet-list" class="crew-grid"></ul>
-          </div>
+          <p class="tab-intro">Each crew member supercharges one machine. Recruit them and train them up with crystals from missions, events and achievements.</p>
+          <ul id="crew-list" class="crew-grid"></ul>
+        </div>
+        <div id="tab-trips" class="tab-body" hidden>
+          <p class="tab-intro">Send crew on expeditions. They come back with crystals, scrap and sometimes a blueprint for a new station module.</p>
+          <div id="trip-panel"></div>
+        </div>
+        <div id="tab-pets" class="tab-body" hidden>
+          <p class="tab-intro">Pets float around the station and lend a paw. One can come along at a time; tap an adopted pet to bring it out.</p>
+          <ul id="pet-list" class="crew-grid"></ul>
         </div>
         <div id="tab-lab" class="tab-body" hidden>
           <div id="lab-active" class="lab-active"></div>
@@ -153,10 +162,12 @@
               </div>
             </div>
           </div>
-          <h3 class="section-title">Challenge runs</h3>
-          <ul id="challenge-list" class="list challenge-list"></ul>
           <h3 class="section-title">Core perks</h3>
           <ul id="perk-list" class="list"></ul>
+        </div>
+        <div id="tab-challenges" class="tab-body" hidden>
+          <p class="tab-intro">Special runs with a twist. Start one from here; beating it earns a lasting bonus.</p>
+          <ul id="challenge-list" class="list challenge-list"></ul>
         </div>
         <div id="tab-galaxy" class="tab-body" hidden>
           <div id="galaxy-card" class="galaxy-card"></div>
@@ -164,44 +175,22 @@
           <ul id="star-map" class="list challenge-list" hidden></ul>
         </div>
         <div id="tab-station" class="tab-body" hidden>
-          <div class="segments three" role="tablist" aria-label="Station sections">
-            <button type="button" data-seg="modules" aria-selected="true">Rooms</button>
-            <button type="button" data-seg="decor" aria-selected="false">Decor</button>
-            <button type="button" data-seg="awards" aria-selected="false">Book</button>
-          </div>
-          <div id="seg-modules" class="seg">
-            <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
-            <div id="module-total" class="module-total"></div>
-            <div id="module-grid" class="module-grid"></div>
-            <div id="module-detail" class="module-detail"></div>
-          </div>
-          <div id="seg-decor" class="seg" hidden>
-            <h3 class="section-title">Decorations <span id="orn-sum" class="section-sub"></span></h3>
-            <p class="tab-intro">Lights, plants and posters for the station, earned as you play. Tap one to take it down or put it back up.</p>
-            <ul id="orn-list" class="decor-grid"></ul>
-            <h3 class="section-title">Sky themes</h3>
-            <ul id="theme-list" class="decor-grid"></ul>
-            <h3 class="section-title">Hull paint</h3>
-            <ul id="paint-list" class="decor-grid"></ul>
-            <h3 class="section-title">Station skins</h3>
-            <p class="tab-intro">Whole new looks for the hull, reactor and every machine. Finish a set in the collection book to unlock one.</p>
-            <ul id="skin-list" class="decor-grid"></ul>
-          </div>
-          <div id="seg-awards" class="seg" hidden>
-            <h3 class="section-title">Collections <span id="book-sum" class="section-sub"></span></h3>
-            <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
-            <ul id="book-list" class="book-list"></ul>
-            <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
-            <div id="ach-grid" class="ach-grid"></div>
-            <p id="ach-caption" class="ach-caption">Tap a badge to see what it's for. Each one is worth +1% income and 3 crystals.</p>
-            <h3 class="section-title">Boss loot <span id="loot-sum" class="section-sub"></span></h3>
-            <p class="tab-intro">Boss wrecks sometimes drop a rare part or pet skin. Parts work for good; skins are worn from the Pets list.</p>
-            <ul id="loot-grid" class="loot-grid"></ul>
-            <h3 class="section-title">Graphs</h3>
-            <div id="graphs" class="graphs"></div>
-            <h3 class="section-title">Stats</h3>
-            <dl id="stats" class="stats"></dl>
-          </div>
+          <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
+          <div id="module-total" class="module-total"></div>
+          <div id="module-grid" class="module-grid"></div>
+          <div id="module-detail" class="module-detail"></div>
+        </div>
+        <div id="tab-decor" class="tab-body" hidden>
+          <h3 class="section-title">Decorations <span id="orn-sum" class="section-sub"></span></h3>
+          <p class="tab-intro">Lights, plants and posters for the station, earned as you play. Tap one to take it down or put it back up.</p>
+          <ul id="orn-list" class="decor-grid"></ul>
+          <h3 class="section-title">Sky themes</h3>
+          <ul id="theme-list" class="decor-grid"></ul>
+          <h3 class="section-title">Hull paint</h3>
+          <ul id="paint-list" class="decor-grid"></ul>
+          <h3 class="section-title">Station skins</h3>
+          <p class="tab-intro">Whole new looks for the hull, reactor and every machine. Finish a set in the collection book to unlock one.</p>
+          <ul id="skin-list" class="decor-grid"></ul>
         </div>
         </div>
       </section>
@@ -297,6 +286,37 @@
         <p class="trader-hello">"Fine wares for a fine station! One of each, mind."</p>
         <ul id="trader-offers" class="offer-list"></ul>
         <p id="trader-left" class="mission-reset"></p>
+      </div>
+    </div>
+    <div id="profile" class="modal" hidden>
+      <div class="modal-card profile-card" role="dialog" aria-modal="true" aria-labelledby="profile-title">
+        <button id="profile-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Captain's log</div>
+        <h2 id="profile-title">Profile</h2>
+        <div class="segments three profile-seg" role="tablist" aria-label="Profile sections">
+          <button type="button" data-prof="awards" aria-selected="true">Awards</button>
+          <button type="button" data-prof="book" aria-selected="false">Collections</button>
+          <button type="button" data-prof="stats" aria-selected="false">Stats</button>
+        </div>
+        <div id="prof-awards" class="prof-body">
+        <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
+        <div id="ach-grid" class="ach-grid"></div>
+        <p id="ach-caption" class="ach-caption">Tap a badge to see what it's for. Each one is worth +1% income and 3 crystals.</p>
+        <h3 class="section-title">Boss loot <span id="loot-sum" class="section-sub"></span></h3>
+        <p class="tab-intro">Boss wrecks sometimes drop a rare part or pet skin. Parts work for good; skins are worn from the Pets list.</p>
+        <ul id="loot-grid" class="loot-grid"></ul>
+        </div>
+        <div id="prof-book" class="prof-body" hidden>
+        <h3 class="section-title">Collections <span id="book-sum" class="section-sub"></span></h3>
+        <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
+        <ul id="book-list" class="book-list"></ul>
+        </div>
+        <div id="prof-stats" class="prof-body" hidden>
+        <h3 class="section-title">Graphs</h3>
+        <div id="graphs" class="graphs"></div>
+        <h3 class="section-title">Stats</h3>
+        <dl id="stats" class="stats"></dl>
+        </div>
       </div>
     </div>
     <div id="missions" class="modal" hidden>

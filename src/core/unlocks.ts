@@ -1,14 +1,15 @@
-import { claimableCores } from './economy';
+import { claimableCores, nextCoreAt } from './economy';
 import type { GameState } from './state';
 
 /*
  * The menu's later tabs open one at a time as the player gets to them, so a new captain sees
  * Build first and the rest arrive with a little ceremony. Once open, a tab stays open
  * (recorded in state.tips as `open:<tab>`). Veterans who relocated have everything.
+ * Older saves recorded a single `open:progress` tab, which held both the Lab and Prestige.
  */
 
 export interface TabUnlock {
-  tab: 'crew' | 'progress' | 'station';
+  tab: 'crew' | 'lab' | 'prestige' | 'station';
   /** Shown when the locked tab is tapped. */
   hint: string;
   /** Shown when it opens. */
@@ -26,10 +27,16 @@ export const TAB_UNLOCKS: readonly TabUnlock[] = [
     ready: (s) => veteran(s) || s.crystals >= 5 || Object.values(s.crew).some((l) => l > 0),
   },
   {
-    tab: 'progress',
-    hint: 'Progress opens after your third upgrade.',
-    news: 'Research in the Lab, and relocate for Star Cores.',
-    ready: (s) => veteran(s) || s.stats.upgradesBought >= 3 || s.research.done.size > 0 || !!s.research.active || claimableCores(s) > 0,
+    tab: 'lab',
+    hint: 'The Lab opens after your third upgrade.',
+    news: 'Research new tech in the Lab. It keeps working while you are away.',
+    ready: (s) => veteran(s) || s.tips.has('open:progress') || s.stats.upgradesBought >= 3 || s.research.done.size > 0 || !!s.research.active,
+  },
+  {
+    tab: 'prestige',
+    hint: 'Prestige opens as you get close to your first Star Core.',
+    news: 'Relocate the station for Star Cores: a fresh start that runs much faster.',
+    ready: (s) => veteran(s) || s.tips.has('open:progress') || claimableCores(s) > 0 || s.allTime.gte(nextCoreAt(s).mul(0.25)),
   },
   {
     tab: 'station',

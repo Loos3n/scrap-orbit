@@ -338,6 +338,12 @@ const RAW_ICONS = {
       cut(rrect(28, 19.5, 6.5, 3, 1.5), 0.6) +
       cut(rrect(28, 31.5, 6.5, 3, 1.5), 0.6),
   ),
+  /** A medal on a ribbon: the captain's profile. */
+  profile: glyph(
+    cf('M12 4h9l5 13h-9zM36 4h-9l-5 13h9z', 0.55) +
+      cf(circ(24, 30, 13)) +
+      cut('M24 21.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L24 34.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z', 0.6),
+  ),
   crew: glyph(
     cf(circ(33, 15.5, 6), 0.5) +
       cf('M26 28.5c2-1.3 4.5-2 7-2 6.5 0 10.5 4.5 10.5 11.5a2 2 0 0 1-2 2H31z', 0.5) +

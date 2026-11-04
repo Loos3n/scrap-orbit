@@ -274,6 +274,7 @@ export class MissionsPanel {
   private key = '';
   constructor(private game: Game, private fmt: Fmt) {
     $('missions-btn').addEventListener('click', () => this.open());
+    $('weekly-chip').addEventListener('click', () => this.open());
     $('missions-close').addEventListener('click', () => ($('missions').hidden = true));
     $('missions').addEventListener('click', (e) => {
       if (e.target === $('missions')) $('missions').hidden = true;
@@ -311,6 +312,22 @@ export class MissionsPanel {
       ${can ? `<button type="button" class="primary wk-claim" data-weekly-claim>${claimLabel}</button>` : s.weekly.claimed >= 3 ? '<p class="wk-done">All rewards claimed. See you next week!</p>' : ''}`;
   }
 
+  /** A small chip by the Next goal line, so the weekly event is never more than a glance away. */
+  private renderChip(): void {
+    const s = this.game.state;
+    const def = currentWeekly(s);
+    const chip = $('weekly-chip');
+    chip.hidden = !def || s.stats.playSec < 240;
+    if (chip.hidden || !def) return;
+    const left = weekEnds(Date.now());
+    const can = weeklyClaimable(s) > 0;
+    const text = can ? 'Event: claim!' : s.weekly.claimed >= 3 ? 'Event done' : `Event ${left >= 86_400 ? `${Math.floor(left / 86_400)}d` : `${Math.max(1, Math.floor(left / 3600))}h`}`;
+    chip.style.setProperty('--c', def.color);
+    chip.classList.toggle('ready', can);
+    chip.setAttribute('aria-label', `${def.name}: ${text}`);
+    setText($('weekly-chip-text'), text);
+  }
+
   open(): void {
     $('missions').hidden = false;
     this.weeklyKey = '';
@@ -324,6 +341,7 @@ export class MissionsPanel {
     const dot = $('missions-dot');
     dot.hidden = ready === 0;
     setText(dot, String(ready));
+    this.renderChip();
     if ($('missions').hidden) return;
     const row = (m: (typeof s.missions.daily)[number], index: number) => {
       const p = meta.missionProgress(s, m);
@@ -525,7 +543,10 @@ interface CoachStep {
 
 const MIKA = CREW.find((c) => c.id === 'mika')!;
 
-/** One-time tips for things that unlock after the tutorial. Each is seen once its tab is opened. */
+/** How long a tip stays up before Mika lets it go on her own. */
+const TIP_LINGER_MS = 15_000;
+
+/** One-time tips for things that unlock after the tutorial. Each is seen once its tab is opened, or after a short while. */
 const TIPS: { id: string; tab: string; text: string; when: (game: Game) => boolean }[] = [
   {
     id: 'crew',
@@ -554,6 +575,8 @@ const TIPS: { id: string; tab: string; text: string; when: (game: Game) => boole
  */
 export class Coach {
   private shownKey = '';
+  /** The tip on screen and when it first showed, so it can fade out on its own. */
+  private tipShown: { id: string; at: number } | null = null;
   /** Where the tutorial's crate is on screen, if the graphics are running. */
   crate: (() => { x: number; y: number } | null) | null = null;
 
@@ -648,7 +671,12 @@ export class Coach {
     const spot = $('coach-spot');
     const dim = $('coach-dim');
     const s = this.game.state;
-    const tip = this.tip();
+    let tip = this.tip();
+    // Tips are a nudge, not a chore: after a short while they go away by themselves.
+    if (tip && !$('coach').hidden && this.tipShown?.id === tip.id && performance.now() - this.tipShown.at > TIP_LINGER_MS) {
+      this.game.seeTip(tip.id);
+      tip = this.tip();
+    }
     let def = tip ? { text: tip.text, target: paneTarget(tip.tab), next: 'Got it' } : this.step();
     // Never sit on top of a pop-up such as the welcome-back screen.
     // Nor on a celebration card or the new-sector title.
@@ -671,6 +699,7 @@ export class Coach {
     const key = `${tip?.id ?? s.tutorial}|${def.text}`;
     if (key !== this.shownKey) {
       this.shownKey = key;
+      this.tipShown = tip ? { id: tip.id, at: performance.now() } : null;
       setText($('coach-text'), def.text);
       const next = $('coach-next');
       next.hidden = !def.next;

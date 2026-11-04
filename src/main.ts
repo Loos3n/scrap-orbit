@@ -172,7 +172,7 @@ async function boot(): Promise<void> {
   syncGrowth();
   ui.onUnlock = (u) =>
     fanfare.whenIdle(() =>
-      fanfare.cheer({ icon: ICONS[u.tab === 'progress' ? 'core' : u.tab], kicker: 'New tab unlocked', title: GROUP_NAMES[u.tab], sub: u.news, color: '#4fe3c1' }),
+      fanfare.cheer({ icon: ICONS[u.tab === 'prestige' ? 'core' : u.tab], kicker: 'New tab unlocked', title: GROUP_NAMES[u.tab], sub: u.news, color: '#4fe3c1' }),
     );
   // Decorations earned together (an old save catching up) share one toast.
   let freshOrnaments: string[] = [];
