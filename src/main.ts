@@ -1,6 +1,13 @@
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
 // Content-Security-Policy hosts (embedded pages, some app stores' web views).
 import 'pixi.js/unsafe-eval';
+// Fonts ship with the game (no network needed), which the phone app relies on.
+import '@fontsource/fredoka/latin-500.css';
+import '@fontsource/fredoka/latin-600.css';
+import '@fontsource/fredoka/latin-700.css';
+import '@fontsource/rubik/latin-400.css';
+import '@fontsource/rubik/latin-500.css';
+import '@fontsource/rubik/latin-600.css';
 import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, UPGRADES } from './core/config';
@@ -107,6 +114,7 @@ async function boot(): Promise<void> {
   if (scene.ready) ui.coach.crate = () => scene.crateOnScreen();
   new ResizeObserver(syncFocus).observe(stage);
   scene.setOwned(game.state.owned);
+  scene.setViewZoom(game.state.settings.viewZoom);
   const syncPerks = () =>
     scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1));
   syncPerks();
@@ -525,7 +533,69 @@ async function boot(): Promise<void> {
   // only becomes a drag once it has moved, so taps and holds work as before.
   let drag: { id: number; x: number; y: number; moving: boolean } | null = null;
   const DRAG_START = 10;
+  // Two fingers pinch to zoom the station. The zoom stays when they lift; the view still glides back
+  // to the middle like after a drag. A mouse wheel does the same on a computer.
+  const fingers = new Map<number, { x: number; y: number }>();
+  let pinch: { a: number; b: number } | null = null;
+  const pinchSpan = () => {
+    const [p, q] = [fingers.get(pinch!.a)!, fingers.get(pinch!.b)!];
+    return { d: Math.max(1, Math.hypot(p.x - q.x, p.y - q.y)), x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+  };
+  const keepZoom = () => {
+    game.state.settings.viewZoom = scene.getViewZoom();
+  };
+  const endPinch = () => {
+    pinch = null;
+    sceneEl.classList.remove('panning');
+    scene.panEnd();
+    keepZoom();
+  };
+  // Zooming is for the full station screen, so it is off while the menu is up.
+  const menuBtn = document.getElementById('menu-btn')!;
+  const menuOpen = () => menuBtn.getAttribute('aria-expanded') === 'true';
+  sceneEl.addEventListener('pointerdown', (ev) => {
+    fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pinch || fingers.size !== 2 || menuOpen()) return;
+    const [a, b] = [...fingers.keys()];
+    pinch = { a, b };
+    cancelHold();
+    drag = null;
+    sceneEl.classList.add('panning');
+  });
   sceneEl.addEventListener('pointermove', (ev) => {
+    if (!pinch || !fingers.has(ev.pointerId)) return;
+    const before = pinchSpan();
+    fingers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (ev.pointerId !== pinch.a && ev.pointerId !== pinch.b) return;
+    const after = pinchSpan();
+    const rect = sceneEl.getBoundingClientRect();
+    scene.panBy(after.x - before.x, after.y - before.y);
+    scene.zoomAt(after.d / before.d, after.x - rect.left, after.y - rect.top);
+  });
+  for (const type of ['pointerup', 'pointercancel'] as const) {
+    sceneEl.addEventListener(type, (ev) => {
+      fingers.delete(ev.pointerId);
+      if (pinch && (ev.pointerId === pinch.a || ev.pointerId === pinch.b)) endPinch();
+    });
+  }
+  let wheelDone = 0;
+  sceneEl.addEventListener(
+    'wheel',
+    (ev) => {
+      ev.preventDefault();
+      if (menuOpen()) return;
+      const rect = sceneEl.getBoundingClientRect();
+      scene.zoomAt(Math.exp(-ev.deltaY * 0.0015), ev.clientX - rect.left, ev.clientY - rect.top);
+      clearTimeout(wheelDone);
+      wheelDone = window.setTimeout(() => {
+        scene.panEnd();
+        keepZoom();
+      }, 250);
+    },
+    { passive: false },
+  );
+  sceneEl.addEventListener('pointermove', (ev) => {
+    if (pinch) return;
     if (hold && Math.hypot(ev.clientX - holdAt.x, ev.clientY - holdAt.y) > 12) cancelHold();
     if (!drag || ev.pointerId !== drag.id) return;
     const dx = ev.clientX - drag.x;
@@ -565,7 +635,7 @@ async function boot(): Promise<void> {
       return;
     }
     cancelHold();
-    if (!drag) {
+    if (!drag && !pinch) {
       drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moving: false };
       try {
         sceneEl.setPointerCapture(ev.pointerId);
@@ -574,7 +644,7 @@ async function boot(): Promise<void> {
       }
     }
     holdAt = { x: ev.clientX, y: ev.clientY };
-    hold = window.setTimeout(() => {
+    if (!pinch) hold = window.setTimeout(() => {
       hold = 0;
       const id = scene.machineAt(x, y);
       if (id && game.state.owned[id] > 0) {
