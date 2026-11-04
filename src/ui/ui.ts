@@ -127,6 +127,7 @@ export class UI {
   constructor(private game: Game) {
     fillIcons();
     this.shown = game.state.scrap;
+    window.addEventListener('resize', () => this.fitScrap($('scrap')));
     this.buildGenerators();
     this.bindTabs();
     this.bindBuyModes();
@@ -428,8 +429,22 @@ export class UI {
     }
     const text = this.fmt(this.shown);
     if (text !== this.lastScrapText) {
+      const el = $('scrap');
+      const grew = text.length !== this.lastScrapText.length;
       this.lastScrapText = text;
-      $('scrap').textContent = text;
+      el.textContent = text;
+      if (grew) this.fitScrap(el);
+    }
+  }
+
+  /** Shrinks the scrap counter's lettering when a long number would not fit beside the buttons. */
+  private fitScrap(el: HTMLElement): void {
+    el.style.fontSize = '';
+    const room = el.parentElement!.clientWidth;
+    const need = el.scrollWidth;
+    if (room > 0 && need > room) {
+      const size = parseFloat(getComputedStyle(el).fontSize);
+      el.style.fontSize = `${Math.max(18, Math.floor(size * (room / need)))}px`;
     }
   }
 
@@ -732,6 +747,7 @@ export class UI {
 
   private purchaseText(p: Purchase): string {
     if (p.kind === 'upgrade') return UPGRADES.find((u) => u.id === p.id)!.name;
+    if (p.kind === 'claw') return `Claw Lv ${this.game.state.claw + 1}`;
     const name = GENERATORS.find((g) => g.id === p.id)!.name;
     return p.count === 1 ? `1 ${name}` : `${p.count} ${name}s`;
   }

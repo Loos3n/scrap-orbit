@@ -416,6 +416,7 @@ export class Game {
     const p = bestPurchase(this.state);
     if (!p || p.cost.gt(this.state.scrap)) return false;
     if (p.kind === 'upgrade') this.buyUpgrade(p.id);
+    else if (p.kind === 'claw') this.levelClaw();
     else this.buy(p.id, p.count);
     return true;
   }
