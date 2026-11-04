@@ -3,7 +3,7 @@ import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
-import { exportCode, importCode } from '../core/state';
+import { exportCode, importCode, type GameState } from '../core/state';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
@@ -96,6 +96,20 @@ export function fmtSpeed(x: number): string {
   return `x${x >= 10 ? Math.round(x).toLocaleString('en-US') : (Math.floor(x * 10) / 10).toString()}`;
 }
 
+/** One cozy line about what the crew got up to while the player was away. */
+export function awayFlavour(seconds: number, state: GameState): string {
+  const hours = seconds / 3600;
+  const crew = Object.entries(state.crew).filter(([, l]) => (l as number) > 0).map(([id]) => CREW.find((c) => c.id === id)!.name);
+  const who = crew.length ? crew[Math.floor(seconds) % crew.length] : 'The drones';
+  const lines =
+    hours >= 8
+      ? [`${who} kept the night shift running and left a thermos of cocoa on the console.`, 'The station hummed through the night. Someone rearranged the cargo bay by colour.', `${who} logged a quiet shift: no alarms, just stars and scrap.`]
+      : hours >= 1
+        ? [`${who} kept the machines purring while you were gone.`, 'The drones sorted the haul into neat little stacks.', 'A passing freighter waved its lights at the station.']
+        : ['The drones barely noticed you left.', `${who} topped up the coolant and kept things ticking.`, 'Just a short break. The scrap kept rolling in.'];
+  return `<li class="away-flavour"><span>${lines[Math.floor(seconds / 7) % lines.length]}</span></li>`;
+}
+
 export class UI {
   private rows = new Map<GeneratorId, GenRow>();
   private upgradeKey = '';
@@ -104,6 +118,7 @@ export class UI {
   private achButtons = new Map<string, HTMLButtonElement>();
   private shown: Decimal = D(0);
   private lastScrapText = '';
+  private shownRate = D(0);
   private fmt = (v: Parameters<typeof format>[0]) => format(v, this.game.state.settings.numbers);
   private crew: CrewPanel;
   private lab: LabPanel;
@@ -616,7 +631,11 @@ export class UI {
   render(): void {
     const s = this.game.state;
     const now = Date.now();
-    setText($('rate'), this.fmt(eco.income(s, now)));
+    // The income line eases toward its new value instead of jumping.
+    const rate = eco.income(s, now);
+    this.shownRate = rate.lt(this.shownRate.mul(0.5)) || this.shownRate.lte(0) ? rate : this.shownRate.add(rate.sub(this.shownRate).mul(0.35));
+    if (rate.sub(this.shownRate).abs().lt(rate.mul(0.002))) this.shownRate = rate;
+    setText($('rate'), this.fmt(this.shownRate));
     this.renderBoost(now);
     this.renderGoal();
     if (!$('tab-build').hidden) this.renderGenerators();
@@ -1012,12 +1031,14 @@ export class UI {
   }
 
   showOffline(seconds: number, earned: Decimal, report: OfflineReport, onCollect: () => void): void {
-    $('modal-report').innerHTML = offlineReportHtml(report);
+    $('modal-report').innerHTML = awayFlavour(seconds, this.game.state) + offlineReportHtml(report);
     const modal = $('modal');
     const amount = $('modal-amount');
     const cap = eco.offlineCapSec(this.game.state);
     const capped = seconds >= cap - 1;
-    $('modal-time').textContent = `Gone for ${formatDuration(seconds)}.${capped ? ` Earnings are capped at ${formatDuration(cap)} for now.` : ''}`;
+    $('modal-time').textContent = capped
+      ? `Gone for over ${formatDuration(cap)}. Storage filled up at ${formatDuration(cap)}; the Night Shift perk and Lab research make it last longer.`
+      : `Gone for ${formatDuration(seconds)}.`;
     modal.hidden = false;
     // Count the amount up from zero.
     const start = performance.now();

@@ -196,8 +196,8 @@ async function boot(): Promise<void> {
           buzz([30, 60, 30]);
         });
         ui.flashRow(e.gen);
-        sfx.buy();
-        buzz(5);
+        sfx.buy(GENERATORS.findIndex((x) => x.id === e.gen), e.count);
+        buzz(e.count >= 10 ? [8, 30, 12] : 5);
         if (e.gen === 'drone') {
           game.advanceTutorial('drone');
           if (game.state.owned.drone >= TUTORIAL_DRONES) game.advanceTutorial('more');

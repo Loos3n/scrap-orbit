@@ -1386,3 +1386,4 @@ button.gen-icon:active { transform: scale(0.94); }
 .wk-mark:last-child span { left: auto; right: -2px; transform: none; }
 .wk-claim { width: 100%; margin-top: 2px; }
 .wk-done { margin-top: 4px !important; color: var(--go) !important; }
+.modal-report .away-flavour { display: block; padding: 8px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.06); color: var(--ink); font-style: italic; text-align: center; }
