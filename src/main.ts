@@ -26,7 +26,7 @@ import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
 import { tradeText } from './ui/trade-ui';
-import { UI } from './ui/ui';
+import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
 import { blockPageZoom } from './ui/nozoom';
 import { ORNAMENTS } from './core/ornaments';
@@ -54,7 +54,10 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 /** Names the sector (or galaxy) the station just warped into. */
-function showSectorCard(relocations: number, galaxy = 0): void {
+function showSectorCard(relocations: number, galaxy = 0, speed = 0): void {
+  const fast = document.getElementById('sector-speed')!;
+  fast.hidden = speed < 1.05;
+  fast.textContent = `Everything runs ${fmtSpeed(speed)} faster`;
   const card = document.getElementById('sector-card')!;
   document.getElementById('sector-num')!.textContent = galaxy ? `Galaxy ${galaxy} · Sector ${relocations + 1}` : `Sector ${relocations + 1}`;
   const sector = sectorFor(relocations);
@@ -69,6 +72,15 @@ function showSectorCard(relocations: number, galaxy = 0): void {
   card.style.animationDuration = sector.twist ? '6.5s' : '';
   window.setTimeout(() => (card.hidden = true), sector.twist ? 6500 : 4000);
 }
+
+/** The card after the very first relocation, so the player sees what prestige bought them. */
+const FIRST_JUMP = (cores: number, speed: number) => ({
+  icon: ICONS.core,
+  kicker: 'First relocation',
+  title: `${fmtSpeed(speed)} faster`,
+  sub: `${cores.toLocaleString('en-US')} Star Cores now power every machine and tap. Earn more before your next jump to go even faster.`,
+  color: '#8f7bff',
+});
 
 const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
@@ -211,8 +223,9 @@ async function boot(): Promise<void> {
         setTimeout(() => {
           scene.setOwned(game.state.owned);
           scene.setSector(sectorFor(game.state.stats.relocations));
-          showSectorCard(game.state.stats.relocations);
+          showSectorCard(game.state.stats.relocations, 0, e.speed);
           fanfare.confetti();
+          if (game.state.stats.relocations === 1) window.setTimeout(() => fanfare.cheer(FIRST_JUMP(e.cores, e.speed)), 4200);
           scene.fireworks([0x8f7bff, 0x5cd6ff, 0xffd166]);
           sfx.fanfare();
         }, 1500);

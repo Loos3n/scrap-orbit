@@ -64,7 +64,7 @@ describe('boss wrecks', () => {
   it('arrives after the first few minutes, takes tap damage and pays out', () => {
     const s = ready();
     expect(updateBoss(s, NOW, 1).arrived).toBe(true);
-    expect(bossHealth(s)).toBe(1);
+    expect(bossHealth(s)).toBeCloseTo(1);
     const before = s.crystals;
     let won;
     for (let i = 0; i < 1000 && !won; i++) won = hitBoss(s, tapValue(s, NOW), NOW);

@@ -23,9 +23,9 @@ export interface GeneratorDef {
 }
 
 export const GENERATORS: readonly GeneratorDef[] = [
-  { id: 'drone', name: 'Salvage Drone', blurb: 'Nibbles bolts off passing wrecks.', baseCost: 15, baseOutput: 0.4, growth: 1.07, color: 0x4fe3c1 },
-  { id: 'hauler', name: 'Hauler', blurb: 'Tows whole hull plates back home.', baseCost: 220, baseOutput: 3.2, growth: 1.09, color: 0x7aa7ff },
-  { id: 'smelter', name: 'Smelter', blurb: 'Melts junk into tidy ingots.', baseCost: 3_500, baseOutput: 22.4, growth: 1.11, color: 0xff8a4c },
+  { id: 'drone', name: 'Salvage Drone', blurb: 'Nibbles bolts off passing wrecks.', baseCost: 15, baseOutput: 0.6, growth: 1.07, color: 0x4fe3c1 },
+  { id: 'hauler', name: 'Hauler', blurb: 'Tows whole hull plates back home.', baseCost: 140, baseOutput: 3.2, growth: 1.09, color: 0x7aa7ff },
+  { id: 'smelter', name: 'Smelter', blurb: 'Melts junk into tidy ingots.', baseCost: 2_400, baseOutput: 22.4, growth: 1.11, color: 0xff8a4c },
   { id: 'fabricator', name: 'Fabricator', blurb: 'Prints parts nobody asked for.', baseCost: 60_000, baseOutput: 168, growth: 1.12, color: 0xc58cff },
   { id: 'dock', name: 'Orbital Dock', blurb: 'Whole derelicts, parked and stripped.', baseCost: 1_100_000, baseOutput: 1_280, growth: 1.13, color: 0xffd166 },
   { id: 'laser', name: 'Mining Laser', blurb: 'Slices asteroids into bite-size chunks.', baseCost: 2e7, baseOutput: 9_600, growth: 1.13, color: 0xff5d6c },

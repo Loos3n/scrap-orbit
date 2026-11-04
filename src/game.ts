@@ -27,7 +27,7 @@ export type GameEvent =
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
   | { type: 'bonus'; value: Decimal }
   | { type: 'achievement'; def: AchievementDef }
-  | { type: 'relocate'; cores: number; crystals: number }
+  | { type: 'relocate'; cores: number; crystals: number; speed: number }
   | { type: 'crew'; id: CrewId; level: number }
   | { type: 'research'; id: string; phase: 'start' | 'done' }
   | { type: 'decor'; id: string }
@@ -446,11 +446,12 @@ export class Game {
 
   /** Prestige: trades this run for Star Cores. Returns the cores gained. */
   relocate(): number {
+    const speed = eco.relocateSpeedup(this.state);
     const cores = eco.relocate(this.state, Date.now());
     if (cores > 0) {
       meta.addCrystals(this.state, RELOCATE_CRYSTALS);
       this.save();
-      this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS });
+      this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS, speed });
     }
     return cores;
   }

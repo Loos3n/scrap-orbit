@@ -141,11 +141,12 @@
             <div class="core-claim">
               <div class="core-claim-label">Relocate now for</div>
               <div class="core-claim-n">+<span id="core-claim">0</span></div>
+              <div id="core-speed" class="core-speed"></div>
             </div>
             <div class="core-progress"><div class="bar"><i id="core-bar"></i></div><div id="core-next" class="core-next"></div></div>
             <button id="relocate" class="primary warp-btn" type="button"><span data-icon="warp"></span>Relocate station</button>
             <div id="relocate-confirm" class="relocate-confirm" hidden>
-              <p>Jump to a new sector? Your scrap, machines and upgrades reset. You keep Star Cores, perks and achievements.</p>
+              <p>Jump to a new sector? Your scrap, machines and upgrades reset. You keep Star Cores, perks and achievements, and <b id="relocate-speed">everything runs faster</b>.</p>
               <div class="row">
                 <button id="relocate-yes" type="button" class="go">Jump</button>
                 <button id="relocate-no" type="button">Not yet</button>
@@ -318,6 +319,7 @@
       <small id="sector-num"></small>
       <b id="sector-name"></b>
       <span id="sector-sub">New sector reached</span>
+      <span id="sector-speed" class="sector-speed" hidden></span>
     </div>
     <div id="boss-edge" class="boss-edge" hidden></div>
     <div id="boss-alert" class="boss-alert" hidden>

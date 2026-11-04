@@ -90,6 +90,11 @@ interface GenRow {
 }
 
 /** The HTML half of the game: readout, build list, upgrades, station stats and settings. */
+/** A speed-up as "x1.6", or "x12" once it is big. */
+export function fmtSpeed(x: number): string {
+  return `x${x >= 10 ? Math.round(x).toLocaleString('en-US') : (Math.floor(x * 10) / 10).toString()}`;
+}
+
 export class UI {
   private rows = new Map<GeneratorId, GenRow>();
   private upgradeKey = '';
@@ -622,6 +627,10 @@ export class UI {
     setText($('core-count'), s.cores.toLocaleString('en-US'));
     setText($('core-bonus'), `+${Math.round(s.cores * eco.perCoreBonus(s) * 100).toLocaleString('en-US')}% income`);
     setText($('core-claim'), claim.toLocaleString('en-US'));
+    const speed = eco.relocateSpeedup(s);
+    const speedText = claim > 0 ? `Station runs ${fmtSpeed(speed)} faster` : '';
+    setText($('core-speed'), speedText);
+    setText($('relocate-speed'), claim > 0 ? `the new station runs ${fmtSpeed(speed)} faster` : 'everything runs faster');
     const next = eco.nextCoreAt(s);
     const prev = eco.lastCoreAt(s);
     const span = next.sub(prev);

@@ -934,6 +934,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--go); outlin
 .sector-card small { font-size: 12px; font-weight: 700; letter-spacing: 0.35em; text-transform: uppercase; color: #a8b4ff; }
 .sector-card b { font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 10vw, 46px); color: #fff; text-shadow: 0 0 24px rgb(140 150 255 / 0.9), 0 3px 0 rgb(30 30 90 / 0.8); }
 .sector-card span { font-size: 13px; color: #d6dcff; }
+.sector-card .sector-speed { margin-top: 6px; padding: 4px 12px; border-radius: 99px; background: rgb(79 227 193 / 0.16); border: 1px solid rgb(79 227 193 / 0.5); color: #8ff5dc; font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.core-speed { margin-top: 4px; color: var(--go); font-weight: 600; font-size: 13px; }
+.core-speed:empty { display: none; }
 .sector-card::before, .sector-card::after { content: ''; height: 1px; width: 70%; background: linear-gradient(90deg, transparent, rgb(170 180 255 / 0.8), transparent); }
 @keyframes sector-in {
   0% { opacity: 0; transform: translateY(14px) scale(0.96); letter-spacing: 0.1em; }

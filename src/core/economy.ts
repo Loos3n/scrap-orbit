@@ -126,6 +126,12 @@ export function globalMult(state: GameState): number {
   return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult') * starIncomeMult(state);
 }
 
+/** How many times faster the station runs after relocating now, from the cores it would bank. */
+export function relocateSpeedup(state: GameState): number {
+  const per = perCoreBonus(state);
+  return (1 + (state.cores + claimableCores(state)) * per) / (1 + state.cores * per);
+}
+
 /** Income bonus per Star Core, as a fraction. */
 export function perCoreBonus(state: GameState): number {
   return PRESTIGE.perCore + researchSum(state, 'corePerCore');
