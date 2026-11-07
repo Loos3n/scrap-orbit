@@ -49,7 +49,8 @@ interface Orbiter { s: Sprite; radius: number; angle: number; speed: number; wob
 interface Spark { s: Sprite; vx: number; vy: number; life: number; max: number }
 interface Puff { s: Sprite; life: number; max: number; grow: number }
 interface Ring { x: number; y: number; r: number; life: number; color: number; width: number }
-type DriftKind = 'debris' | 'crate' | 'meteor' | 'convoy' | 'golden' | 'star';
+type DriftKind = 'debris' | 'crate' | 'mini' | 'meteor' | 'convoy' | 'golden' | 'star';
+export type SpecialHit = 'crate' | 'mini' | 'meteor' | 'convoy' | 'golden' | 'star';
 interface Drift { s: Sprite; vx: number; vy: number; vr: number; kind: DriftKind; glow?: Sprite; tail?: Sprite }
 interface Chunk { s: Sprite; x0: number; y0: number; t: number; dur: number; color: number }
 interface Floater { text: Text; vy: number; life: number; max: number }
@@ -1385,10 +1386,27 @@ export class StationScene {
     if (this.ready && !this.drifts.some((d) => d.kind === 'golden')) this.spawnDrift('golden');
   }
 
-  hitSpecial(sx: number, sy: number): 'crate' | 'meteor' | 'convoy' | 'golden' | 'star' | null {
+  /** A lucky crate's swarm: little crates spill out of where it cracked open and drift away. */
+  spawnSwarm(count: number): void {
+    if (!this.ready) return;
+    const { x, y } = this.lastHit;
+    const turn = Math.random() * TAU;
+    for (let i = 0; i < count; i++) {
+      this.spawnDrift('mini');
+      const d = this.drifts[this.drifts.length - 1];
+      const a = turn + (i / count) * TAU + rand(-0.2, 0.2);
+      const v = rand(30, 44);
+      d.s.position.set(x + Math.cos(a) * 14, y + Math.sin(a) * 14);
+      d.vx = Math.cos(a) * v;
+      d.vy = Math.sin(a) * v;
+    }
+    this.rings.push({ x, y, r: 16, life: 0.9, color: 0x9fe6ff, width: 4 });
+  }
+
+  hitSpecial(sx: number, sy: number): SpecialHit | null {
     if (!this.ready) return null;
     const p = this.toWorld(sx, sy);
-    const reach: Record<DriftKind, number> = { debris: 0, crate: 34, meteor: 32, convoy: 46, golden: 42, star: 52 };
+    const reach: Record<DriftKind, number> = { debris: 0, crate: 34, mini: 30, meteor: 32, convoy: 46, golden: 42, star: 52 };
     const hit = this.drifts.find((d) => d.kind !== 'debris' && Math.hypot(d.s.x - p.x, d.s.y - p.y) < reach[d.kind]);
     if (!hit) return null;
     // Read the position before removing it: a destroyed sprite has none.
@@ -1402,7 +1420,7 @@ export class StationScene {
     this.puff(x, y, color, 3, 0.6);
     this.rings.push({ x, y, r: 10, life: 1, color, width: 3 });
     this.shake = Math.max(this.shake, hit.kind === 'meteor' ? 4 : 6);
-    return hit.kind as 'crate' | 'meteor' | 'convoy' | 'golden' | 'star';
+    return hit.kind as SpecialHit;
   }
 
   /**
@@ -1853,7 +1871,7 @@ export class StationScene {
   private spawnDrift(kind: DriftKind): void {
     const half = WORLD * 0.8;
     const fromLeft = Math.random() < 0.5;
-    const tex = kind === 'star' ? this.tex.flare : kind === 'golden' ? this.tex.golden : kind === 'crate' ? this.tex.crate : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
+    const tex = kind === 'star' ? this.tex.flare : kind === 'golden' ? this.tex.golden : kind === 'crate' || kind === 'mini' ? this.tex.crate : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
     const s = new Sprite(tex);
     s.anchor.set(0.5);
     let vx = (fromLeft ? 1 : -1) * rand(12, 28);
@@ -1865,6 +1883,7 @@ export class StationScene {
       s.scale.set(1.1);
       vx = (fromLeft ? 1 : -1) * rand(26, 34);
     }
+    if (kind === 'mini') s.scale.set(0.62);
     if (kind === 'golden') {
       s.scale.set(1.25);
       vx = (fromLeft ? 1 : -1) * rand(20, 24);
@@ -1959,7 +1978,7 @@ export class StationScene {
       if (d.glow) {
         d.glow.position.copyFrom(d.s.position);
         const p = 0.5 + 0.5 * Math.sin(this.time * 5);
-        const base = d.kind === 'convoy' ? 2.4 : d.kind === 'meteor' ? 0.9 : d.kind === 'golden' ? 2.2 : d.kind === 'star' ? 2.6 : 1.3;
+        const base = d.kind === 'convoy' ? 2.4 : d.kind === 'meteor' || d.kind === 'mini' ? 0.9 : d.kind === 'golden' ? 2.2 : d.kind === 'star' ? 2.6 : 1.3;
         d.glow.scale.set(base + p * 0.4);
         d.glow.alpha = 0.55 + p * 0.3;
       }
@@ -1975,7 +1994,7 @@ export class StationScene {
         d.s.rotation = Math.sin(this.time * 2) * 0.15;
         if (Math.random() < dt * 14) this.burst(d.s.x + rand(-14, 14), d.s.y + rand(-14, 14), 0xffe27a, 1, 0.5);
       }
-      const gone = Math.abs(d.s.x) > half + 1 || d.s.y > WORLD * 0.8;
+      const gone = Math.abs(d.s.x) > half + 1 || Math.abs(d.s.y) > WORLD * 0.8;
       if (gone) this.removeDrift(d);
     }
   }

@@ -25,6 +25,7 @@ import { Game } from './game';
 import * as art from './scene/art';
 import { StationScene } from './scene/station';
 import { sectorCrateMult, timeStretch } from './core/sectors';
+import { CRATE_BUFFS } from './core/crate-buffs';
 import { GEN_ICONS, ICONS } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
@@ -109,7 +110,7 @@ async function boot(): Promise<void> {
   ui.onRelocate = () => game.relocate();
   ui.syncSettings();
   const scene = new StationScene();
-  if (import.meta.env.DEV) (window as unknown as { __scene: StationScene }).__scene = scene;
+  if (import.meta.env.DEV) Object.assign(window, { __scene: scene, __game: game });
   ui.onComfortChange = (reduceFlash, reduceShake) => scene.setComfort(reduceFlash, reduceShake);
   ui.onPowerChange = (saver) => scene.setBatterySaver(saver);
   ui.syncSettings();
@@ -230,11 +231,40 @@ async function boot(): Promise<void> {
       case 'offline':
         ui.showOffline(e.seconds, e.earned, e.report, () => sfx.coins());
         break;
-      case 'bonus':
-        ui.toast(ICONS.scrap, `<b>Salvage crate!</b> +${fmt(e.value)}`);
-        ui.bigGain(e.value);
+      case 'bonus': {
+        const p = e.prize;
         game.advanceTutorial('crate');
         sfx.crate();
+        if (p.kind === 'scrap') {
+          ui.toast(ICONS.scrap, `<b>Salvage crate!</b> +${fmt(p.amount)}`);
+          ui.bigGain(p.amount);
+        } else if (p.kind === 'haul') {
+          ui.toast(ICONS.scrap.replace('currentColor', '#ffd166'), `<b>Big haul!</b> The crate was packed: +${fmt(p.amount)}`);
+          ui.bigGain(p.amount);
+          sfx.coins();
+          buzz([20, 30, 40]);
+        } else if (p.kind === 'buff') {
+          const b = CRATE_BUFFS[p.id];
+          ui.toast(p.id === 'surge' ? ICONS.bolt.replace('currentColor', '#7cf0ff') : ICONS.claw.replace('currentColor', '#ffb347'), `<b>${b.name}!</b> ${b.mult}x ${b.what} for ${p.seconds} seconds${p.id === 'frenzy' ? '. Tap tap tap!' : ''}`);
+          scene.celebrate(p.id === 'surge' ? 0x7cf0ff : 0xffb347);
+          sfx.boost();
+          buzz(40);
+        } else if (p.kind === 'swarm') {
+          scene.spawnSwarm(p.count);
+          ui.toast(ICONS.scrap.replace('currentColor', '#9fe6ff'), `<b>Crate swarm!</b> ${p.count} little crates spilled out. Catch them!`);
+          sfx.achievement();
+          buzz([15, 30, 15]);
+        } else if (p.kind === 'crystals') {
+          ui.toast(ICONS.crystal, `<b>Crystal stash!</b> +${p.amount} crystals`);
+          sfx.coins();
+        } else {
+          ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Spare battery!</b> Overdrive is charged and ready');
+          sfx.boost();
+        }
+        break;
+      }
+      case 'mini':
+        sfx.coins();
         break;
       case 'achievement':
         ui.toast(ICONS.trophy.replace('currentColor', '#ffd166'), `<b>${e.def.name}</b> +1% income and 3 crystals`);
@@ -731,9 +761,16 @@ async function boot(): Promise<void> {
     }, 450);
     const hit = scene.hitSpecial(x, y);
     if (hit === 'crate') {
-      const v = game.collectBonus();
-      scene.floatText(0, -60, `+${fmt(v)}`, true);
+      const p = game.collectBonus();
+      const text = p.kind === 'scrap' || p.kind === 'haul' ? `+${fmt(p.amount)}` : p.kind === 'buff' ? CRATE_BUFFS[p.id].name + '!' : p.kind === 'swarm' ? 'Swarm!' : p.kind === 'crystals' ? `+${p.amount} crystals` : 'Overdrive ready!';
+      scene.floatText(Math.max(-70, Math.min(70, scene.lastHit.x)), scene.lastHit.y - 20, text, true);
       buzz(25);
+      return;
+    }
+    if (hit === 'mini') {
+      const v = game.collectMini();
+      scene.floatText(scene.lastHit.x, scene.lastHit.y, `+${fmt(v)}`);
+      buzz(10);
       return;
     }
     if (hit === 'meteor') {

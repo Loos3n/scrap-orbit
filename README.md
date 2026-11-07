@@ -53,7 +53,7 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
 - Synthesized sound effects: FM bells and mallets, filtered noise for impacts and whooshes, a shared space echo and a compressor (taps climb a musical scale), with a mute button
 - Asteroids, meteors and moons painted per pixel from a height map: lumpy outlines, crater bowls with raised rims, lit from the same direction as the station
-- Salvage crates that drift past now and then; tap one for a bonus
+- Lucky salvage crates drift past every couple of minutes. Each is sealed until you tap it: most hold scrap, the rest hold a Power surge (5x income for 45s), a Claw frenzy (20x taps for 12s), a big haul that grows with your banked scrap, a swarm of little crates to catch, a crystal stash or a spare battery that recharges Overdrive. Buffs stack with Overdrive and golden rushes
 - Autosave every 30 seconds and when the app is hidden
 - Offline earnings for up to 2 hours (4 with a perk), shown when you come back
 

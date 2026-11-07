@@ -1439,3 +1439,24 @@ button.gen-icon:active { transform: scale(0.94); }
 .profile-card h2 { margin: 0 0 10px; }
 .profile-seg { margin: 0 0 6px; }
 .prof-body .section-title:first-child { margin-top: 10px; }
+
+/* ---------- Lucky crate buffs ---------- */
+.buff-row { position: absolute; left: 10px; bottom: 10px; z-index: 4; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.buff-row:not(:has(> .buff-chip:not([hidden]))) { display: none; }
+.buff-chip {
+  --c: #7cf0ff;
+  position: relative; display: flex; align-items: center; gap: 7px; padding: 5px 10px 7px 7px; border-radius: 12px;
+  background: rgb(10 18 46 / 0.86); border: 1px solid var(--c); color: #eef6ff; overflow: hidden;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c) 45%, transparent); animation: pop-in 0.3s ease-out, buff-glow 1.2s ease-in-out infinite;
+}
+.buff-chip[data-buff='frenzy'] { --c: #ffb347; }
+.buff-chip [data-icon] { width: 20px; height: 20px; color: var(--c); flex: none; }
+.buff-text { display: grid; line-height: 1.05; }
+.buff-text small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c); font-weight: 600; }
+.buff-text b { font-family: var(--font-display); font-size: 14px; font-weight: 700; }
+.buff-time { font-family: var(--font-display); font-size: 15px; font-variant-numeric: tabular-nums; min-width: 28px; text-align: right; }
+.buff-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgb(255 255 255 / 0.1); }
+.buff-bar > i { display: block; height: 100%; background: var(--c); }
+@keyframes buff-glow { 50% { box-shadow: 0 0 26px color-mix(in srgb, var(--c) 75%, transparent); } }
+body.buff-surge #rate { color: #7cf0ff; text-shadow: 0 0 12px rgb(124 240 255 / 0.7); }
+.reduce-flash .buff-chip { animation: none; }
