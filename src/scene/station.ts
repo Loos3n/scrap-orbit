@@ -3,6 +3,20 @@ import type { GeneratorId } from '../core/config';
 import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } from '../core/content';
 import type { SkinDef } from '../core/collection';
 import * as art from './art';
+import { markOf } from '../core/evolve';
+
+/** Glow colours for Mk II to Mk V: chrome, cyan core, gold, prism violet. */
+const MARK_TINTS = [0xeaf2ff, 0x5ce1ff, 0xffd166, 0xc58cff];
+
+/** A soft pastel that cycles round the colour wheel as `t` grows (one turn per 1.0). */
+function pastel(t: number): number {
+  const h = ((t % 1) + 1) % 1;
+  const f = (k: number) => {
+    const x = (k + h * 6) % 6;
+    return 0.72 + 0.28 * Math.max(0, Math.min(1, Math.abs(x - 3) - 1));
+  };
+  return (Math.round(f(5) * 255) << 16) | (Math.round(f(3) * 255) << 8) | Math.round(f(1) * 255);
+}
 
 /** How far the player can pinch the view out and in. */
 const VIEW_ZOOM_MIN = 0.7;
@@ -35,6 +49,11 @@ const COLORS = {
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const easeInCubic = (t: number) => t * t * t;
+
+/** How long each cinematic runs, in seconds. */
+const CINE = { relocate: { dur: 3.8 }, galaxy: { dur: 6.4 } };
+/** When the station swaps to its new sector, in ms after a jump starts: the flash's brightest moment. */
+export const JUMP_SWAP_MS = { relocate: 1800, galaxy: 3400 };
 
 /** Where the big late-game machines sit, in world units. */
 const GATE_POS = { x: -250, y: -205 };
@@ -220,7 +239,26 @@ export class StationScene {
   private rig: { c: Container; part: Sprite; glow: Sprite; look: string; grow: number } | null = null;
   private coreColor: number = COLORS.scrap;
   private hullSprites: Sprite[] = [];
-  private jump = 0;
+  /** The relocation or galaxy-shift cinematic, while one plays (see startCine). */
+  private cine: { t: number; dur: number; swap: number; galaxy: boolean; landed: boolean; nextRing: number } | null = null;
+  /** Screen-space layer for the cinematic: hyperspace streaks and the galaxy tunnel rings. */
+  private cineLayer = new Container();
+  private cineG = new Graphics();
+  private hyper: { s: Sprite; a: number; d: number; v: number }[] = [];
+  private tunnel: { r: number; life: number; color: number; width: number }[] = [];
+  private cineZoom = 1;
+  /** Extra scale on the distant galaxy while the galaxy shift dives into it. */
+  private galaxyBoost = 1;
+  private galaxyScale = 1;
+  /** How far the station moves down to the middle of the screen while the menus step aside. */
+  private cineLift = 0;
+  private galaxyPull = 0;
+  /** Each machine's model on show (core/evolve.ts), its original texture, and painted refits. */
+  private marks: Partial<Record<GeneratorId, number>> = {};
+  private baseTex: Partial<Record<GeneratorId, Texture>> = {};
+  private markTex = new Map<string, Texture>();
+  private twinkles: { s: Sprite; life: number; max: number; size: number; spin: number }[] = [];
+  private nextTwinkle = 1;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   /** Comfort settings: soften flashes and pulses, and keep the camera still. */
   private calmFlash = false;
@@ -325,11 +363,12 @@ export class StationScene {
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
     }
+    this.cineLayer.addChild(this.cineG);
 
     this.layout();
     this.app.renderer.on('resize', () => {
@@ -801,7 +840,8 @@ export class StationScene {
     if (this.sector.look === 'hole') this.home.planet = { x: w / 2 + Math.min(w, 540) * 0.3, y: top + fh * 0.1 };
     this.moon.scale.set(ps / 220);
     this.home.galaxy = { x: w * 0.16, y: top + fh * 0.86 };
-    this.galaxy.scale.set(Math.min(w, 600) / 300);
+    this.galaxyScale = Math.min(w, 600) / 300;
+    this.galaxy.scale.set(this.galaxyScale);
     this.flash.width = w;
     this.flash.height = h;
     this.vignette.width = w * 1.15;
@@ -848,6 +888,7 @@ export class StationScene {
 
   setOwned(owned: Record<GeneratorId, number>): void {
     if (!this.ready) return;
+    this.applyMarks(owned);
     const t = this.tex;
 
     const droneCount = Math.min(30, Math.ceil(Math.sqrt(owned.drone) * 3.2));
@@ -999,6 +1040,120 @@ export class StationScene {
     let zoom = 1;
     for (const [id, z] of Object.entries(ZOOM_FOR) as [GeneratorId, number][]) if (owned[id] > 0) zoom = Math.max(zoom, z);
     this.zoomTarget = zoom;
+  }
+
+  /** The texture slot each machine draws from; nanites are glows, so they have none. */
+  private static readonly TEX_KEY: Record<GeneratorId, 'drone' | 'hauler' | 'smelter' | 'fab' | 'dock' | 'turret' | 'vortex' | 'gate' | 'panel' | null> = {
+    drone: 'drone',
+    hauler: 'hauler',
+    smelter: 'smelter',
+    fabricator: 'fab',
+    dock: 'dock',
+    laser: 'turret',
+    gravity: 'vortex',
+    nanite: null,
+    gate: 'gate',
+    dyson: 'panel',
+  };
+
+  /** Every sprite on the station that shows one kind of machine. */
+  private spritesOf(id: GeneratorId): Sprite[] {
+    switch (id) {
+      case 'drone': return this.drones.map((o) => o.s);
+      case 'hauler': return this.haulers.map((o) => o.s);
+      case 'smelter': return this.pods;
+      case 'fabricator': return this.fabs;
+      case 'dock': return this.docks;
+      case 'laser': return this.turrets.map((tu) => tu.s);
+      case 'gravity': return this.wells.map((w) => w.s);
+      case 'nanite': return this.nanites.map((n) => n.s);
+      case 'gate': return this.gate ? [this.gate.ring] : [];
+      case 'dyson': return this.sun ? this.sun.panels : [];
+    }
+  }
+
+  /** Swaps in the refitted art when a machine reaches a new model, and back after a relocation. */
+  private applyMarks(owned: Record<GeneratorId, number>): void {
+    for (const id of Object.keys(owned) as GeneratorId[]) {
+      const mark = markOf(owned[id]);
+      if (mark === (this.marks[id] ?? 0)) continue;
+      this.marks[id] = mark;
+      const key = StationScene.TEX_KEY[id];
+      if (!key) continue;
+      this.baseTex[id] ??= this.tex[key];
+      let tex = this.baseTex[id]!;
+      if (mark > 0) {
+        const k = `${id}:${mark}`;
+        if (!this.markTex.has(k)) this.markTex.set(k, art.machineMark(id, mark, DOCK_RADIUS));
+        tex = this.markTex.get(k)!;
+      }
+      this.tex[key] = tex;
+      for (const sp of this.spritesOf(id)) {
+        sp.texture = tex;
+        if (mark < 4) sp.tint = id === 'nanite' ? sp.tint : 0xffffff;
+      }
+    }
+  }
+
+  /** A machine just evolved: every one of them flares in its new model's colour. */
+  evolve(id: GeneratorId): void {
+    if (!this.ready) return;
+    const mark = this.marks[id] ?? 0;
+    const color = MARK_TINTS[Math.max(0, mark - 1)];
+    const list = this.spritesOf(id).slice(0, 14);
+    list.forEach((sp, i) => {
+      window.setTimeout(() => {
+        if (sp.destroyed) return;
+        const p = this.fxLayer.toLocal(sp.getGlobalPosition());
+        this.burst(p.x, p.y, color, this.calmFlash ? 4 : 10, 0.9);
+        this.rings.push({ x: p.x, y: p.y, r: 6, life: 0.8, color, width: 2 });
+        this.twinkle(p.x, p.y, color, 0.6);
+      }, i * 70);
+    });
+    this.celebrate(color);
+  }
+
+  private twinkle(x: number, y: number, color: number, size: number): void {
+    const s = this.sprite(this.tex.flare, this.fxLayer, x, y);
+    s.blendMode = 'add';
+    s.tint = color;
+    s.scale.set(0);
+    this.twinkles.push({ s, life: 0.7, max: 0.7, size, spin: rand(-2, 2) });
+  }
+
+  /** Evolved machines glint as they work: chrome shines, cores pulse, gold sparkles, prism shifts hue. */
+  private updateMarkFx(dt: number): void {
+    for (const tw of [...this.twinkles]) {
+      tw.life -= dt;
+      const k = 1 - tw.life / tw.max;
+      tw.s.scale.set(tw.size * Math.sin(Math.min(1, k) * Math.PI));
+      tw.s.rotation += tw.spin * dt;
+      if (tw.life <= 0) {
+        this.twinkles.splice(this.twinkles.indexOf(tw), 1);
+        tw.s.destroy();
+      }
+    }
+    const evolved = (Object.keys(this.marks) as GeneratorId[]).filter((id) => (this.marks[id] ?? 0) > 0);
+    if (!evolved.length) return;
+    // Mk V machines slowly cycle through soft pastel tints.
+    for (const id of evolved) {
+      if ((this.marks[id] ?? 0) < 4 || id === 'nanite') continue;
+      const list = this.spritesOf(id);
+      list.forEach((sp, i) => (sp.tint = pastel(this.time * 0.25 + i * 0.13)));
+    }
+    this.nextTwinkle -= dt;
+    if (this.nextTwinkle > 0 || this.twinkles.length > 24) return;
+    const id = evolved[Math.floor(Math.random() * evolved.length)];
+    const mark = this.marks[id]!;
+    this.nextTwinkle = rand(0.25, 0.7) / Math.min(4, evolved.length * (0.5 + mark * 0.25));
+    const list = this.spritesOf(id);
+    const sp = list[Math.floor(Math.random() * list.length)];
+    if (!sp || sp.destroyed || !sp.visible) return;
+    const p = this.fxLayer.toLocal(sp.getGlobalPosition());
+    const jitter = id === 'dock' || id === 'gate' ? 30 : 6;
+    const color = mark >= 4 ? pastel(Math.random()) : MARK_TINTS[mark - 1];
+    this.twinkle(p.x + rand(-jitter, jitter), p.y + rand(-jitter, jitter), color, 0.18 + mark * 0.06);
+    if (mark >= 2 && Math.random() < 0.3) this.puff(p.x, p.y, color, 0.5, 0.4);
   }
 
   /** Crate Magnet perk: crates show up `mult` times as often. */
@@ -1267,33 +1422,155 @@ export class StationScene {
   /** Moves the station by the pan, and the scenery by less, so the distance shows. */
   private placePan(): void {
     const { x, y } = this.pan;
-    this.world.position.set(this.home.world.x + x, this.home.world.y + y);
+    this.world.position.set(this.home.world.x + x, this.home.world.y + y + this.cineLift);
     this.planet.position.set(this.home.planet.x + x * 0.45, this.home.planet.y + y * 0.45);
-    this.galaxy.position.set(this.home.galaxy.x + x * 0.2, this.home.galaxy.y + y * 0.2);
+    const gx = this.home.galaxy.x + x * 0.2;
+    const gy = this.home.galaxy.y + y * 0.2;
+    // During the galaxy shift the old galaxy slides in behind the station as it dives in.
+    this.galaxy.position.set(gx + (this.world.x - gx) * this.galaxyPull, gy + (this.world.y - gy) * this.galaxyPull);
     this.starLayer.position.set(x * 0.1, y * 0.1);
     this.fgLayer.position.set(x * 1.3, y * 1.3);
     this.dustLayer.position.set(x * 1.15, y * 1.15);
     this.placeDecor();
   }
 
+  /** The relocation cinematic: the station spools up, punches into hyperspace and lands somewhere new. */
   warpJump(): void {
-    if (!this.ready) return;
-    this.recenter();
-    this.flash.tint = 0xffffff;
-    this.jump = 2.4;
-    this.shake = Math.max(this.shake, 9);
-    this.celebrate(COLORS.gate);
+    this.startCine(false);
   }
 
-  /** The Galaxy Shift: a longer, golden jump with rings of starlight. */
+  /** The Galaxy Shift: longer and golden, with the old galaxy rushing past through a tunnel of light. */
   galaxyJump(): void {
+    this.startCine(true);
+  }
+
+  private startCine(galaxy: boolean): void {
     if (!this.ready) return;
-    this.warpJump();
-    this.flash.tint = 0xffe9a8;
-    this.shake = Math.max(this.shake, 14);
-    for (let i = 0; i < 4; i++) this.rings.push({ x: 0, y: 0, r: 30 + i * 30, life: 1.2 + i * 0.25, color: i % 2 ? 0x8f7bff : 0xffe9a8, width: 5 - i });
-    window.setTimeout(() => this.celebrate(0xffe9a8), 1700);
-    window.setTimeout(() => this.celebrate(0x8f7bff), 2100);
+    this.recenter();
+    const dur = galaxy ? CINE.galaxy.dur : CINE.relocate.dur;
+    const swap = (galaxy ? JUMP_SWAP_MS.galaxy : JUMP_SWAP_MS.relocate) / 1000;
+    this.flash.tint = galaxy ? 0xffe9a8 : 0xeaf0ff;
+    this.cine = { t: 0, dur, swap, galaxy, landed: false, nextRing: 0 };
+    this.wake();
+  }
+
+  /** True while a relocation or galaxy-shift cinematic is playing. */
+  cinePlaying(): boolean {
+    return !!this.cine;
+  }
+
+  private updateCine(dt: number): void {
+    const c = this.cine;
+    const { width: w, height: h } = this.app.screen;
+    this.cineLayer.position.set(this.world.x, this.world.y);
+    // Streaks and rings live on after the jump until they fly off screen.
+    const reach = Math.hypot(w, h) * 0.6 + 40;
+    for (const st of [...this.hyper]) {
+      st.d += st.v * dt * (1 + st.d / 90);
+      st.s.position.set(Math.cos(st.a) * st.d, Math.sin(st.a) * st.d);
+      st.s.scale.set(0.5 + st.d / 22, 0.6);
+      st.s.alpha = Math.min(1, st.d / 60) * (c && c.t > c.swap ? Math.max(0, 1 - (c.t - c.swap) * 2) : 1);
+      if (st.d > reach || (st.s.alpha <= 0.01 && c && c.t > c.swap)) {
+        this.hyper.splice(this.hyper.indexOf(st), 1);
+        st.s.destroy();
+      }
+    }
+    const g = this.cineG.clear();
+    for (const r of this.tunnel) {
+      r.life -= dt * 0.9;
+      r.r *= 1 + dt * 2.6;
+      g.circle(0, 0, r.r).stroke({ width: r.width * (1 + r.r / 120), color: r.color, alpha: Math.max(0, Math.min(1, r.life)) * 0.6 });
+    }
+    this.tunnel = this.tunnel.filter((r) => r.life > 0 && r.r < reach * 1.4);
+    if (!c) return;
+
+    c.t += dt;
+    const calm = this.reducedMotion || this.calmFlash;
+    const before = Math.min(1, c.t / c.swap);
+    const after = c.t > c.swap ? Math.min(1, (c.t - c.swap) / (c.dur - c.swap)) : 0;
+    // The menus fade away, so the station glides to the middle of the screen, and back as it lands.
+    const smooth = (k: number) => k * k * (3 - 2 * k);
+    const back = Math.max(0, Math.min(1, (c.t - c.swap - 0.5) / 1.2));
+    const centred = c.t < c.swap ? smooth(Math.min(1, c.t / 0.7)) : 1 - smooth(back);
+    this.cineLift = (h / 2 - this.home.world.y) * centred;
+    this.galaxyPull = c.galaxy ? (c.t < c.swap ? smooth(before) : 1 - smooth(after)) : 0;
+    this.placePan();
+    // The flash: a quick rise to the swap, then a slower fade into the new sector.
+    const rise = c.galaxy ? 0.7 : 0.4;
+    const fall = c.galaxy ? 1.1 : 0.6;
+    const f = c.t < c.swap ? Math.max(0, 1 - (c.swap - c.t) / rise) ** 2 : Math.max(0, 1 - (c.t - c.swap) / fall);
+    this.flash.alpha = f * (this.calmFlash ? 0.15 : 0.95);
+
+    if (c.t < c.swap) {
+      // Spooling up: the camera leans in, the station shakes harder, sparks rush to the core.
+      this.cineZoom = calm ? 1 : 1 + 0.3 * before * before;
+      this.shake = Math.max(this.shake, (c.galaxy ? 12 : 7) * before);
+      this.squash = Math.max(this.squash, 0.3 * before);
+      if (!calm && Math.random() < dt * (c.galaxy ? 40 : 26)) {
+        const a = rand(0, TAU);
+        const d = rand(150, 240);
+        const color = c.galaxy ? (Math.random() < 0.5 ? 0xffe9a8 : 0x8f7bff) : Math.random() < 0.5 ? COLORS.gate : 0xffffff;
+        this.chunkTo(Math.cos(a) * d, Math.sin(a) * d, color);
+      }
+      // Into hyperspace: streaks burst out from the station.
+      if (before > 0.45) {
+        const n = Math.round(dt * (calm ? 30 : c.galaxy ? 320 : 240) * before);
+        for (let i = 0; i < n && this.hyper.length < 220; i++) {
+          const s = this.sprite(this.tex.streak, this.cineLayer);
+          s.blendMode = 'add';
+          s.anchor.set(0, 0.5);
+          const a = rand(0, TAU);
+          s.rotation = a;
+          s.tint = c.galaxy ? [0xffe9a8, 0xffffff, 0x8f7bff, 0xffd166][i % 4] : [0xffffff, 0x9fe8ff, COLORS.gate][i % 3];
+          this.hyper.push({ s, a, d: rand(20, 80), v: rand(220, 420) });
+        }
+      }
+      // The galaxy shift's tunnel: rings of light racing outward.
+      if (c.galaxy && before > 0.3 && c.t >= c.nextRing) {
+        c.nextRing = c.t + (calm ? 0.35 : 0.12);
+        this.tunnel.push({ r: 14, life: 1.3, color: this.tunnel.length % 2 ? 0x8f7bff : 0xffe9a8, width: 2.5 });
+      }
+      if (c.galaxy) {
+        // The old galaxy swells and spins as the station dives toward it.
+        this.galaxy.alpha = 0.55 + 0.45 * before;
+        this.galaxy.rotation += dt * (0.2 + before * 2.5);
+        this.galaxyBoost = 1 + before * before * 3.5;
+      }
+    } else {
+      if (!c.landed) {
+        // Touchdown: a shockwave and a burst of colour, then the camera settles back.
+        c.landed = true;
+        const color = c.galaxy ? 0xffe9a8 : COLORS.gate;
+        for (let i = 0; i < (c.galaxy ? 4 : 3); i++) this.rings.push({ x: 0, y: 0, r: 30 + i * 26, life: 1.1 + i * 0.2, color: i % 2 ? 0xffffff : color, width: 5 - i });
+        this.burst(0, 0, color, this.calmFlash ? 10 : 50, 2.2);
+        this.puff(0, 0, color, 6, 0.9);
+        this.shake = Math.max(this.shake, c.galaxy ? 10 : 6);
+      }
+      const e = 1 - (1 - after) ** 3;
+      this.cineZoom = calm ? 1 : 0.78 + 0.22 * e;
+      if (c.galaxy) this.galaxyBoost = 1 + (1 - e) * 1.2;
+    }
+    if (c.t >= c.dur) {
+      this.cine = null;
+      this.cineZoom = 1;
+      this.galaxyBoost = 1;
+      this.galaxy.alpha = 0.55;
+      this.flash.alpha = 0;
+      this.cineLift = 0;
+      this.galaxyPull = 0;
+      this.placePan();
+    }
+    this.galaxy.scale.set(this.galaxyScale * this.galaxyBoost);
+  }
+
+  /** A spark rushing from (x, y) into the station's core. */
+  private chunkTo(x: number, y: number, color: number): void {
+    const s = this.sparkPool.get();
+    s.tint = color;
+    s.position.set(x, y);
+    const d = Math.hypot(x, y) || 1;
+    const v = rand(260, 380);
+    this.sparks.push({ s, vx: (-x / d) * v, vy: (-y / d) * v, life: 0.6, max: 0.6 });
   }
 
   /** Each galaxy paints the distant spiral its own colour. */
@@ -1779,18 +2056,18 @@ export class StationScene {
     // Drop to half rate when idle; wake() restores it on the next touch.
     if (!this.saver && this.app.ticker.maxFPS === 0 && this.idle) this.app.ticker.maxFPS = IDLE_FPS;
     this.time += dt;
-    this.jump = Math.max(0, this.jump - dt);
-    const warpTarget = this.jump > 0.6 ? 2.6 : this.boosting ? 1 : 0;
+    this.updateCine(dt);
+    const c = this.cine;
+    const hyper = c ? (c.t < c.swap ? Math.min(1, c.t / c.swap / 0.6) * 2.6 : Math.max(0, 1 - (c.t - c.swap) / 0.8) * 2.6) : 0;
+    const warpTarget = c ? hyper : this.boosting ? 1 : 0;
     this.warp += (warpTarget - this.warp) * Math.min(1, dt * 3);
-    // The flash peaks partway through the jump, as the station lands somewhere new.
-    const jt = 2.4 - this.jump;
-    this.flash.alpha = this.jump > 0 ? Math.max(0, 1 - Math.abs(jt - 1.6) * 2.2) * (this.calmFlash ? 0.12 : 0.85) : 0;
     const speed = 1 + Math.min(1, this.warp) * 1.4;
     if (Math.abs(this.zoom - this.zoomTarget) > 0.0005) {
       this.zoom += (this.zoomTarget - this.zoom) * Math.min(1, dt * 1.5);
       this.scale = (this.baseScale * this.viewZoom) / this.zoom;
       this.world.scale.set(this.scale);
     }
+    if (this.cine || this.world.scale.x !== this.scale) this.world.scale.set(this.scale * this.cineZoom);
     this.flare += ((this.event === 'flare' ? 1 : 0) - this.flare) * Math.min(1, dt * 2);
     this.flareGlow.alpha = this.flare * (this.calmFlash ? 0.4 : 0.55 + 0.15 * Math.sin(this.time * 3));
     this.updatePan(dt);
@@ -1806,6 +2083,7 @@ export class StationScene {
     this.updateRig(dt);
     this.updatePet(dt);
     this.updateFx(dt);
+    this.updateMarkFx(dt);
     if (this.calmShake) this.shake = 0;
     if (!this.reducedMotion && this.shake > 0.05) {
       this.world.pivot.set(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);

@@ -14,7 +14,9 @@ import '@fontsource/rubik/latin-500.css';
 import '@fontsource/rubik/latin-600.css';
 import './style.css';
 import { Sfx } from './audio';
-import { CLAW, GENERATORS, UPGRADES } from './core/config';
+import { CLAW, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES } from './core/config';
+import { modelName } from './core/evolve';
+import { MARK_COLORS } from './art/kit';
 import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
 import { SAFE_TYPES, SETS, SKINS } from './core/collection';
 import { CHALLENGES, GOLDEN, LOOT, TRIPS, moduleDef } from './core/expansion';
@@ -23,10 +25,10 @@ import * as eco from './core/economy';
 import { D, format } from './core/num';
 import { Game } from './game';
 import * as art from './scene/art';
-import { StationScene } from './scene/station';
+import { JUMP_SWAP_MS, StationScene } from './scene/station';
 import { sectorCrateMult, timeStretch } from './core/sectors';
 import { CRATE_BUFFS } from './core/crate-buffs';
-import { GEN_ICONS, ICONS } from './ui/icons';
+import { GEN_ICONS, ICONS, genIcon } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
@@ -86,6 +88,12 @@ const FIRST_JUMP = (cores: number, speed: number) => ({
   sub: `${cores.toLocaleString('en-US')} Star Cores now power every machine and tap. Earn more before your next jump to go even faster.`,
   color: '#8f7bff',
 });
+
+/** Fades the menus out while a jump plays, so the station has the whole screen, and back after it lands. */
+function cinematic(swapMs: number): void {
+  document.body.classList.add('cinematic');
+  window.setTimeout(() => document.body.classList.remove('cinematic'), swapMs + 900);
+}
 
 const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
@@ -214,6 +222,23 @@ async function boot(): Promise<void> {
         buzz(30);
         break;
       }
+      case 'evolve': {
+        const g = GENERATORS.find((x) => x.id === e.gen)!;
+        const def = MARKS[e.mark - 1];
+        const owned = game.state.owned[e.gen];
+        scene.setOwned(game.state.owned);
+        scene.evolve(e.gen);
+        fanfare.cheer({
+          icon: genIcon(e.gen, e.mark),
+          kicker: `${def.title} model unlocked`,
+          title: modelName(e.gen, owned),
+          sub: `${def.look} Every ${g.name} now produces ${MILESTONE_MULT * def.mult}x as much.`,
+          color: MARK_COLORS[e.mark - 1],
+        });
+        sfx.fanfare();
+        buzz([30, 40, 60]);
+        break;
+      }
       case 'upgrade': {
         const u = UPGRADES.find((x) => x.id === e.id)!;
         ui.toast(ICONS.star, `<b>${u.name}</b> installed`);
@@ -272,39 +297,56 @@ async function boot(): Promise<void> {
         break;
       case 'relocate':
         scene.warpJump();
+        cinematic(JUMP_SWAP_MS.relocate);
         // Swap the station and the sector over at the brightest moment of the flash.
         setTimeout(() => {
           scene.setOwned(game.state.owned);
           syncGrowth();
           scene.setSector(sectorFor(game.state.stats.relocations));
-          showSectorCard(game.state.stats.relocations, 0, e.speed);
-          fanfare.confetti();
-          if (game.state.stats.relocations === 1) window.setTimeout(() => fanfare.cheer(FIRST_JUMP(e.cores, e.speed)), 4200);
-          scene.fireworks([0x8f7bff, 0x5cd6ff, 0xffd166]);
-          sfx.fanfare();
-        }, 1500);
+          window.setTimeout(() => {
+            showSectorCard(game.state.stats.relocations, 0, e.speed);
+            fanfare.confetti();
+            scene.fireworks([0x8f7bff, 0x5cd6ff, 0xffd166]);
+            sfx.fanfare();
+            ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores, +${e.crystals} crystals`);
+          }, 500);
+          if (game.state.stats.relocations === 1) window.setTimeout(() => fanfare.cheer(FIRST_JUMP(e.cores, e.speed)), 4700);
+        }, JUMP_SWAP_MS.relocate);
         syncPerks();
-        ui.toast(ICONS.core, `<b>New sector!</b> +${e.cores.toLocaleString('en-US')} Star Cores, +${e.crystals} crystals`);
         sfx.warp();
-        buzz(60);
+        buzz([20, 60, 20, 60, 120]);
         break;
-      case 'galaxy':
+      case 'galaxy': {
         scene.galaxyJump();
+        cinematic(JUMP_SWAP_MS.galaxy);
+        const galaxyNo = game.state.galaxy.shifts + 1;
+        sfx.warp();
+        window.setTimeout(() => sfx.warp(), 1600);
         setTimeout(() => {
           scene.setOwned(game.state.owned);
           syncGrowth();
           scene.setSector(sectorFor(game.state.stats.relocations));
           scene.setGalaxy(game.state.galaxy.shifts);
-          showSectorCard(game.state.stats.relocations, game.state.galaxy.shifts + 1);
-          fanfare.confetti(['#ffe9a8', '#8f7bff', '#ffd166', '#ffffff']);
-          scene.fireworks([0xffe9a8, 0x8f7bff, 0xffffff]);
-        }, 1500);
+          sfx.achievement();
+          window.setTimeout(() => {
+            fanfare.cheer({
+              icon: ICONS.star.replace('currentColor', '#ffe9a8'),
+              kicker: 'Galaxy Shift',
+              title: `Welcome to Galaxy ${galaxyNo}`,
+              sub: `+${e.stars.toLocaleString('en-US')} Galaxy Stars. Every star ever earned powers the station, and the Star Map has new upgrades to buy.`,
+              color: '#ffe9a8',
+            });
+            fanfare.confetti(['#ffe9a8', '#8f7bff', '#ffd166', '#ffffff']);
+            scene.fireworks([0xffe9a8, 0x8f7bff, 0xffffff]);
+            sfx.fanfare();
+            fanfare.whenIdle(() => showSectorCard(game.state.stats.relocations, galaxyNo));
+            ui.toast(ICONS.star.replace('currentColor', '#ffe9a8'), galaxyText(e.stars, galaxyNo));
+          }, 900);
+        }, JUMP_SWAP_MS.galaxy);
         syncPerks();
-        ui.toast(ICONS.star.replace('currentColor', '#ffe9a8'), galaxyText(e.stars, game.state.galaxy.shifts + 1));
-        sfx.warp();
-        setTimeout(() => sfx.achievement(), 1700);
-        buzz([60, 80, 120]);
+        buzz([40, 60, 40, 60, 40, 60, 200]);
         break;
+      }
       case 'starNode':
         scene.setOwned(game.state.owned);
         syncGrowth();
@@ -600,11 +642,12 @@ async function boot(): Promise<void> {
         const c = CHALLENGES.find((x) => x.id === e.id)!;
         if (e.phase === 'start') {
           scene.warpJump();
+          cinematic(JUMP_SWAP_MS.relocate);
           setTimeout(() => {
             scene.setOwned(game.state.owned);
             syncGrowth();
             scene.setSector(sectorFor(game.state.stats.relocations));
-          }, 1500);
+          }, JUMP_SWAP_MS.relocate);
           syncPerks();
           ui.showTab('build');
           ui.toast(ICONS.trophy.replace('currentColor', hexColor(c.color)), `<b>Challenge: ${c.name}</b> ${c.rule}${e.cores ? ` (+${e.cores} Star Cores banked)` : ''}`);

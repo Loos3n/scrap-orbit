@@ -1,3 +1,4 @@
+import { markMult } from './evolve';
 import {
   ACHIEVEMENT_BONUS,
   BOOST,
@@ -156,7 +157,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id);
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * markMult(owned) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;

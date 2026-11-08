@@ -1,10 +1,11 @@
-import { ACHIEVEMENT_BONUS, BOOST, GENERATORS, MILESTONE_MULT, UPGRADES, type GeneratorId } from '../core/config';
+import { ACHIEVEMENT_BONUS, BOOST, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES, type GeneratorId } from '../core/config';
+import { markMult, markOf, modelName, nextMark } from '../core/evolve';
 import { CREW, CREW_PER_LEVEL } from '../core/content';
 import * as eco from '../core/economy';
 import { CHALLENGES, GOLDEN, LOOT, bonuses, goldenActive } from '../core/expansion';
 import { D, type Decimal } from '../core/num';
 import type { Game } from '../game';
-import { GEN_ICONS, ICONS } from './icons';
+import { GEN_ICONS, ICONS, genIcon } from './icons';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -102,8 +103,10 @@ export class InfoSheet {
     const milestones = eco.milestonesReached(owned);
     const away = s.trips.some((t) => t.crew === crew.id);
     const crewText = s.crew[crew.id] === 0 ? 'Not recruited' : away ? `${esc(crew.name)} is on a trip` : `${esc(crew.name)} ${xText(crewX)}`;
-    return `<div class="info-hero" style="--c:${hex(g.color)}"><div class="info-icon">${GEN_ICONS[id]}</div>
-        <div><div class="eyebrow">Machine</div><h2>${esc(g.name)}</h2><div class="info-owned">${owned.toLocaleString('en-US')} built</div></div></div>
+    const mark = markOf(owned);
+    const nextModel = nextMark(owned);
+    return `<div class="info-hero" style="--c:${hex(g.color)}"><div class="info-icon">${genIcon(id, mark)}</div>
+        <div><div class="eyebrow">${mark ? `${MARKS[mark - 1].title} model` : 'Machine'}</div><h2>${esc(modelName(id, owned))}</h2><div class="info-owned">${owned.toLocaleString('en-US')} built</div></div></div>
       <p class="info-lore">${LORE[id]}</p>
       <h3 class="section-title">Output</h3>
       ${this.rows([
@@ -115,6 +118,7 @@ export class InfoSheet {
       <h3 class="section-title">Multipliers</h3>
       ${this.rows([
         ['Milestones', `${milestones} reached ${xText(MILESTONE_MULT ** milestones)}`],
+        ['Model', mark ? `${MARKS[mark - 1].name} ${xText(markMult(owned))}` : 'Original'],
         ['Crew', crewText],
         ['Upgrades', xText(upX)],
         ['Station-wide bonuses', xText(eco.globalMult(s) * (1 + bonuses(s).income))],
@@ -122,6 +126,7 @@ export class InfoSheet {
       <h3 class="section-title">Next</h3>
       ${this.rows([
         ['Next milestone', next ? `${owned} / ${next.at} for 2x output` : 'All reached'],
+        ['Next model', nextModel ? `${MARKS[MARKS.indexOf(nextModel)].name} at ${nextModel.at} built` : 'Final model'],
         ['Next one costs', this.fmt(eco.costFor(g, owned, 1, eco.costDiscount(s)))],
       ])}`;
   }

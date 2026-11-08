@@ -1,3 +1,4 @@
+import { markOf } from './core/evolve';
 import { recordIncome, recordRun } from './core/history';
 import { catchStar, type StarPrize } from './core/lucky';
 import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
@@ -28,6 +29,8 @@ export type GameEvent =
   | { type: 'tap'; value: Decimal }
   | { type: 'bought'; gen: GeneratorId; count: number }
   | { type: 'milestone'; gen: GeneratorId; at: number }
+  /** A machine reached a new model: `mark` 1 is Mk II. */
+  | { type: 'evolve'; gen: GeneratorId; mark: number }
   | { type: 'upgrade'; id: string }
   | { type: 'boost' }
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
@@ -446,6 +449,12 @@ export class Game {
     if (count === 0) return;
     this.emit({ type: 'bought', gen: id, count });
     const after = this.state.owned[id];
+    const mark = markOf(after);
+    if (mark > markOf(before)) {
+      // A new model outshines the milestone it lands on, so only the evolution is announced.
+      this.emit({ type: 'evolve', gen: id, mark });
+      return;
+    }
     for (const m of MILESTONES) {
       if (before < m && after >= m) this.emit({ type: 'milestone', gen: id, at: m });
     }

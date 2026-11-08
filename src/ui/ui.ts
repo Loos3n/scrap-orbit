@@ -2,7 +2,7 @@ import { Graphs } from './graphs';
 import { askPermission, notificationsAvailable } from '../notify';
 import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
-import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
+import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
 import { exportCode, importCode, type GameState } from '../core/state';
@@ -10,7 +10,8 @@ import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
-import { GEN_ICONS, ICONS } from './icons';
+import { GEN_ICONS, ICONS, genIcon } from './icons';
+import { markOf, modelName, nextMark } from '../core/evolve';
 import { holdToRepeat, makePanelToggle, type PanelToggle } from './gestures';
 import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderCrateBuffs, renderGoldenBanner } from './expansion-ui';
@@ -87,6 +88,10 @@ const setText = (el: HTMLElement, text: string) => {
 
 interface GenRow {
   li: HTMLLIElement;
+  icon: HTMLElement;
+  name: HTMLElement;
+  /** The model on show, so the icon is only redrawn when the machine evolves. */
+  mark: number;
   count: HTMLElement;
   rate: HTMLElement;
   bar: HTMLElement;
@@ -207,7 +212,7 @@ export class UI {
       li.className = 'gen';
       li.style.setProperty('--c', hex(g.color));
       li.innerHTML = `
-        <button class="gen-icon" type="button" aria-label="About ${g.name}">${GEN_ICONS[g.id]}<span class="gen-count">0</span><span class="info-dot">i</span></button>
+        <button class="gen-icon" type="button" aria-label="About ${g.name}"><span class="gen-art">${GEN_ICONS[g.id]}</span><span class="gen-count">0</span><span class="info-dot">i</span></button>
         <div class="gen-info">
           <div class="gen-name"></div>
           <div class="gen-rate"></div>
@@ -219,6 +224,9 @@ export class UI {
       li.querySelector('.gen-name')!.textContent = g.name;
       const row: GenRow = {
         li,
+        icon: li.querySelector('.gen-art')!,
+        name: li.querySelector('.gen-name')!,
+        mark: 0,
         count: li.querySelector('.gen-count')!,
         rate: li.querySelector('.gen-rate')!,
         bar: li.querySelector('.bar > i')!,
@@ -935,7 +943,7 @@ export class UI {
   private purchaseText(p: Purchase): string {
     if (p.kind === 'upgrade') return UPGRADES.find((u) => u.id === p.id)!.name;
     if (p.kind === 'claw') return `Claw Lv ${this.game.state.claw + 1}`;
-    const name = GENERATORS.find((g) => g.id === p.id)!.name;
+    const name = modelName(p.id, this.game.state.owned[p.id]);
     return p.count === 1 ? `1 ${name}` : `${p.count} ${name}s`;
   }
 
@@ -961,13 +969,21 @@ export class UI {
       const affordable = quote.cost.lte(s.scrap);
       row.li.classList.toggle('locked', owned === 0 && !affordable);
       setText(row.count, String(owned));
+      const mark = markOf(owned);
+      if (mark !== row.mark) {
+        row.mark = mark;
+        row.icon.innerHTML = genIcon(g.id, mark);
+        row.name.textContent = modelName(g.id, owned);
+        for (let m = 1; m <= MARKS.length; m++) row.li.classList.toggle(`mk-${m}`, m === mark);
+      }
       const rateHtml = owned > 0 ? `<b>+${this.fmt(eco.generatorRate(s, g))}</b> / sec` : g.blurb;
       if (row.rate.innerHTML !== rateHtml) row.rate.innerHTML = rateHtml;
       const next = eco.nextMilestone(owned);
       if (next) {
         const pct = ((owned - next.prev) / (next.at - next.prev)) * 100;
         row.bar.style.width = `${pct}%`;
-        const html = `${owned} / ${next.at} <b>→ 2x output</b>`;
+        const model = nextMark(owned);
+        const html = model && model.at === next.at ? `${owned} / ${next.at} <b class="mk-next">→ ${model.name} · ${MILESTONE_MULT * model.mult}x output</b>` : `${owned} / ${next.at} <b>→ 2x output</b>`;
         if (row.milestone.innerHTML !== html) row.milestone.innerHTML = html;
       } else {
         row.bar.style.width = '100%';
@@ -982,8 +998,8 @@ export class UI {
 
   private renderUpgrades(): void {
     const s = this.game.state;
-    const available = UPGRADES.filter((u) => !s.upgrades.has(u.id) && eco.upgradeVisible(s, u));
-    const teaser = UPGRADES.find((u) => !s.upgrades.has(u.id) && !eco.upgradeVisible(s, u));
+    const available = UPGRADES.filter((u) => !s.upgrades.has(u.id) && eco.upgradeVisible(s, u)).sort((a, b) => a.cost - b.cost);
+    const teaser = UPGRADES.filter((u) => !s.upgrades.has(u.id) && !eco.upgradeVisible(s, u)).sort((a, b) => a.cost - b.cost)[0];
     $('upgrade-dot').hidden = !available.some((u) => s.scrap.gte(u.cost));
     if ($('tab-upgrades').hidden) return;
 

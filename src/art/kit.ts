@@ -160,3 +160,51 @@ export function facetStar(cx: number, cy: number, r1: number, r2: number, k: num
   }
   return out + outline(poly(...pts), c.ink);
 }
+
+/**
+ * Machine evolutions (core/evolve.ts) refit a machine's metal: steel and hull plating become
+ * chrome (Mk II), carbon (Mk III), gold (Mk IV) or prism (Mk V), and from Mk IV on the outlines
+ * take on the plating's trim colour. Works on any markup drawn from the palette.
+ */
+export const MARK_RAMPS: readonly Ramp[] = [
+  { hi: '#ffffff', base: '#dfe9ff', lo: '#8aa2dc', ink: '#16285e' },
+  { hi: '#8d98d8', base: '#3a417e', lo: '#1c2152', ink: '#070a22' },
+  { hi: '#fff6d6', base: '#ffcf5a', lo: '#c48a12', ink: '#4a2f05' },
+  { hi: '#ffffff', base: '#f3d2ff', lo: '#9a7bff', ink: '#2a1050' },
+];
+/** The trim colour each mark paints its outlines (Mk IV and V only). */
+const MARK_TRIM = ['', '', '#7a4c06', '#4a1a8a'];
+/** A colour per mark for badges and glows: Mk II chrome, Mk III cyan core, Mk IV gold, Mk V violet. */
+export const MARK_COLORS = ['#dfe9ff', '#5ce1ff', '#ffd166', '#c58cff'];
+
+export function refit(markup: string, mark: number): string {
+  if (mark <= 0) return markup;
+  const r = MARK_RAMPS[Math.min(mark, MARK_RAMPS.length) - 1];
+  const swap = new Map<string, string>();
+  for (const ramp of [PALETTE.steel, PALETTE.hull]) {
+    swap.set(ramp.hi, r.hi);
+    swap.set(ramp.base, r.base);
+    swap.set(ramp.lo, r.lo);
+    swap.set(ramp.ink, r.ink);
+  }
+  const trim = MARK_TRIM[Math.min(mark, MARK_TRIM.length) - 1];
+  if (trim) for (const ramp of Object.values(PALETTE)) if (!swap.has(ramp.ink)) swap.set(ramp.ink, trim);
+  return markup.replace(/#[0-9a-fA-F]{6}\b/g, (c) => swap.get(c.toLowerCase()) ?? c);
+}
+
+/** A small tag for a menu icon's lower right: one chevron per mark, a star for the last. */
+export function markBadge(mark: number, view = 48): string {
+  if (mark <= 0) return '';
+  const c = MARK_COLORS[Math.min(mark, MARK_COLORS.length) - 1];
+  const k = view / 48;
+  const x = 48 * k - 15 * k;
+  const y = 1 * k;
+  const g = `<g transform="translate(${n(x)} ${n(y)}) scale(${n(k)})">`;
+  const body =
+    mark >= 4
+      ? fill(rrect(0, 0, 14, 12, 3.5), '#1a1040') + outline(rrect(0, 0, 14, 12, 3.5), c, 1.4) + fill(poly(...starPts(7, 6.3, 4.6, 2, 5)), c)
+      : fill(rrect(0, 0, 14, 12, 3.5), '#0b0e2a') +
+        outline(rrect(0, 0, 14, 12, 3.5), c, 1.4) +
+        Array.from({ length: mark }, (_, i) => line(`M3.8 ${n(8.6 - i * 2.6 + (mark - 1) * 1.3)}L7 ${n(5.8 - i * 2.6 + (mark - 1) * 1.3)}L10.2 ${n(8.6 - i * 2.6 + (mark - 1) * 1.3)}`, c, 1.5)).join('');
+  return g + body + '</g>';
+}
