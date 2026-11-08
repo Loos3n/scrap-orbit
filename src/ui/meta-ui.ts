@@ -629,13 +629,22 @@ export class Coach {
         if (s.scrap.lt(cost)) return { text: `A Salvage Drone costs ${Math.ceil(cost)} scrap. Keep tapping!`, target: '#stage', progress: [Math.floor(s.scrap.toNumber()), Math.ceil(cost)] };
         return { text: 'Nice haul! Build a Salvage Drone. It salvages for you, even while you are away.', target: '#gen-list .gen:first-child .buy', tab: 'build' };
       }
-      case 'more':
+      case 'more': {
+        // Can't afford the next drone yet: point at the station and say to tap, not at a grey button.
+        const next = eco.costFor(GENERATORS[0], s.owned.drone, 1, eco.costDiscount(s)).toNumber();
+        if (s.scrap.lt(next))
+          return {
+            text: 'Not enough scrap for the next drone yet. Tap the station to salvage more, or let your drones bring it in.',
+            target: '#stage',
+            progress: [Math.min(s.owned.drone, TUTORIAL_DRONES), TUTORIAL_DRONES],
+          };
         return {
           text: 'Drones add up fast. Build a few more. Tip: hold the button down to keep buying.',
           target: '#gen-list .gen:first-child .buy',
           tab: 'build',
           progress: [Math.min(s.owned.drone, TUTORIAL_DRONES), TUTORIAL_DRONES],
         };
+      }
       case 'upgradeTab':
         if ($('upgrade-dot').hidden) return { text: "Keep tapping and building. I'll shout when an upgrade is ready." };
         return { text: `An upgrade is ready! ${paneHint('upgrades')}`, target: paneTarget('upgrades') };
