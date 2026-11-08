@@ -43,6 +43,9 @@ export class Sfx {
   private musicTimer = 0;
   private nextChordAt = 0;
   private chord = 0;
+  /** Night (0 to 1): the music slows, drops a step and softens; see setNight. */
+  private night = 0;
+  private musicLp: BiquadFilterNode | null = null;
   private lastTap = 0;
   private lastBuy = 0;
   private lastHit = 0;
@@ -80,7 +83,8 @@ export class Sfx {
       // Music runs through its own quiet bus with a soft low-pass, under the effects.
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 1400;
+      lp.frequency.value = 1400 - this.night * 650;
+      this.musicLp = lp;
       this.musicBus = ctx.createGain();
       this.musicBus.gain.value = 0;
       this.musicBus.connect(lp).connect(ctx.destination);
@@ -377,6 +381,12 @@ export class Sfx {
     this.setMusic(music > 0);
   }
 
+  /** Night-time music: 0 is the normal loop, 1 a slower, lower, muffled lullaby version. */
+  setNight(n: number): void {
+    this.night = Math.max(0, Math.min(1, n));
+    if (this.ctx && this.musicLp) this.musicLp.frequency.setTargetAtTime(1400 - this.night * 650, this.ctx.currentTime, 4);
+  }
+
   setMusic(on: boolean): void {
     if (on === this.musicOn) return;
     this.musicOn = on;
@@ -412,7 +422,10 @@ export class Sfx {
     if (!ctx || !this.musicBus || ctx.state !== 'running') return;
     while (this.nextChordAt < ctx.currentTime + 1.5) {
       const start = this.nextChordAt;
-      const notes = CHORDS[this.chord % CHORDS.length];
+      // At night each chord lasts longer and sits two semitones lower: a sleepier loop.
+      const chordSec = CHORD_SEC * (1 + this.night * 0.5);
+      const shift = this.night > 0.5 ? -2 : 0;
+      const notes = CHORDS[this.chord % CHORDS.length].map((n) => n + shift);
       // Pad: each chord tone as two slightly detuned voices with a slow swell.
       for (const semi of notes) {
         for (const detune of [-6, 6]) {
@@ -423,15 +436,15 @@ export class Sfx {
           osc.detune.value = detune;
           g.gain.setValueAtTime(0.0001, start);
           g.gain.linearRampToValueAtTime(0.09, start + 2.5);
-          g.gain.linearRampToValueAtTime(0.0001, start + CHORD_SEC + 1.5);
+          g.gain.linearRampToValueAtTime(0.0001, start + chordSec + 1.5);
           osc.connect(g).connect(this.musicBus);
           osc.start(start);
-          osc.stop(start + CHORD_SEC + 1.6);
+          osc.stop(start + chordSec + 1.6);
         }
       }
       // Sparse twinkles from the chord, two octaves up.
-      for (let beat = 0; beat < CHORD_SEC; beat += 0.5) {
-        if (Math.random() > 0.28) continue;
+      for (let beat = 0; beat < chordSec; beat += 0.5) {
+        if (Math.random() > 0.28 - this.night * 0.12) continue;
         const semi = notes[Math.floor(Math.random() * notes.length)] + 24 + (Math.random() < 0.3 ? 12 : 0);
         const t = start + beat;
         const osc = ctx.createOscillator();
@@ -445,7 +458,7 @@ export class Sfx {
         osc.start(t);
         osc.stop(t + 1.5);
       }
-      this.nextChordAt += CHORD_SEC;
+      this.nextChordAt += chordSec;
       this.chord++;
     }
   }

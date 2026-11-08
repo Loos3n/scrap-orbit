@@ -42,6 +42,11 @@ function connect(): Promise<{ auth: Auth; db: Firestore }> {
   return services;
 }
 
+/** Firebase sign-in and database, started on first use (src/friends.ts shares them). */
+export function firebase(): Promise<{ auth: Auth; db: Firestore }> {
+  return connect();
+}
+
 /** Calls `fn` now and whenever the player signs in or out. */
 export async function watchUser(fn: (user: User | null) => void): Promise<void> {
   if (!cloudAvailable()) return;

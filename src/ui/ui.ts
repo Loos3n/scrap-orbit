@@ -161,6 +161,9 @@ export class UI {
   onSoundChange: ((sfx: number, music: number) => void) | null = null;
   onComfortChange: ((reduceFlash: boolean, reduceShake: boolean) => void) | null = null;
   onPowerChange: ((saver: boolean) => void) | null = null;
+  onDayNightChange: (() => void) | null = null;
+  /** True while friends' gifts wait to be opened (src/ui/friends-ui.ts): lights the Profile dot. */
+  friendsDot: (() => boolean) | null = null;
   /** Called after the player confirms a relocation. */
   onRelocate: (() => void) | null = null;
 
@@ -421,7 +424,7 @@ export class UI {
   private renderProfile(force = false): void {
     const s = this.game.state;
     if ($('profile').hidden) {
-      $('profile-dot').hidden = s.achievements.size <= this.seenAch;
+      $('profile-dot').hidden = s.achievements.size <= this.seenAch && !this.friendsDot?.();
       return;
     }
     this.seenAch = s.achievements.size;
@@ -484,6 +487,7 @@ export class UI {
       auto.checked = o.autoBuy;
       hap.checked = o.haptics;
       ($('opt-battery') as HTMLInputElement).checked = o.batterySaver;
+      ($('opt-daynight') as HTMLInputElement).checked = o.dayNight;
       ($('opt-ads') as HTMLInputElement).checked = o.adOffers;
       ($('opt-notify') as HTMLInputElement).checked = o.notifications;
       $('opt-notify-row').hidden = !notificationsAvailable();
@@ -540,6 +544,11 @@ export class UI {
     battery.addEventListener('change', () => {
       settings().batterySaver = battery.checked;
       this.onPowerChange?.(battery.checked);
+    });
+    const dayNight = $('opt-daynight') as HTMLInputElement;
+    dayNight.addEventListener('change', () => {
+      settings().dayNight = dayNight.checked;
+      this.onDayNightChange?.();
     });
     auto.addEventListener('change', () => (settings().autoBuy = auto.checked));
     const volume = (input: HTMLInputElement, key: 'sfxVol' | 'musicVol', flag: 'sound' | 'music') =>

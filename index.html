@@ -227,6 +227,7 @@
             <label class="toggle"><input id="opt-shake" type="checkbox" /><span>Reduce screen shake<small>Keep the station still on big moments</small></span></label>
             <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration</span></label>
             <label id="opt-notify-row" class="toggle" hidden><input id="opt-notify" type="checkbox" /><span>Reminders<small>When storage fills up, research finishes or crew come home</small></span></label>
+            <label class="toggle"><input id="opt-daynight" type="checkbox" /><span>Day and night<small>The station follows your clock: sleepy lights and slower music late at night</small></span></label>
             <label class="toggle"><input id="opt-battery" type="checkbox" /><span>Battery saver<small>Smoother on older phones and easier on the battery</small></span></label>
             <h3 class="section-title">Game</h3>
             <label class="toggle"><input id="opt-ads" type="checkbox" /><span>Ad offers<small>Optional bonuses for watching an ad. An ad only plays when you tap one.</small></span></label>
@@ -317,10 +318,11 @@
         <button id="profile-close" class="close-btn" type="button" aria-label="Close">&times;</button>
         <div class="eyebrow">Captain's log</div>
         <h2 id="profile-title">Profile</h2>
-        <div class="segments three profile-seg" role="tablist" aria-label="Profile sections">
+        <div class="segments four profile-seg" role="tablist" aria-label="Profile sections">
           <button type="button" data-prof="awards" aria-selected="true">Awards</button>
           <button type="button" data-prof="book" aria-selected="false">Collections</button>
           <button type="button" data-prof="stats" aria-selected="false">Stats</button>
+          <button type="button" data-prof="friends" aria-selected="false">Friends<span id="friends-dot" class="dot" hidden></span></button>
         </div>
         <div id="prof-awards" class="prof-body">
         <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
@@ -335,12 +337,54 @@
         <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
         <ul id="book-list" class="book-list"></ul>
         </div>
+        <div id="prof-friends" class="prof-body" hidden>
+          <div id="fr-off" class="fr-off" hidden>
+            <p id="fr-off-text" class="tab-intro"></p>
+            <button id="fr-off-btn" type="button" class="fr-btn fr-main" hidden>Connect Google account</button>
+          </div>
+          <div id="fr-on" hidden>
+            <div class="fr-me">
+              <small>Your friend code</small>
+              <b id="fr-code">----</b>
+              <div class="fr-row">
+                <button id="fr-copy" type="button" class="fr-btn">Copy</button>
+                <button id="fr-share" type="button" class="fr-btn">Share</button>
+              </div>
+              <label class="fr-name"><span>Station name</span><input id="fr-name" type="text" maxlength="20" autocomplete="off" spellcheck="false" /></label>
+            </div>
+            <div id="fr-gifts" class="fr-gifts" hidden>
+              <span class="fr-gift-icon" data-icon="gift"></span>
+              <span id="fr-gifts-text"></span>
+              <button id="fr-open" type="button" class="fr-btn fr-main">Open</button>
+            </div>
+            <h3 class="section-title">Add a friend</h3>
+            <div class="fr-add">
+              <input id="fr-input" type="text" placeholder="ABCD-EFGH" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Friend code" />
+              <button id="fr-add" type="button" class="fr-btn fr-main">Add</button>
+            </div>
+            <p id="fr-msg" class="fr-msg" aria-live="polite"></p>
+            <h3 class="section-title">Friends <span id="fr-count" class="section-sub"></span></h3>
+            <ul id="fr-list" class="fr-list"></ul>
+            <p class="tab-intro">Visit a friend to see their station, and send each friend a gift once a day. Each gift is <b>5 crystals</b> for them, and sending one gives you a crystal too.</p>
+          </div>
+        </div>
         <div id="prof-stats" class="prof-body" hidden>
         <h3 class="section-title">Graphs</h3>
         <div id="graphs" class="graphs"></div>
         <h3 class="section-title">Stats</h3>
         <dl id="stats" class="stats"></dl>
         </div>
+      </div>
+    </div>
+    <div id="friend-visit" class="modal" hidden>
+      <div class="modal-card visit-card" role="dialog" aria-modal="true" aria-labelledby="visit-name">
+        <button id="visit-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Visiting</div>
+        <h2 id="visit-name">Station</h2>
+        <div id="visit-pic" class="visit-pic"></div>
+        <dl id="visit-stats" class="stats visit-stats"></dl>
+        <button id="visit-gift" class="primary" type="button">Send a gift</button>
+        <button id="visit-remove" class="cloud-ask-later" type="button">Remove friend</button>
       </div>
     </div>
     <div id="missions" class="modal" hidden>

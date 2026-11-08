@@ -41,6 +41,8 @@ import { Fanfare } from './ui/fanfare';
 import { blockPageZoom } from './ui/nozoom';
 import { setupBackButton } from './back';
 import { ORNAMENTS } from './core/ornaments';
+import { FriendsPanel } from './ui/friends-ui';
+import { PHASE_LINES, daylight, type DayPhase } from './core/daynight';
 
 /**
  * If anything throws, say so on screen instead of silently freezing, so a player can report
@@ -173,6 +175,29 @@ async function boot(): Promise<void> {
   window.addEventListener('pointerdown', unlock, { capture: true });
 
   const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  /**
+   * Day and night from the device clock (core/daynight.ts). Checked every 20 seconds; when the
+   * light changes while playing, the crew mention it in a toast (not on start-up or in the tutorial).
+   */
+  let lastPhase: DayPhase | null = null;
+  const syncDaylight = (instant = false) => {
+    const on = game.state.settings.dayNight;
+    const light = on ? daylight(Date.now()) : { night: 0, warm: 0, phase: 'day' as DayPhase };
+    scene.setDaylight(light.night, light.warm, instant);
+    sfx.setNight(light.night);
+    document.body.classList.toggle('is-night', light.night > 0.5);
+    if (on && lastPhase && light.phase !== lastPhase && game.state.tutorial < 0) ui.toast(light.phase === 'night' || light.phase === 'dusk' ? ICONS.moon : ICONS.star.replace('currentColor', '#ffd166'), PHASE_LINES[light.phase]);
+    lastPhase = light.phase;
+  };
+  syncDaylight(true);
+  const friends = new FriendsPanel(game, (d) => fmt(d), () => scene.snapshot(), (icon, html) => ui.toast(icon, html));
+  ui.friendsDot = () => friends.hasGifts;
+  if (import.meta.env.DEV) Object.assign(window, { __friends: friends });
+  window.setInterval(() => syncDaylight(), 20_000);
+  ui.onDayNightChange = () => {
+    lastPhase = null;
+    syncDaylight();
+  };
   /** Grows the station's hull to match the machines owned, with a card when it gets bigger. */
   const syncGrowth = () => {
     const stage = growthStage(game.state.owned);
