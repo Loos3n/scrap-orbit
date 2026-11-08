@@ -7,9 +7,9 @@ export const COMBO = {
   /** Heat each tap adds (0 to 1); about 15 quick taps reach the top. */
   perTap: 0.07,
   /** Seconds heat holds after a tap before it starts to cool. */
-  holdSec: 0.6,
-  /** Heat lost per second once cooling. */
-  coolPerSec: 0.5,
+  holdSec: 0.35,
+  /** Heat lost per second once cooling: a full meter empties in about a second. */
+  coolPerSec: 1.1,
   /** Tap multiplier at full heat. */
   maxMult: 3,
 };

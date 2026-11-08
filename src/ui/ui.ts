@@ -956,9 +956,45 @@ export class UI {
       return;
     }
     const p = goalProgress(s, goal);
-    setText($('goal-text'), goal.text);
     $('goal-bar').style.width = `${p * 100}%`;
-    $('goal-ready').hidden = p < 1 || goal.pane === 'cores';
+    const ready = p >= 1 && goal.pane !== 'cores';
+    const fitKey = `${goal.text}|${ready}|${this.goalWidth}`;
+    if (fitKey !== this.goalFit) {
+      this.goalFit = fitKey;
+      $('goal-ready').hidden = !ready;
+      this.fitGoal(line, goal.text, goal.short);
+    }
+  }
+
+  /** Last text, Ready state and width the goal line was fitted for, so it only measures when one changes. */
+  private goalFit = '';
+  private goalWidth = 0;
+
+  /**
+   * Makes the goal fit on one line: full words first, then smaller type with just the trophy,
+   * then the short wording, then without the trophy. Only if even that is too long does the end get cut with "…".
+   */
+  private fitGoal(line: HTMLElement, text: string, short: string): void {
+    if (!this.goalWidth) {
+      new ResizeObserver(() => {
+        const w = Math.round(line.clientWidth);
+        if (w && w !== this.goalWidth) {
+          this.goalWidth = w;
+          this.goalFit = '';
+        }
+      }).observe(line);
+      this.goalWidth = -1;
+    }
+    const el = $('goal-text');
+    const fits = (): boolean => el.scrollWidth <= el.clientWidth + 1;
+    line.classList.remove('tight', 'tighter');
+    setText(el, text);
+    if (fits()) return;
+    line.classList.add('tight');
+    if (fits()) return;
+    setText(el, short);
+    if (fits()) return;
+    line.classList.add('tighter');
   }
 
   /** The Buy best button: what it would buy, and whether it can yet. */
