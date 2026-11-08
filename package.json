@@ -1,0 +1,27 @@
+{
+  "name": "scrap-orbit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A cozy space-salvage idle clicker for mobile and web.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "tsc --noEmit && vite build --mode single",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sim": "vite-node scripts/simulate.ts"
+  },
+  "dependencies": {
+    "break_infinity.js": "^2.2.0",
+    "pixi.js": "^8.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.0.5"
+  }
+}

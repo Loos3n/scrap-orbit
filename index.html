@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b0d26" />
+    <title>Scrap Orbit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;600&display=swap" />
+  </head>
+  <body>
+    <div id="scene" aria-label="Your station. Tap to salvage scrap."></div>
+    <div id="app">
+      <div id="hud" class="hud">
+        <div class="readout">
+          <div class="scrap-badge">
+            <span class="scrap-icon" data-icon="scrap"></span>
+            <span id="cores-chip" class="cores-chip" hidden title="Star Cores"><span data-icon="core"></span><span id="cores-n">0</span></span>
+          </div>
+          <div class="readout-text">
+            <div id="scrap" class="scrap">0</div>
+            <div id="rate-btn" class="rate" role="button" tabindex="0" aria-label="Income breakdown"><span id="rate">0</span>&nbsp;/&nbsp;sec<span class="info-dot">i</span> <span class="crystal-pill"><span data-icon="crystal"></span><span id="crystals">0</span></span></div>
+          </div>
+        </div>
+        <div class="hud-actions">
+          <button id="settings-btn" class="round-btn" type="button" aria-label="Settings"><span data-icon="gear"></span></button>
+          <button id="missions-btn" class="round-btn" type="button" aria-label="Missions"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></button>
+          <button id="boost" class="boost" type="button">
+            <span class="boost-icon" data-icon="bolt"></span>
+            <span class="boost-text">
+              <span class="boost-title">Overdrive</span>
+              <span id="boost-sub" class="boost-sub">2x for 30s</span>
+            </span>
+          </button>
+        </div>
+        <button id="goal" class="goal-line" type="button" hidden><span class="goal-tag"><span data-icon="trophy"></span>Next</span><span id="goal-text" class="goal-text"></span><span id="goal-ready" class="goal-ready" hidden>Ready</span><i class="goal-bar"><i id="goal-bar"></i></i></button>
+      </div>
+      <div id="stage">
+        <div id="boss-banner" class="boss-banner" hidden>
+          <div class="boss-row">
+            <svg class="boss-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.2"/></svg>
+            <div class="event-text"><b><span class="boss-tag">Boss</span> <span id="boss-name"></span></b><span>Break it for <b class="boss-reward"><span data-icon="scrap"></span><span id="boss-reward"></span></b></span></div>
+            <span id="boss-time" class="event-time"></span>
+          </div>
+          <div class="boss-hp"><i id="boss-hp"></i></div>
+        </div>
+        <button id="safe-banner" class="trader-banner safe-banner" type="button" hidden><span data-icon="lock"></span>Locked cargo! <b id="safe-time"></b></button>
+        <button id="trader-banner" class="trader-banner" type="button" hidden><span data-icon="crystal"></span>Trader docked <b id="trader-time"></b></button>
+        <div id="golden-banner" class="golden-banner" hidden><span data-icon="star"></span>Golden rush <b id="golden-time"></b></div>
+        <div id="event-banner" class="event-banner" hidden>
+          <span id="event-icon" class="event-icon"></span>
+          <div class="event-text"><b id="event-name"></b><span id="event-desc"></span></div>
+          <span id="event-time" class="event-time"></span>
+          <i id="event-bar" class="event-bar"></i>
+        </div>
+      </div>
+      <section id="panel">
+        <nav class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="build" aria-selected="true" type="button"><span data-icon="build"></span>Build<span id="build-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="crew" aria-selected="false" type="button"><span data-icon="crew"></span>Crew<span id="crew-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="progress" aria-selected="false" type="button"><span data-icon="core"></span>Progress<span id="progress-dot" class="dot" hidden></span></button>
+          <button class="tab" role="tab" data-tab="station" aria-selected="false" type="button"><span data-icon="station"></span>Station<span id="station-dot" class="dot" hidden></span></button>
+        </nav>
+        <div id="sheet" class="sheet">
+        <div class="segments pane-seg two" data-group="build" role="tablist" aria-label="Build sections">
+          <button type="button" data-pane="build" aria-selected="true">Machines</button>
+          <button type="button" data-pane="upgrades" aria-selected="false">Upgrades<span id="upgrade-dot" class="dot" hidden></span></button>
+        </div>
+        <div class="segments pane-seg three" data-group="progress" role="tablist" aria-label="Progress sections" hidden>
+          <button type="button" data-pane="lab" aria-selected="true">Lab<span id="lab-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="cores" aria-selected="false">Cores<span id="cores-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="galaxy" aria-selected="false">Galaxy<span id="galaxy-dot" class="dot" hidden></span></button>
+        </div>
+        <div id="tab-build" class="tab-body">
+          <div id="challenge-line" class="challenge-line" hidden><span data-icon="trophy"></span><span>Challenge: <b id="challenge-line-name"></b></span><div class="bar"><i id="challenge-line-bar"></i></div><b id="challenge-line-pct"></b></div>
+          <div id="sector-line" class="sector-line" hidden><small id="sector-line-where"></small><b id="sector-line-name"></b><span id="sector-line-text"></span></div>
+          <button id="best-buy" class="best-buy" type="button"><span class="best-icon" data-icon="star"></span><span class="best-info"><b>Buy best</b><span id="best-what"></span></span><span class="buy-cost"><span data-icon="scrap"></span><span id="best-cost" class="n"></span></span></button>
+          <ul class="list claw-list">
+            <li id="claw-row" class="gen claw">
+              <div class="gen-icon"><span data-icon="claw"></span><span id="claw-level" class="gen-count">0</span></div>
+              <div class="gen-info">
+                <div class="gen-name">Salvage Claw</div>
+                <div id="claw-rate" class="gen-rate"></div>
+                <div class="bar"><i id="claw-bar"></i></div>
+                <div id="claw-next" class="milestone"></div>
+              </div>
+              <button id="claw-buy" class="buy" type="button"><span class="buy-count">Level up</span><span class="buy-cost"><span data-icon="scrap"></span><span id="claw-cost" class="n"></span></span></button>
+            </li>
+            <li id="rig-row" class="gen rig" hidden>
+              <div class="gen-icon"><img id="rig-img" alt="" /><span class="gen-count">Rig</span></div>
+              <div class="gen-info">
+                <div id="rig-name" class="gen-name"></div>
+                <div id="rig-desc" class="gen-rate"></div>
+                <div class="milestone">Only in this sector</div>
+              </div>
+              <button id="rig-buy" class="buy" type="button"><span id="rig-label" class="buy-count">Build</span><span class="buy-cost"><span data-icon="scrap"></span><span id="rig-cost" class="n"></span></span></button>
+            </li>
+          </ul>
+          <div class="buy-modes" role="radiogroup" aria-label="Buy amount">
+            <button type="button" data-mode="1" aria-checked="true" role="radio">x1</button>
+            <button type="button" data-mode="10" aria-checked="false" role="radio">x10</button>
+            <button type="button" data-mode="100" aria-checked="false" role="radio">x100</button>
+            <button type="button" data-mode="max" aria-checked="false" role="radio">Max</button>
+          </div>
+          <ul id="gen-list" class="list"></ul>
+          <p id="gen-hint" class="hint">Build more to discover new machines.</p>
+          <p class="hold-hint">Tip: press and hold a machine on the station to see it up close.</p>
+        </div>
+        <div id="tab-upgrades" class="tab-body" hidden>
+          <ul id="upgrade-list" class="list"></ul>
+        </div>
+        <div id="tab-crew" class="tab-body" hidden>
+          <div class="segments three" role="tablist" aria-label="Crew sections">
+            <button type="button" data-seg="crewlist" aria-selected="true">Crew</button>
+            <button type="button" data-seg="trips" aria-selected="false">Trips<span id="trips-dot" class="dot" hidden></span></button>
+            <button type="button" data-seg="pets" aria-selected="false">Pets<span id="pets-dot" class="dot" hidden></span></button>
+          </div>
+          <div id="seg-crewlist" class="seg">
+            <p class="tab-intro">Each crew member supercharges one machine. Recruit them and train them up with crystals from missions, events and achievements.</p>
+            <ul id="crew-list" class="crew-grid"></ul>
+          </div>
+          <div id="seg-trips" class="seg" hidden>
+            <p class="tab-intro">Send crew on expeditions. They come back with crystals, scrap and sometimes a blueprint for a new station module.</p>
+            <div id="trip-panel"></div>
+          </div>
+          <div id="seg-pets" class="seg" hidden>
+            <p class="tab-intro">Pets float around the station and lend a paw. One can come along at a time; tap an adopted pet to bring it out.</p>
+            <ul id="pet-list" class="crew-grid"></ul>
+          </div>
+        </div>
+        <div id="tab-lab" class="tab-body" hidden>
+          <div id="lab-active" class="lab-active"></div>
+          <div id="lab-tree" class="lab-tree"></div>
+          <div id="lab-detail" class="lab-detail"></div>
+        </div>
+        <div id="tab-cores" class="tab-body" hidden>
+          <div class="core-card">
+            <div class="core-art" data-icon="core"></div>
+            <div class="core-head">
+              <div class="eyebrow">Star Cores</div>
+              <div class="core-count"><span id="core-count">0</span><span id="core-bonus" class="core-bonus">+0% income</span></div>
+            </div>
+            <div class="core-claim">
+              <div class="core-claim-label">Relocate now for</div>
+              <div class="core-claim-n">+<span id="core-claim">0</span></div>
+            </div>
+            <div class="core-progress"><div class="bar"><i id="core-bar"></i></div><div id="core-next" class="core-next"></div></div>
+            <button id="relocate" class="primary warp-btn" type="button"><span data-icon="warp"></span>Relocate station</button>
+            <div id="relocate-confirm" class="relocate-confirm" hidden>
+              <p>Jump to a new sector? Your scrap, machines and upgrades reset. You keep Star Cores, perks and achievements.</p>
+              <div class="row">
+                <button id="relocate-yes" type="button" class="go">Jump</button>
+                <button id="relocate-no" type="button">Not yet</button>
+              </div>
+            </div>
+          </div>
+          <h3 class="section-title">Challenge runs</h3>
+          <ul id="challenge-list" class="list challenge-list"></ul>
+          <h3 class="section-title">Core perks</h3>
+          <ul id="perk-list" class="list"></ul>
+        </div>
+        <div id="tab-galaxy" class="tab-body" hidden>
+          <div id="galaxy-card" class="galaxy-card"></div>
+          <h3 id="star-map-title" class="section-title" hidden>Star Map</h3>
+          <ul id="star-map" class="list challenge-list" hidden></ul>
+        </div>
+        <div id="tab-station" class="tab-body" hidden>
+          <div class="segments three" role="tablist" aria-label="Station sections">
+            <button type="button" data-seg="modules" aria-selected="true">Rooms</button>
+            <button type="button" data-seg="decor" aria-selected="false">Decor</button>
+            <button type="button" data-seg="awards" aria-selected="false">Book</button>
+          </div>
+          <div id="seg-modules" class="seg">
+            <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
+            <div id="module-total" class="module-total"></div>
+            <div id="module-grid" class="module-grid"></div>
+            <div id="module-detail" class="module-detail"></div>
+          </div>
+          <div id="seg-decor" class="seg" hidden>
+            <h3 class="section-title">Decorations <span id="orn-sum" class="section-sub"></span></h3>
+            <p class="tab-intro">Lights, plants and posters for the station, earned as you play. Tap one to take it down or put it back up.</p>
+            <ul id="orn-list" class="decor-grid"></ul>
+            <h3 class="section-title">Sky themes</h3>
+            <ul id="theme-list" class="decor-grid"></ul>
+            <h3 class="section-title">Hull paint</h3>
+            <ul id="paint-list" class="decor-grid"></ul>
+            <h3 class="section-title">Station skins</h3>
+            <p class="tab-intro">Whole new looks for the hull, reactor and every machine. Finish a set in the collection book to unlock one.</p>
+            <ul id="skin-list" class="decor-grid"></ul>
+          </div>
+          <div id="seg-awards" class="seg" hidden>
+            <h3 class="section-title">Collections <span id="book-sum" class="section-sub"></span></h3>
+            <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
+            <ul id="book-list" class="book-list"></ul>
+            <h3 class="section-title">Achievements <span id="ach-sum" class="section-sub"></span></h3>
+            <div id="ach-grid" class="ach-grid"></div>
+            <p id="ach-caption" class="ach-caption">Tap a badge to see what it's for. Each one is worth +1% income and 3 crystals.</p>
+            <h3 class="section-title">Boss loot <span id="loot-sum" class="section-sub"></span></h3>
+            <p class="tab-intro">Boss wrecks sometimes drop a rare part or pet skin. Parts work for good; skins are worn from the Pets list.</p>
+            <ul id="loot-grid" class="loot-grid"></ul>
+            <h3 class="section-title">Stats</h3>
+            <dl id="stats" class="stats"></dl>
+          </div>
+        </div>
+        </div>
+      </section>
+      <button id="menu-btn" class="menu-btn" type="button" aria-label="Menu" aria-expanded="false"><span class="menu-grid"><i></i><i></i><i></i><i></i></span><span class="menu-close"></span><span id="menu-dot" class="menu-dot" hidden></span></button>
+    </div>
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-art" data-icon="scrap"></div>
+        <div class="eyebrow">While you were away</div>
+        <h2 id="modal-title">Your crew kept salvaging</h2>
+        <div id="modal-amount" class="modal-amount">+0</div>
+        <p id="modal-time" class="modal-time"></p>
+        <ul id="modal-report" class="modal-report"></ul>
+        <button id="modal-ok" class="primary" type="button">Collect</button>
+      </div>
+    </div>
+    <div id="settings" class="modal" hidden>
+      <div class="modal-card settings-card settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <button id="settings-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <h2 id="settings-title">Settings</h2>
+            <h3 class="section-title">Sound</h3>
+            <label class="slider-row"><span>Effects</span><input id="opt-sfx-vol" type="range" min="0" max="100" step="5" aria-label="Effects volume" /><b id="opt-sfx-val"></b></label>
+            <label class="slider-row"><span>Music</span><input id="opt-music-vol" type="range" min="0" max="100" step="5" aria-label="Music volume" /><b id="opt-music-val"></b></label>
+            <h3 class="section-title">Comfort</h3>
+            <label class="toggle"><input id="opt-flash" type="checkbox" /><span>Reduce flashing<small>Softer warps, glows and pops</small></span></label>
+            <label class="toggle"><input id="opt-shake" type="checkbox" /><span>Reduce screen shake<small>Keep the station still on big moments</small></span></label>
+            <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration</span></label>
+            <h3 class="section-title">Game</h3>
+            <label id="opt-auto-row" class="toggle" hidden><input id="opt-auto" type="checkbox" /><span>Auto-Builder</span></label>
+            <div class="setting-row">
+              <span>Numbers</span>
+              <div id="opt-numbers" class="mini-segments" role="radiogroup" aria-label="Number format">
+                <button type="button" role="radio" data-num="letters">15M</button>
+                <button type="button" role="radio" data-num="scientific">1.5e7</button>
+                <button type="button" role="radio" data-num="engineering">15e6</button>
+              </div>
+            </div>
+            <button id="replay-tutorial" class="reset" type="button">Replay the tutorial</button>
+            <button id="reset" class="reset" type="button">Reset progress</button>
+            <div id="reset-confirm" class="reset-confirm" hidden>
+              <span>Erase this station and start over?</span>
+              <button id="reset-yes" type="button" class="danger">Erase</button>
+              <button id="reset-no" type="button">Keep playing</button>
+            </div>
+                </div>
+    </div>
+    <div id="info" class="modal" hidden>
+      <div class="modal-card info-card" role="dialog" aria-modal="true">
+        <button id="info-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div id="info-body"></div>
+        <button id="info-buy" class="buy info-buy" type="button" hidden><span id="info-buy-count" class="buy-count">Buy 1</span><span class="buy-cost"><span data-icon="scrap"></span><span id="info-buy-cost" class="n"></span></span></button>
+      </div>
+    </div>
+    <div id="safe" class="modal" hidden>
+      <div class="modal-card safe-card" role="dialog" aria-modal="true" aria-labelledby="safe-name">
+        <button id="safe-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Locked cargo</div>
+        <h2 id="safe-name">Supply Crate</h2>
+        <div id="safe-locks" class="safe-locks"></div>
+        <button id="safe-dial" class="safe-dial" type="button" aria-label="Crack the lock">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <circle cx="100" cy="100" r="86" class="dial-rim"/>
+            <circle cx="100" cy="100" r="72" class="dial-track"/>
+            <path id="safe-zone" class="dial-zone" d=""/>
+            <g id="safe-ticks"></g>
+            <line id="safe-needle" class="dial-needle" x1="100" y1="100" x2="100" y2="34"/>
+            <circle cx="100" cy="100" r="13" class="dial-hub"/>
+          </svg>
+        </button>
+        <p id="safe-status" class="safe-status">Tap when the needle is in the green.</p>
+        <div id="safe-lives" class="safe-lives"></div>
+        <button id="safe-done" class="primary" type="button" hidden>Collect</button>
+      </div>
+    </div>
+    <div id="trader" class="modal" hidden>
+      <div class="modal-card trader-card" role="dialog" aria-modal="true" aria-labelledby="trader-name">
+        <button id="trader-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Trading post</div>
+        <h2 id="trader-name">Trader</h2>
+        <p class="trader-hello">"Fine wares for a fine station! One of each, mind."</p>
+        <ul id="trader-offers" class="offer-list"></ul>
+        <p id="trader-left" class="mission-reset"></p>
+      </div>
+    </div>
+    <div id="missions" class="modal" hidden>
+      <div class="modal-card missions-card" role="dialog" aria-modal="true" aria-labelledby="missions-title">
+        <button id="missions-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Mission board</div>
+        <h2 id="missions-title">Today's missions</h2>
+        <ul id="mission-list" class="mission-list"></ul>
+        <p id="mission-reset" class="mission-reset"></p>
+        <h3 class="section-title">Weekly challenge</h3>
+        <ul id="weekly-list" class="mission-list"></ul>
+      </div>
+    </div>
+    <div id="fanfare" class="fanfare" hidden aria-live="polite">
+      <div class="fanfare-card">
+        <div id="fanfare-icon" class="fanfare-icon"></div>
+        <small id="fanfare-kicker"></small>
+        <b id="fanfare-title"></b>
+        <span id="fanfare-sub"></span>
+      </div>
+    </div>
+    <div id="confetti" class="confetti" aria-hidden="true"></div>
+    <div id="sector-card" class="sector-card" hidden>
+      <small id="sector-num"></small>
+      <b id="sector-name"></b>
+      <span id="sector-sub">New sector reached</span>
+    </div>
+    <div id="boss-edge" class="boss-edge" hidden></div>
+    <div id="boss-alert" class="boss-alert" hidden>
+      <div class="boss-alert-stripes"></div>
+      <div class="boss-alert-text">
+        <small>Warning</small>
+        <b>Boss wreck incoming!</b>
+        <span id="boss-alert-name"></span>
+        <em>Break it apart for <b id="boss-alert-reward"></b> scrap</em>
+      </div>
+      <div class="boss-alert-stripes"></div>
+    </div>
+    <div id="streak" class="modal" hidden>
+      <div class="modal-card streak-card" role="dialog" aria-modal="true" aria-labelledby="streak-title">
+        <div class="eyebrow">Daily supply drop</div>
+        <h2 id="streak-title">Day 1</h2>
+        <p id="streak-sub" class="modal-time"></p>
+        <ol id="streak-days" class="streak-days"></ol>
+        <button id="streak-claim" class="primary" type="button">Claim</button>
+      </div>
+    </div>
+    <div id="coach-dim" class="coach-dim" hidden></div>
+    <div id="coach-spot" class="coach-spot" hidden></div>
+    <div id="coach" class="coach" role="status" hidden>
+      <div class="coach-head">
+        <span id="coach-face" class="coach-face"></span>
+        <div class="coach-who"><b>Mika</b><small>Drone Wrangler</small></div>
+        <span id="coach-count" class="coach-count"></span>
+      </div>
+      <p id="coach-text"></p>
+      <div id="coach-bar" class="coach-bar" hidden><i></i></div>
+      <div class="coach-actions">
+        <button id="coach-skip" class="coach-skip" type="button">Skip tutorial</button>
+        <button id="coach-next" class="coach-next" type="button" hidden>Next</button>
+      </div>
+    </div>
+    <div id="toasts" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
