@@ -1,3 +1,4 @@
+import { GENERATORS } from '../core/config';
 import { contractDef, contractProgress, goalText, sprintLeft } from '../core/contracts';
 import type { Game } from '../game';
 
@@ -64,9 +65,10 @@ export class ContractPanel {
     line.classList.toggle('done', c.done);
     const p = contractProgress(s)!;
     setText($('contract-line-name'), d.name);
-    const left = sprintLeft(s);
-    const clock = left !== null ? ` · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left` : '';
-    setText($('contract-line-goal'), c.done ? 'Goal met!' : `${goalText(c)}${clock}`);
+    const left = sprintLeft(s, Date.now());
+    // On the slim line the clock comes first, so a narrow phone cuts the goal, never the time.
+    const goal = left !== null ? `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left · Build a ${GENERATORS[c.goal].name}` : goalText(c);
+    setText($('contract-line-goal'), c.done ? 'Goal met!' : goal);
     setText($('contract-line-pct'), c.done ? '✓' : `${p.have}/${p.need}`);
     ($('contract-line-bar') as HTMLElement).style.width = `${(p.pct * 100).toFixed(1)}%`;
   }

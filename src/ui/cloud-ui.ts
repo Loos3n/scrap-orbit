@@ -32,6 +32,8 @@ export class CloudPanel {
    */
   private synced = false;
   private readonly openedAt = Date.now();
+  /** "Keep this one" was tapped once and waits for the confirming tap. */
+  private keepArmed = false;
 
   constructor(private game: Game, private fmt: (d: Decimal) => string) {
     if (!cloudAvailable()) return;
@@ -44,12 +46,21 @@ export class CloudPanel {
       this.status('Signed out. Your station stays on this device.');
     }));
     $('cloud-use').addEventListener('click', () => this.useCloud());
-    $('cloud-keep').addEventListener('click', () => void this.run(async () => {
-      $('cloud-choice').hidden = true;
-      this.pending = null;
-      this.synced = true;
-      await this.backup(true);
-    }));
+    // Keeping this station replaces the cloud copy for good, so it takes a second tap to confirm.
+    const keep = $('cloud-keep');
+    keep.addEventListener('click', () => {
+      if (!this.keepArmed) {
+        this.keepArmed = true;
+        keep.textContent = 'Tap again to replace the cloud save';
+        return;
+      }
+      void this.run(async () => {
+        $('cloud-choice').hidden = true;
+        this.pending = null;
+        this.synced = true;
+        await this.backup(true);
+      });
+    });
     void watchUser((user) => {
       this.authKnown = true;
       const wasSignedIn = this.signedIn;
@@ -69,6 +80,14 @@ export class CloudPanel {
     this.setupInvite();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void this.backup(false, true);
+      // Coming back to the game: another device may have played since, so look again before
+      // this one backs anything up (a left-open app must never overwrite newer progress).
+      else if (this.signedIn && !this.busy) {
+        this.synced = false;
+        this.pending = null;
+        $('cloud-choice').hidden = true;
+        void this.run(() => this.checkOnOpen());
+      }
     });
   }
 
@@ -191,9 +210,12 @@ export class CloudPanel {
 
   private ask(cloud: CloudSave): void {
     this.pending = cloud;
+    this.keepArmed = false;
+    $('cloud-keep').textContent = 'Keep this one';
     const when = new Date(cloud.savedAt).toLocaleString();
     $('cloud-choice-text').textContent = `The cloud has a station from ${when} with ${this.fmt(D(cloud.allTime))} scrap salvaged (${cloud.relocations} relocations). This one has ${this.fmt(this.game.state.allTime)}. Which do you want to keep?`;
     $('cloud-choice').hidden = false;
+    this.status('Backups are paused until you pick which station to keep.');
   }
 
   private useCloud(): void {
@@ -219,13 +241,14 @@ export class CloudPanel {
     if (!force && age < (leaving ? LEAVE_MS : BACKUP_MS)) return;
     const s = this.game.state;
     try {
-      // A timed backup first checks that another device hasn't got further since (played on both).
-      if (!force && !leaving) {
+      // An automatic backup first checks that another device hasn't got further since (played on
+      // both). When leaving, an answer that doesn't arrive in time just means no backup.
+      if (!force) {
         const cloud = await download();
         if (cloud && cloud.savedAt > this.lastBackup && D(cloud.allTime).gt(s.allTime)) {
           this.synced = false;
           this.ask(cloud);
-          $('settings-btn').click();
+          if (!leaving) $('settings-btn').click();
           return;
         }
       }

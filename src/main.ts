@@ -39,6 +39,7 @@ import { tradeText } from './ui/trade-ui';
 import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
 import { blockPageZoom } from './ui/nozoom';
+import { setupBackButton } from './back';
 import { ORNAMENTS } from './core/ornaments';
 
 /**
@@ -102,6 +103,7 @@ const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
 async function boot(): Promise<void> {
   blockPageZoom();
+  setupBackButton();
   const game = new Game();
   /** The tint of the skin the active pet wears, if any. */
   const petTint = () => {
@@ -243,7 +245,8 @@ async function boot(): Promise<void> {
         break;
       }
       case 'adReward':
-        if (e.kind === 'overdrive') ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Overdrive recharged!</b> Fire it when you are ready');
+        if (e.kind === 'overdrive' && e.fired) ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Free Overdrive!</b> It had already recharged, so this one is on the house');
+        else if (e.kind === 'overdrive') ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Overdrive recharged!</b> Fire it when you are ready');
         else if (e.kind === 'crystals') ui.toast(ICONS.crystal.replace('currentColor', '#5cd6ff'), `<b>Supply drop!</b> +${AD_CRYSTALS} crystals`);
         else ui.toast(ICONS.scrap, '<b>Doubled!</b> Your time-away earnings came in twice');
         sfx.coins();
@@ -661,6 +664,8 @@ async function boot(): Promise<void> {
         buzz(15);
         break;
       case 'contract': {
+        // A contract can change the crate rate (Crate Season), so the scene follows it.
+        syncPerks();
         if (!e.id) break;
         const d = contractDef(e.id);
         const icon = ICONS.trophy.replace('currentColor', hexColor(d.color));

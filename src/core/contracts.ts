@@ -20,6 +20,8 @@ export interface ActiveContract extends ContractOffer {
   /** The counter the goal is measured from (taps, crates or Overdrives so far). */
   base: number;
   done: boolean;
+  /** Sprint only: the wall-clock time (epoch ms) the goal must be met by, so time away counts too. */
+  deadline?: number;
 }
 
 export interface ContractDef {
@@ -148,10 +150,14 @@ export function goalText(offer: ContractOffer): string {
   }
 }
 
-/** Seconds left on the Sprint clock, or null for contracts without one. */
-export function sprintLeft(state: GameState): number | null {
+/**
+ * Seconds left on the Sprint clock, or null for contracts without one. The clock runs on real
+ * time, so closing the game doesn't pause it (saves from before the deadline use play time).
+ */
+export function sprintLeft(state: GameState, now: number): number | null {
   const c = state.contract;
   if (!c || c.id !== 'sprint' || c.done) return null;
+  if (c.deadline) return Math.max(0, (c.deadline - now) / 1000);
   return Math.max(0, SPRINT_SEC - state.stats.runSec);
 }
 
@@ -183,15 +189,17 @@ export const contractIncomeMult = (state: GameState) => 1 + state.contractsDone 
 // ---------- Actions ----------
 
 /** Signs one of the offered contracts (or none, with null) for the run that has just begun. */
-export function pickContract(state: GameState, index: number | null): ContractOffer | null {
+export function pickContract(state: GameState, index: number | null, now: number): ContractOffer | null {
   const offer = index === null ? null : state.contractOffers[index] ?? null;
   state.contractOffers = [];
   state.contract = offer ? { ...offer, base: counter(state, offer.id), done: false } : null;
+  // The Sprint clock started with the run; whatever is left of it runs on real time from here.
+  if (state.contract?.id === 'sprint') state.contract.deadline = now + Math.max(0, SPRINT_SEC - state.stats.runSec) * 1000;
   return offer;
 }
 
 /** Marks the contract met (paying out) or failed. Returns what happened, if anything. */
-export function checkContract(state: GameState): 'done' | 'failed' | null {
+export function checkContract(state: GameState, now: number): 'done' | 'failed' | null {
   const c = state.contract;
   if (!c || c.done) return null;
   const p = contractProgress(state)!;
@@ -201,7 +209,7 @@ export function checkContract(state: GameState): 'done' | 'failed' | null {
     state.contractsDone++;
     return 'done';
   }
-  if (c.id === 'sprint' && state.stats.runSec > SPRINT_SEC) {
+  if (c.id === 'sprint' && sprintLeft(state, now) === 0) {
     state.contract = null;
     return 'failed';
   }

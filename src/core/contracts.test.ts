@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkContract, contractGenMult, contractIncomeMult, contractProgress, makeOffers, pickContract, SPRINT_SEC } from './contracts';
+import { checkContract, contractGenMult, contractIncomeMult, contractProgress, makeOffers, pickContract, sprintLeft, SPRINT_SEC } from './contracts';
 import { relocate, tapValue } from './economy';
 import { D } from './num';
 import { deserialize, newState, serialize, type GameState } from './state';
@@ -37,17 +37,17 @@ describe('run contracts', () => {
     const s = midRun();
     s.contractOffers = [{ id: 'haulers', goal: 175 }];
     expect(contractGenMult(s, 'hauler')).toBe(1);
-    pickContract(s, 0);
+    pickContract(s, 0, 0);
     expect(s.contractOffers).toEqual([]);
     expect(contractGenMult(s, 'hauler')).toBe(4);
     expect(contractGenMult(s, 'drone')).toBe(0.25);
-    expect(checkContract(s)).toBeNull();
+    expect(checkContract(s, 0)).toBeNull();
     s.owned.hauler = 175;
-    expect(checkContract(s)).toBe('done');
+    expect(checkContract(s, 0)).toBe('done');
     expect(s.contractsDone).toBe(1);
     expect(contractIncomeMult(s)).toBeCloseTo(1.02);
     // Met once only, and the rule stays for the rest of the run.
-    expect(checkContract(s)).toBeNull();
+    expect(checkContract(s, 0)).toBeNull();
     expect(contractGenMult(s, 'hauler')).toBe(4);
   });
 
@@ -55,7 +55,7 @@ describe('run contracts', () => {
     const s = midRun();
     s.taps = 5000;
     s.contractOffers = [{ id: 'hands', goal: 1200 }];
-    pickContract(s, 0);
+    pickContract(s, 0, 0);
     expect(contractProgress(s)!.have).toBe(0);
     const before = tapValue(s, 0, true);
     s.contract = null;
@@ -65,16 +65,27 @@ describe('run contracts', () => {
   it('fails a sprint when the clock runs out', () => {
     const s = midRun();
     s.contractOffers = [{ id: 'sprint', goal: 7 }];
-    pickContract(s, 0);
+    pickContract(s, 0, 0);
     s.stats.runSec = SPRINT_SEC + 1;
-    expect(checkContract(s)).toBe('failed');
+    expect(checkContract(s, SPRINT_SEC * 1000 + 1)).toBe('failed');
     expect(s.contract).toBeNull();
+  });
+
+  it('keeps the sprint clock running while the game is closed', () => {
+    const s = midRun();
+    s.stats.runSec = 60;
+    s.contractOffers = [{ id: 'sprint', goal: 7 }];
+    pickContract(s, 0, 1000);
+    // Play time stands still while away, but the clock does not.
+    expect(sprintLeft(s, 1000 + 10 * 60_000)).toBe(SPRINT_SEC - 60 - 600);
+    const back = deserialize(serialize(s), 0)!;
+    expect(checkContract(back, 1000 + 3 * 3600_000)).toBe('failed');
   });
 
   it('skipping signs nothing', () => {
     const s = midRun();
     s.contractOffers = makeOffers(s);
-    pickContract(s, null);
+    pickContract(s, null, 0);
     expect(s.contract).toBeNull();
     expect(s.contractOffers).toEqual([]);
   });
@@ -82,7 +93,7 @@ describe('run contracts', () => {
   it('survives a save and ends with the run', () => {
     const s = midRun();
     s.contractOffers = [{ id: 'crates', goal: 12 }];
-    pickContract(s, 0);
+    pickContract(s, 0, 0);
     s.contractsDone = 3;
     const back = deserialize(serialize(s), 0)!;
     expect(back.contract).toEqual(s.contract);

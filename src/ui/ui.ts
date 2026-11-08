@@ -1200,6 +1200,7 @@ export class UI {
   private async watchAd(kind: AdReward, earned?: Decimal): Promise<boolean> {
     if (this.adBusy || adsLeft(this.game.state, kind, Date.now()) <= 0) return false;
     this.adBusy = true;
+    this.game.adPlaying = true;
     try {
       const watched = await playRewardedAd();
       if (!watched) {
@@ -1209,6 +1210,8 @@ export class UI {
       return this.game.adReward(kind, earned);
     } finally {
       this.adBusy = false;
+      // The first frame back from a full-screen ad can land just after it closes.
+      window.setTimeout(() => (this.game.adPlaying = false), 1500);
     }
   }
 

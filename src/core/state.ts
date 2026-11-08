@@ -482,6 +482,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.contractOffers = Array.isArray(data.contractOffers) ? data.contractOffers.filter(offerOk).slice(0, 3).map((o) => ({ id: o.id, goal: int(o.goal) })) : [];
   const c = data.contract;
   state.contract = offerOk(c) ? { id: c.id, goal: int(c.goal), base: int(c.base), done: !!c.done } : null;
+  if (state.contract && c && Number.isFinite(Number(c.deadline)) && Number(c.deadline) > 0) state.contract.deadline = Number(c.deadline);
   state.contractsDone = int(data.contractsDone);
   const challengeIds = new Set(CHALLENGES.map((c) => c.id));
   for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);

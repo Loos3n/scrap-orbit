@@ -35,7 +35,7 @@ export type GameEvent =
   /** A machine reached a new model: `mark` 1 is Mk II. */
   | { type: 'evolve'; gen: GeneratorId; mark: number }
   | { type: 'upgradeAll'; ids: string[] }
-  | { type: 'adReward'; kind: AdReward; earned?: Decimal }
+  | { type: 'adReward'; kind: AdReward; earned?: Decimal; fired?: boolean }
   | { type: 'upgrade'; id: string }
   | { type: 'boost' }
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
@@ -216,7 +216,7 @@ export class Game {
     // Decorations wait for the tutorial to finish, so it stays uncluttered.
     if (s.tutorial < 0) for (const o of checkOrnaments(s)) this.emit({ type: 'ornament', id: o.id, fresh: true });
     const deal = s.contract;
-    const outcome = checkContract(s);
+    const outcome = checkContract(s, now);
     if (outcome === 'done') meta.addCrystals(s, CONTRACT_CRYSTALS);
     if (outcome) this.emit({ type: 'contract', phase: outcome, id: deal!.id });
     const beaten = meta.checkChallenge(s);
@@ -429,8 +429,12 @@ export class Game {
     };
     const { seconds, earned } = eco.applyOffline(s, now);
     this.lastFrame = now;
-    if (seconds >= 30 && earned.gt(0)) this.emit({ type: 'offline', seconds, earned, report });
+    // Time spent watching an optional ad is credited quietly, not greeted with "welcome back".
+    if (seconds >= 30 && earned.gt(0) && !this.adPlaying) this.emit({ type: 'offline', seconds, earned, report });
   }
+
+  /** True while an optional ad plays (and a moment after), when the game may be paused behind it. */
+  adPlaying = false;
 
   /** Combo heat as of the last tap, and when that was (core/combo.ts). */
   private heat = 0;
@@ -515,12 +519,15 @@ export class Game {
    */
   adReward(kind: AdReward, earned?: Decimal): boolean {
     const now = Date.now();
-    if (kind === 'overdrive' && now >= this.state.boostReadyAt) return false;
     if (!useAd(this.state, kind, now)) return false;
     if (kind === 'offline' && earned) eco.earn(this.state, earned);
-    if (kind === 'overdrive') this.state.boostReadyAt = now;
+    // Overdrive may have finished recharging while the ad played: then the ad pays a free
+    // Overdrive that leaves the cooldown alone, so watching it is never wasted.
+    const fired = kind === 'overdrive' && now >= this.state.boostReadyAt;
+    if (fired) this.state.boostUntil = Math.max(this.state.boostUntil, now) + eco.boostDurationSec(this.state) * 1000;
+    else if (kind === 'overdrive') this.state.boostReadyAt = now;
     if (kind === 'crystals') meta.addCrystals(this.state, AD_CRYSTALS);
-    this.emit({ type: 'adReward', kind, earned });
+    this.emit({ type: 'adReward', kind, earned, fired });
     this.save();
     return true;
   }
@@ -562,7 +569,7 @@ export class Game {
 
   /** Signs the offered contract at `index`, or none with null. */
   pickContract(index: number | null): void {
-    const offer = pickContract(this.state, index);
+    const offer = pickContract(this.state, index, Date.now());
     this.save();
     this.emit({ type: 'contract', phase: 'start', id: offer?.id });
   }
