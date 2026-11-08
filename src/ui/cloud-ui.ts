@@ -6,6 +6,11 @@ import type { Game } from '../game';
 const $ = (id: string) => document.getElementById(id)!;
 /** How often a signed-in player's save is backed up while playing. Players can also back up any time. */
 const BACKUP_MS = 60 * 60 * 1000;
+/** Remembers on this device that the first-time cloud save invite was shown. */
+const ASK_KEY = 'scrap-orbit.cloudAsked';
+/** How long a session runs before the invite can appear, so it never greets a player on launch. */
+const ASK_AFTER_MS = 20_000;
+
 /** Leaving the game backs up too, unless the last backup is this recent (keeps app switching cheap). */
 const LEAVE_MS = 15 * 60 * 1000;
 
@@ -19,6 +24,9 @@ export class CloudPanel {
   private lastBackup = 0;
   private busy = false;
   private pending: CloudSave | null = null;
+  /** True once Firebase has said whether someone is signed in. */
+  private authKnown = false;
+  private readonly openedAt = Date.now();
 
   constructor(private game: Game, private fmt: (d: Decimal) => string) {
     if (!cloudAvailable()) return;
@@ -37,15 +45,75 @@ export class CloudPanel {
       await this.backup(true);
     }));
     void watchUser((user) => {
+      this.authKnown = true;
       this.signedIn = !!user;
       $('cloud-signin').hidden = this.signedIn;
       for (const id of ['cloud-backup', 'cloud-restore', 'cloud-signout']) $(id).hidden = !this.signedIn;
       if (user) this.status(`Signed in as ${user.displayName || user.email || 'you'}. ${this.lastText()}`);
     });
     window.setInterval(() => void this.backup(false), 30_000);
+    this.setupInvite();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void this.backup(false, true);
     });
+  }
+
+  /**
+   * A one-time invite to connect a Google account, shown once per device after the tutorial,
+   * when nothing else is on screen. Closing it in any way (X, Not now, tapping outside) is final.
+   */
+  private setupInvite(): void {
+    if (asked()) return;
+    const close = () => {
+      markAsked();
+      $('cloud-ask').hidden = true;
+    };
+    $('cloud-ask-close').addEventListener('click', close);
+    $('cloud-ask-no').addEventListener('click', close);
+    $('cloud-ask').addEventListener('click', (e) => {
+      if (e.target === $('cloud-ask')) close();
+    });
+    $('cloud-ask-yes').addEventListener('click', () => void this.inviteSignIn(close));
+    const timer = window.setInterval(() => {
+      if (asked() || this.signedIn) {
+        window.clearInterval(timer);
+        return;
+      }
+      if (this.inviteReady()) {
+        window.clearInterval(timer);
+        $('cloud-ask').hidden = false;
+      }
+    }, 3000);
+  }
+
+  private inviteReady(): boolean {
+    if (!this.authKnown || this.signedIn || this.busy) return false;
+    if (this.game.state.tutorial >= 0 || Date.now() - this.openedAt < ASK_AFTER_MS) return false;
+    if (document.body.classList.contains('cinematic') || document.visibilityState !== 'visible') return false;
+    // Wait until no other window or tutorial tip is up.
+    const busy = document.querySelector('.modal:not([hidden]), #coach:not([hidden])');
+    return !busy;
+  }
+
+  private async inviteSignIn(close: () => void): Promise<void> {
+    if (this.busy) return;
+    const yes = $('cloud-ask-yes') as HTMLButtonElement;
+    const note = $('cloud-ask-status');
+    yes.disabled = true;
+    note.hidden = false;
+    note.textContent = 'Connecting…';
+    this.busy = true;
+    try {
+      await this.signIn();
+      close();
+      // A save already in the cloud that is further along: show the choice in Settings.
+      if (this.pending) $('settings-btn').click();
+    } catch (e) {
+      note.textContent = `That didn't work: ${(e as Error).message || 'please try again'}.`;
+    } finally {
+      this.busy = false;
+      yes.disabled = false;
+    }
   }
 
   private status(text: string): void {
@@ -129,5 +197,21 @@ export class CloudPanel {
     } catch (e) {
       if (force) throw e;
     }
+  }
+}
+
+function asked(): boolean {
+  try {
+    return localStorage.getItem(ASK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markAsked(): void {
+  try {
+    localStorage.setItem(ASK_KEY, '1');
+  } catch {
+    // Private mode: the invite may show again next time, which is harmless.
   }
 }

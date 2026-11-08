@@ -1515,3 +1515,10 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 .cloud-actions .cloud-main { flex: 1; background: #fff; color: #1f2a55; border-color: #fff; }
 .cloud-choice { display: grid; gap: 8px; margin: 0 0 10px; padding: 10px; border-radius: 12px; background: rgb(0 0 0 / 0.2); }
 .cloud-choice p { margin: 0; font-size: 13px; line-height: 1.4; }
+
+/* ---------- First-time cloud save invite ---------- */
+.cloud-ask-card .modal-time { margin-bottom: 8px; }
+.cloud-ask-status { margin: 0 0 6px; font-size: 13.5px; color: var(--ink-dim); }
+.cloud-ask-later { margin-top: 4px; padding: 10px 18px; border: 0; border-radius: 12px; background: rgb(255 255 255 / 0.06); color: var(--ink-dim); font-weight: 600; }
+.cloud-ask-note { color: var(--ink-dim); opacity: 0.75; font-size: 12px; }
+#cloud-ask-yes:disabled { opacity: 0.6; }
