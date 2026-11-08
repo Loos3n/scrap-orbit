@@ -575,6 +575,8 @@ const TIPS: { id: string; tab: string; text: string; when: (game: Game) => boole
  */
 export class Coach {
   private shownKey = '';
+  /** Set once the player scrolls a menu list themselves, so a card stops scrolling it for them. */
+  private handScrolled = false;
   /** The tip on screen and when it first showed, so it can fade out on its own. */
   private tipShown: { id: string; at: number } | null = null;
   /** Where the tutorial's crate is on screen, if the graphics are running. */
@@ -582,6 +584,12 @@ export class Coach {
 
   constructor(private game: Game) {
     $('coach-face').innerHTML = portrait(MIKA);
+    const byHand = (e: Event) => {
+      const el = e.target as Element | null;
+      // Pressing a button (like the Buy the card points at) isn't scrolling.
+      if (el?.closest?.('.tab-body') && (e.type === 'wheel' || !el.closest('button'))) this.handScrolled = true;
+    };
+    for (const ev of ['touchstart', 'wheel', 'pointerdown'] as const) document.addEventListener(ev, byHand, { passive: true, capture: true });
     $('coach-skip').addEventListener('click', () => {
       const tip = this.tip();
       if (tip) this.game.seeTip(tip.id);
@@ -708,6 +716,7 @@ export class Coach {
     const key = `${tip?.id ?? s.tutorial}|${def.text}`;
     if (key !== this.shownKey) {
       this.shownKey = key;
+      this.handScrolled = false;
       this.tipShown = tip ? { id: tip.id, at: performance.now() } : null;
       setText($('coach-text'), def.text);
       const next = $('coach-next');
@@ -744,8 +753,9 @@ export class Coach {
       delete coach.dataset.place;
       return;
     }
-    const r = target!.getBoundingClientRect();
     const isStage = def.target === '#stage';
+    if (!crate && !isStage && !this.handScrolled) this.reveal(target as HTMLElement);
+    const r = target!.getBoundingClientRect();
     spot.classList.toggle('chase', !!crate);
     // The stage gets a soft ring around the station; anything else gets a snug cut-out.
     const pad = isStage ? 0 : 6;
@@ -777,5 +787,26 @@ export class Coach {
     coach.dataset.place = below ? 'below' : 'above';
     const top = below ? sr.top + sr.height + 14 : sr.top - coach.offsetHeight - 14;
     coach.style.top = `${Math.max(8, Math.min(window.innerHeight - coach.offsetHeight - 8, top))}px`;
+  }
+
+  /**
+   * Scrolls a target that is cut off (say a Buy button at the foot of a short menu on a phone)
+   * fully into view inside its scrolling list. Keeps it there as the menu resizes, until the
+   * player scrolls the list themselves.
+   */
+  private reveal(el: HTMLElement): void {
+    const view = el.closest<HTMLElement>('.tab-body');
+    if (!view) return;
+    const r = el.getBoundingClientRect();
+    if (!r.height) return; // Not laid out yet.
+    const v = view.getBoundingClientRect();
+    const margin = 10;
+    const top = Math.max(0, v.top) + margin;
+    // On phones the browser's own bars can cover the foot of the page, so go by what is really visible.
+    const vv = window.visualViewport;
+    const seen = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const bottom = Math.min(window.innerHeight, seen, v.bottom) - margin;
+    if (r.bottom > bottom) view.scrollTop += Math.min(r.bottom - bottom, r.top - top);
+    else if (r.top < top) view.scrollTop -= top - r.top;
   }
 }
