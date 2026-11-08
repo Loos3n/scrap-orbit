@@ -32,11 +32,22 @@ jobs:
       - name: Skip deploy until the secret is set
         if: env.SA == ''
         run: echo "::notice::FIREBASE_SERVICE_ACCOUNT is not set, so the site was not deployed."
+      # Keys copied on a phone often come back with the private key's \n escapes turned into real
+      # line breaks, which is not valid JSON. Read it leniently and rebuild a clean key file.
+      - name: Prepare the Firebase key
+        if: env.SA != ''
+        run: |
+          python3 - <<'PY'
+          import json, os, re, textwrap
+          sa = json.loads(os.environ['SA'].strip(), strict=False)
+          m = re.search(r'-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----', sa['private_key'], re.S)
+          body = re.sub(r'\\n|\s', '', m.group(1))
+          sa['private_key'] = '-----BEGIN PRIVATE KEY-----\n' + '\n'.join(textwrap.wrap(body, 64)) + '\n-----END PRIVATE KEY-----\n'
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'sa.json'), 'w') as f:
+              json.dump(sa, f)
+          PY
       - name: Deploy to Firebase Hosting
         if: env.SA != ''
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: scrap-orbit
-          channelId: live
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@14 deploy --only hosting --project scrap-orbit --non-interactive
