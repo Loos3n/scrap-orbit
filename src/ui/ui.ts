@@ -13,7 +13,7 @@ import type { Game } from '../game';
 import { GEN_ICONS, ICONS } from './icons';
 import { holdToRepeat, makePanelToggle, type PanelToggle } from './gestures';
 import { InfoSheet } from './info';
-import { LootShelf, ModulePanel, TripPanel, renderGoldenBanner } from './expansion-ui';
+import { LootShelf, ModulePanel, TripPanel, renderCrateBuffs, renderGoldenBanner } from './expansion-ui';
 import { SETS } from '../core/collection';
 import { BookPanel, SafeGame, SkinPanel } from './book-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
@@ -740,6 +740,7 @@ export class UI {
     renderEventBanner(this.game);
     renderBossBanner(this.game);
     renderGoldenBanner(this.game);
+    renderCrateBuffs(this.game);
     this.trader.render();
     this.safeGame?.render();
     this.challenges.render();
@@ -1047,6 +1048,7 @@ export class UI {
         ['Taps', n(s.taps)],
         ['Machines built', n(s.stats.machines)],
         ['Crates grabbed', n(s.stats.crates)],
+        ['Crate surprises', n(s.stats.surprises ?? 0)],
         ['Meteors smashed', n(s.stats.meteors)],
         ['Events seen', n(s.stats.events)],
         ['Overdrives fired', n(s.stats.boosts)],

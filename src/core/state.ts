@@ -68,6 +68,8 @@ export interface GameState {
   skins: Partial<Record<PetId, string>>;
   /** Golden scrap: the rush ends at `until`; the next crate is due at `nextAt`. */
   golden: { until: number; nextAt: number };
+  /** Lucky crate buffs: each ends at this epoch ms (0 = off). */
+  crateBuffs: { surge: number; frenzy: number };
   /** The trading post: docked until `until` with these offers; the next visit is due at `nextAt`. */
   trader: { until: number; nextAt: number; name: number; offers: Offer[] };
   /** The challenge run in progress, if any, and the ones already beaten. */
@@ -110,6 +112,8 @@ export interface GameState {
     trades?: number;
     safes?: number;
     stars?: number;
+    /** Crates that opened into something other than plain scrap. */
+    surprises?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -175,6 +179,7 @@ interface SaveData {
   lootMiss?: number;
   skins?: Partial<Record<PetId, string>>;
   golden?: GameState['golden'];
+  crateBuffs?: Partial<GameState['crateBuffs']>;
   trader?: GameState['trader'];
   challenge?: string | null;
   challengeGoal?: string;
@@ -240,6 +245,7 @@ export function newState(now: number): GameState {
     lootMiss: 0,
     skins: {},
     golden: { until: 0, nextAt: 0 },
+    crateBuffs: { surge: 0, frenzy: 0 },
     trader: { until: 0, nextAt: 0, name: 0, offers: [] },
     challenge: null,
     challengeGoal: D(0),
@@ -309,6 +315,7 @@ export function serialize(state: GameState): string {
     lootMiss: state.lootMiss,
     skins: { ...state.skins },
     golden: { ...state.golden },
+    crateBuffs: { ...state.crateBuffs },
     trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
     challenge: state.challenge,
     challengeGoal: state.challengeGoal.toString(),
@@ -425,6 +432,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
     const skin = data.skins?.[p.id];
     if (typeof skin === 'string' && state.loot.has(skin)) state.skins[p.id] = skin;
   }
+  if (data.crateBuffs) state.crateBuffs = { surge: Number(data.crateBuffs.surge) || 0, frenzy: Number(data.crateBuffs.frenzy) || 0 };
   if (data.golden) state.golden = { until: Number(data.golden.until) || 0, nextAt: Number(data.golden.nextAt) || 0 };
   const t = data.trader;
   if (t && typeof t === 'object') {

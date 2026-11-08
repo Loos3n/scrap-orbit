@@ -3,6 +3,8 @@ import { GENERATORS } from '../core/config';
 import * as eco from '../core/economy';
 import { GOLDEN, LOOT, MODULES, TRIPS, TRIP_PER_LEVEL, TRIP_SLOTS, bonuses, goldenActive, moduleCost, moduleDef, moduleUnlocked, moduleYield, onTrip, tripMs, type Bonuses, type ModuleId } from '../core/expansion';
 import { formatDuration, type Decimal } from '../core/num';
+import { CRATE_BUFFS, type CrateBuffId } from '../core/crate-buffs';
+import { timeStretch } from '../core/sectors';
 import type { Game } from '../game';
 import { pressWatch } from './gestures';
 import { ICONS } from './icons';
@@ -237,4 +239,25 @@ export function renderGoldenBanner(game: Game): void {
   $('golden-banner').hidden = !on;
   document.body.classList.toggle('golden', on);
   if (on) setText($('golden-time'), `${GOLDEN.mult}x for ${Math.ceil((game.state.golden.until - now) / 1000)}s`);
+}
+
+// ---------- Lucky crate buffs ----------
+
+/** A chip for each crate buff that is running, with the seconds left and a draining bar. */
+export function renderCrateBuffs(game: Game): void {
+  const now = Date.now();
+  const s = game.state;
+  for (const id of Object.keys(CRATE_BUFFS) as CrateBuffId[]) {
+    const left = s.crateBuffs[id] - now;
+    const chip = $(`buff-${id}`);
+    const on = left > 0;
+    if (chip.hidden === on) chip.hidden = !on;
+    document.body.classList.toggle(`buff-${id}`, on);
+    if (!on) continue;
+    const b = CRATE_BUFFS[id];
+    setText(chip.querySelector('.buff-text b')!, `${b.mult}x ${b.what}`);
+    const full = b.seconds * timeStretch(s) * 1000;
+    setText($(`buff-${id}-time`), `${Math.ceil(left / 1000)}s`);
+    $(`buff-${id}-bar`).style.width = `${Math.min(100, (left / full) * 100).toFixed(1)}%`;
+  }
 }

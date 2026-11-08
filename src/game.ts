@@ -1,7 +1,7 @@
 import { recordIncome, recordRun } from './core/history';
 import { catchStar, type StarPrize } from './core/lucky';
 import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
-import { sectorCrateMult } from './core/sectors';
+import { openCrate, openMiniCrate, type CratePrize } from './core/crates';
 import { GENERATORS, MILESTONES, type GeneratorId } from './core/config';
 import { bestPurchase } from './core/advisor';
 import { checkOrnaments, toggleOrnament } from './core/ornaments';
@@ -10,7 +10,7 @@ import { ACHIEVEMENT_CRYSTALS, RESEARCH, TUTORIAL, type CrewId, type EventKind, 
 import * as eco from './core/economy';
 import type { ModuleId } from './core/expansion';
 import * as meta from './core/meta';
-import type { Decimal } from './core/num';
+import { D, type Decimal } from './core/num';
 import { deserialize, newState, serialize, type GameState } from './core/state';
 
 const SAVE_KEY = 'scrap-orbit-save';
@@ -31,7 +31,8 @@ export type GameEvent =
   | { type: 'upgrade'; id: string }
   | { type: 'boost' }
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
-  | { type: 'bonus'; value: Decimal }
+  | { type: 'bonus'; prize: CratePrize }
+  | { type: 'mini'; value: Decimal }
   | { type: 'achievement'; def: AchievementDef }
   | { type: 'relocate'; cores: number; crystals: number; speed: number }
   | { type: 'crew'; id: CrewId; level: number }
@@ -115,6 +116,8 @@ export class Game {
   private lastPounce = Date.now();
   private streakShown = '';
   private tripsReady = new Set<CrewId>();
+  /** What each little crate of the current swarm is worth. */
+  private swarmEach: Decimal = D(1);
 
   constructor() {
     const now = Date.now();
@@ -421,16 +424,19 @@ export class Game {
     return value;
   }
 
-  /** Bonus crate: worth 30 seconds of income or 25 taps, whichever is more. */
-  collectBonus(): Decimal {
+  /** A lucky crate: cracks it open and pays whatever is inside. */
+  collectBonus(): CratePrize {
     const now = Date.now();
-    const a = eco.income(this.state, now).mul(30);
-    const b = eco.tapValue(this.state, now).mul(25);
-    // The Orbit Pup doubles what crates are worth.
-    const value = (a.gt(b) ? a : b).mul(meta.petActive(this.state, 'pup') ? 2 : 1).mul(sectorCrateMult(this.state));
-    eco.earn(this.state, value);
-    this.state.stats.crates++;
-    this.emit({ type: 'bonus', value });
+    const prize = openCrate(this.state, now, Math.random(), this.state.tutorial < 0);
+    if (prize.kind === 'swarm') this.swarmEach = prize.each;
+    this.emit({ type: 'bonus', prize });
+    return prize;
+  }
+
+  /** One of the little crates a swarm spilled out. */
+  collectMini(): Decimal {
+    const value = openMiniCrate(this.state, this.swarmEach);
+    this.emit({ type: 'mini', value });
     return value;
   }
 

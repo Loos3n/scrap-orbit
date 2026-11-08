@@ -18,6 +18,7 @@ import {
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
 import { weeklyOn } from './weekly';
+import { crateIncomeMult, crateTapMult } from './crate-buffs';
 import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { D, Decimal } from './num';
@@ -172,7 +173,7 @@ export function baseIncome(state: GameState): Decimal {
 
 export function income(state: GameState, now: number): Decimal {
   const base = baseIncome(state);
-  const boosted = boostActive(state, now) ? base.mul(BOOST.mult) : base;
+  const boosted = (boostActive(state, now) ? base.mul(BOOST.mult) : base).mul(crateIncomeMult(state, now));
   return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 
@@ -209,7 +210,7 @@ export function tapValue(state: GameState, now: number, plain = false): Decimal 
   if (weeklyOn(state, 'taps')) mult *= 2;
   const value = D(mult * globalMult(state) * (1 + bonuses(state).tap)).add(baseIncome(state).mul(share));
   if (plain) return value;
-  const boosted = boostActive(state, now) ? value.mul(BOOST.mult) : value;
+  const boosted = (boostActive(state, now) ? value.mul(BOOST.mult) : value).mul(crateTapMult(state, now));
   return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 
@@ -364,6 +365,7 @@ export function resetRun(state: GameState, now: number): void {
   state.rig = false;
   state.boostUntil = 0;
   state.boostReadyAt = 0;
+  state.crateBuffs = { surge: 0, frenzy: 0 };
   // A wreck sized for the old station would be unbreakable (and overpaid) in the new one.
   state.boss = null;
   state.nextBossAt = now + BOSS.gap[0] * 60_000;
