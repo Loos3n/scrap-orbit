@@ -103,6 +103,8 @@ export type Goal = {
   /** Stays the same while the goal does, so the line can hold on to it. */
   key: string;
   text: string;
+  /** A shorter way to say the same thing, for when `text` will not fit on a narrow phone. */
+  short: string;
   /** Scrap still to save for it, and what it costs in total. */
   cost: Decimal;
   /** The pane that finishes it. */
@@ -119,6 +121,15 @@ export function goalOpen(state: GameState, key: string): boolean {
   return false;
 }
 
+/** The last word of a name ("Salvage Drone" gives "Drone"), for the short form of a goal. */
+function lastWord(name: string): string {
+  return name.split(' ').pop() ?? name;
+}
+
+function coreText(n: number): { text: string; short: string } {
+  return n === 1 ? { text: 'Earn your first Star Core', short: 'First Star Core' } : { text: 'Earn the next Star Core', short: 'Next Star Core' };
+}
+
 /** Every goal on offer now. */
 function goals(state: GameState): Goal[] {
   const discount = costDiscount(state);
@@ -127,16 +138,16 @@ function goals(state: GameState): Goal[] {
     const g = genById(id);
     const owned = state.owned[id];
     if (owned === 0) {
-      out.push({ key: `new:${id}`, text: `Build your first ${g.name}`, cost: costFor(g, 0, 1, discount), pane: 'build' });
+      out.push({ key: `new:${id}`, text: `Build your first ${g.name}`, short: `First ${g.name}`, cost: costFor(g, 0, 1, discount), pane: 'build' });
       continue;
     }
     const next = nextMilestone(owned);
-    if (next) out.push({ key: `ms:${id}:${next.at}`, text: `${owned}/${next.at} ${g.name}s → 2x`, cost: costFor(g, owned, next.at - owned, discount), pane: 'build' });
+    if (next) out.push({ key: `ms:${id}:${next.at}`, text: `${owned}/${next.at} ${g.name}s → 2x`, short: `${owned}/${next.at} ${lastWord(g.name)}s → 2x`, cost: costFor(g, owned, next.at - owned, discount), pane: 'build' });
   }
   if (!challengeOn(state, 'noupg')) {
     for (const u of UPGRADES) {
       if (state.upgrades.has(u.id) || !upgradeVisible(state, u)) continue;
-      out.push({ key: `upg:${u.id}`, text: `Install ${u.name}`, cost: D(u.cost), pane: 'upgrades' });
+      out.push({ key: `upg:${u.id}`, text: `Install ${u.name}`, short: u.name, cost: D(u.cost), pane: 'upgrades' });
     }
   }
   return out;
@@ -148,7 +159,7 @@ export function pickGoal(state: GameState): Goal | null {
   for (const g of goals(state)) if (!best || g.cost.lt(best.cost)) best = g;
   if (best) return best;
   const n = coreTotal(state) + 1;
-  return { key: `core:${n}`, text: n === 1 ? 'Earn your first Star Core' : 'Earn the next Star Core', cost: nextCoreAt(state), pane: 'cores' };
+  return { key: `core:${n}`, ...coreText(n), cost: nextCoreAt(state), pane: 'cores' };
 }
 
 /** A goal by key, recomputed so its cost is current; null once it is done. */
@@ -156,7 +167,7 @@ export function goalByKey(state: GameState, key: string): Goal | null {
   if (!goalOpen(state, key)) return null;
   if (key.startsWith('core:')) {
     const n = Number(key.split(':')[1]);
-    return { key, text: n === 1 ? 'Earn your first Star Core' : 'Earn the next Star Core', cost: nextCoreAt(state), pane: 'cores' };
+    return { key, ...coreText(n), cost: nextCoreAt(state), pane: 'cores' };
   }
   return goals(state).find((g) => g.key === key) ?? null;
 }

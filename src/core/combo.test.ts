@@ -13,7 +13,9 @@ describe('combo tapping', () => {
 
   it('holds briefly, then cools to nothing', () => {
     expect(cooled(0.8, COMBO.holdSec)).toBe(0.8);
-    expect(cooled(0.8, COMBO.holdSec + 1)).toBeCloseTo(0.8 - COMBO.coolPerSec);
+    expect(cooled(0.8, COMBO.holdSec + 0.5)).toBeCloseTo(0.8 - 0.5 * COMBO.coolPerSec);
+    // A full meter is empty within about a second and a half of the last tap.
+    expect(cooled(1, 1.5)).toBe(0);
     expect(cooled(0.8, 60)).toBe(0);
     expect(comboMult(0)).toBe(1);
   });
