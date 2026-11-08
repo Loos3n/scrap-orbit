@@ -1,0 +1,42 @@
+name: Web
+
+# Publishes the web version to Firebase Hosting (https://scrap-orbit.web.app) on every push to
+# main or a claude/ work branch, so the site always runs the newest build. Needs the repository
+# secret FIREBASE_SERVICE_ACCOUNT (a Firebase service account key, as JSON); without it the
+# deploy step is skipped.
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+concurrency:
+  group: web-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Skip deploy until the secret is set
+        if: env.SA == ''
+        run: echo "::notice::FIREBASE_SERVICE_ACCOUNT is not set, so the site was not deployed."
+      - name: Deploy to Firebase Hosting
+        if: env.SA != ''
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: scrap-orbit
+          channelId: live
