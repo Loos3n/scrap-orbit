@@ -40,6 +40,10 @@ import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
 import { blockPageZoom } from './ui/nozoom';
 import { setupBackButton } from './back';
+import { canVibrate, vibrate } from './haptics';
+import { registerServiceWorker, setupInstall } from './web-app';
+import { setupKeys } from './ui/keys';
+import { setupTabTitle } from './ui/tab-title';
 import { ORNAMENTS } from './core/ornaments';
 import { FriendsPanel } from './ui/friends-ui';
 import { PHASE_LINES, daylight, type DayPhase } from './core/daynight';
@@ -106,6 +110,7 @@ const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 async function boot(): Promise<void> {
   blockPageZoom();
   setupBackButton();
+  registerServiceWorker();
   const game = new Game();
   /** The tint of the skin the active pet wears, if any. */
   const petTint = () => {
@@ -133,7 +138,7 @@ async function boot(): Promise<void> {
   const stage = document.getElementById('stage')!;
   const syncFocus = () => {
     const r = stage.getBoundingClientRect();
-    scene.setFocus(r.top, r.bottom);
+    scene.setFocus(r.top, r.bottom, r.left, r.right);
   };
   syncFocus();
   // The game runs even if the graphics can't start (old or locked-down web views): the
@@ -162,13 +167,7 @@ async function boot(): Promise<void> {
 
   const fmt = (v: Parameters<typeof format>[0]) => format(v, game.state.settings.numbers);
   const buzz = (ms: number | number[]) => {
-    if (game.state.settings.haptics && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(ms);
-      } catch {
-        // Not allowed in this context; ignore.
-      }
-    }
+    if (game.state.settings.haptics) vibrate(ms);
   };
   // Browsers only start audio after a gesture; any first touch anywhere unlocks it.
   const unlock = () => sfx.unlock();
@@ -914,6 +913,21 @@ async function boot(): Promise<void> {
     sfx.tap();
     buzz(8);
   });
+
+  // Computers: Space taps the middle of the station, other keys press buttons (ui/keys.ts).
+  setupKeys({
+    tap: () => {
+      const r = stage.getBoundingClientRect();
+      const init = { pointerId: 9999, pointerType: 'mouse', isPrimary: true, bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 };
+      sceneEl.dispatchEvent(new PointerEvent('pointerdown', init));
+      sceneEl.dispatchEvent(new PointerEvent('pointerup', init));
+    },
+    inTutorial: () => game.state.tutorial >= 0,
+  });
+  setupTabTitle(game);
+  setupInstall((text) => ui.toast(ICONS.star.replace('currentColor', '#ffd166'), text));
+  // Hide the vibration switch where nothing can vibrate (computers, iPhone browsers).
+  if (!canVibrate()) document.getElementById('opt-haptics')?.closest('label')?.setAttribute('hidden', '');
 
   scene.setSector(sectorFor(game.state.stats.relocations));
   scene.setRig(game.state.rig);

@@ -1,3 +1,4 @@
+import { isWide } from './gestures';
 import { WEEKLY_CRYSTALS, currentWeekly, weekEnds, weeklyClaimable, weeklyProgress } from '../core/weekly';
 import { EVENT_PAINTS } from '../core/weekly';
 import { BOSS_NAMES, BRANCHES, CREW, CREW_MAX_LEVEL, CREW_PER_LEVEL, EVENTS, PAINTS, PETS, RESEARCH, STREAK_REWARDS, THEMES, TUTORIAL, TUTORIAL_DRONES, TUTORIAL_TAPS, type PetId, type ResearchDef } from '../core/content';
@@ -672,6 +673,8 @@ export class Coach {
       case 'missions':
         return { text: 'Your mission board has daily goals that pay crystals. Have a look.', target: '#missions-btn' };
       case 'panel':
+        // Wide screens keep the menu beside the station, so there is no square to tap.
+        if (isWide()) return { text: 'On a big screen the menu stays beside your station. Pinch or scroll on the station to zoom in and out.', next: 'Got it' };
         return { text: 'Tap this square to hide the menu and see your whole station. Tap it again to bring the menu back.', target: '#menu-btn' };
       case 'done':
         return {

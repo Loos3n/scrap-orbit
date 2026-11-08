@@ -5,6 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#0b0d26" />
     <title>Scrap Orbit</title>
+    <meta name="description" content="A cozy space-salvage idle game. Tap scrap, build machines and grow your station. Free to play in your browser." />
+    <link rel="icon" type="image/png" sizes="48x48" href="./favicon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Scrap Orbit" />
+    <!-- How a shared link looks in chats and social apps. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Scrap Orbit" />
+    <meta property="og:title" content="Scrap Orbit: a cozy space salvage idle game" />
+    <meta property="og:description" content="Tap scrap, build machines and grow your own little space station. Free to play in your browser." />
+    <meta property="og:url" content="https://scrap-orbit.web.app/" />
+    <meta property="og:image" content="https://scrap-orbit.web.app/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A small space station floating in a purple sky, with the build menu beside it." />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="scene" aria-label="Your station. Tap to salvage scrap."></div>
@@ -240,6 +260,10 @@
                 <button type="button" role="radio" data-num="engineering">15e6</button>
               </div>
             </div>
+            <div id="keys-box" class="keys-box" hidden>
+              <h3 class="section-title">Keyboard</h3>
+              <dl id="keys-list" class="keys-list"></dl>
+            </div>
             <div id="cloud-box" class="cloud-box" hidden>
               <h3 class="section-title">Cloud save</h3>
               <p id="cloud-status" class="cloud-status">Sign in to keep your station safe and play it on any phone or browser.</p>
@@ -254,6 +278,11 @@
                 <button id="cloud-restore" type="button" hidden>Load cloud save</button>
                 <button id="cloud-signout" type="button" hidden>Sign out</button>
               </div>
+            </div>
+            <div id="install-box" class="cloud-box" hidden>
+              <h3 class="section-title">Install the game</h3>
+              <p id="install-text" class="cloud-status">Add Scrap Orbit to your home screen or desktop. It opens in its own window and plays without internet.</p>
+              <div class="cloud-actions"><button id="install-btn" type="button" class="cloud-main">Install Scrap Orbit</button></div>
             </div>
             <button id="save-open" class="reset" type="button">Back up or move your save</button>
             <div id="save-box" class="save-box" hidden>
