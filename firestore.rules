@@ -1,14 +1,50 @@
 rules_version = '2';
 
-// Cloud saves (src/cloud.ts): each signed-in player can read and write only their own save.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Cloud saves (src/cloud.ts): each signed-in player can read and write only their own save.
     match /saves/{uid} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null && request.auth.uid == uid
         && request.resource.data.code is string
         && request.resource.data.code.size() < 900000
         && request.resource.data.savedAt is number;
+    }
+
+    // Friend codes (src/friends.ts): a station name, a small picture and a few numbers that any
+    // signed-in player can look at. Only the player who made a profile can change or delete it.
+    match /profiles/{code} {
+      function validProfile() {
+        let d = request.resource.data;
+        return code.size() == 8
+          && d.uid == request.auth.uid
+          && d.name is string && d.name.size() <= 20
+          && d.pic is string && d.pic.size() < 300000
+          && (d.card == null || d.card is map)
+          && d.updatedAt is number;
+      }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && validProfile();
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid && validProfile();
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+
+      // Gifts: one per sender per day (the id is <sender code>_<day> and can't be overwritten).
+      // Only the profile's owner can read and open (delete) them.
+      match /gifts/{giftId} {
+        function owner() {
+          return get(/databases/$(database)/documents/profiles/$(code)).data.uid == request.auth.uid;
+        }
+        allow read, delete: if request.auth != null && owner();
+        allow create: if request.auth != null
+          && request.resource.data.fromUid == request.auth.uid
+          && request.resource.data.from is string && request.resource.data.from.size() == 8
+          && request.resource.data.day is string && request.resource.data.day.size() == 10
+          && request.resource.data.name is string && request.resource.data.name.size() <= 20
+          && giftId == request.resource.data.from + '_' + request.resource.data.day
+          && exists(/databases/$(database)/documents/profiles/$(code))
+          && !owner()
+          && get(/databases/$(database)/documents/profiles/$(request.resource.data.from)).data.uid == request.auth.uid;
+      }
     }
   }
 }

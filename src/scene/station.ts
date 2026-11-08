@@ -1,3 +1,4 @@
+import { nightStarRate } from '../core/daynight';
 import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
 import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } from '../core/content';
@@ -19,6 +20,13 @@ function pastel(t: number): number {
 }
 
 /** How far the player can pinch the view out and in. */
+/** Blends colour a towards b by t (0 to 1). */
+function mixColor(a: number, b: number, t: number): number {
+  const k = Math.max(0, Math.min(1, t));
+  const ch = (sh: number) => Math.round(((a >> sh) & 255) + (((b >> sh) & 255) - ((a >> sh) & 255)) * k);
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
 const VIEW_ZOOM_MIN = 0.7;
 const VIEW_ZOOM_MAX = 2.2;
 
@@ -260,6 +268,15 @@ export class StationScene {
   private twinkles: { s: Sprite; life: number; max: number; size: number; spin: number }[] = [];
   private nextTwinkle = 1;
   private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** Day and night (core/daynight.ts): what is shown eases towards the target. */
+  private daylight = { night: 0, warm: 0 };
+  private daylightTarget = { night: 0, warm: 0 };
+  /** Dark blue over the sky at night, and a golden wash at sunrise and sunset. */
+  private nightShade = new Sprite(Texture.WHITE);
+  private warmShade = new Sprite(Texture.WHITE);
+  /** Warm window light from the habitat ring after dark. */
+  private windowGlow!: Sprite;
+  private nextSnore = 3;
   /** Comfort settings: soften flashes and pulses, and keep the camera still. */
   private calmFlash = false;
   private calmShake = false;
@@ -350,6 +367,11 @@ export class StationScene {
     this.fgBlur = new BlurFilter({ strength: 2, quality: 2 });
     this.fgLayer.filters = [this.fgBlur];
     this.flash.alpha = 0;
+    this.nightShade.tint = 0x03051c;
+    this.nightShade.alpha = 0;
+    this.warmShade.tint = 0xff7a3a;
+    this.warmShade.blendMode = 'add';
+    this.warmShade.alpha = 0;
     this.vignette.texture = this.tex.vignette;
     this.keyLight.texture = this.tex.glow;
     this.keyLight.anchor.set(0.5);
@@ -363,7 +385,7 @@ export class StationScene {
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -752,6 +774,11 @@ export class StationScene {
     this.habitat = this.sprite(t.habitat, this.hub);
     this.hullSprites.push(this.habitat);
     this.habitat.scale.set(0.82);
+    this.windowGlow = this.sprite(t.glow, this.hub);
+    this.windowGlow.blendMode = 'add';
+    this.windowGlow.tint = 0xffc27a;
+    this.windowGlow.scale.set(3);
+    this.windowGlow.alpha = 0;
     // Fixed light and shade over the turning ring, so the hub reads as lit from the upper left.
     this.sprite(t.shadeDark, this.hub);
     const lit = this.sprite(t.shadeLight, this.hub);
@@ -844,6 +871,11 @@ export class StationScene {
     this.galaxy.scale.set(this.galaxyScale);
     this.flash.width = w;
     this.flash.height = h;
+    for (const sh of [this.nightShade, this.warmShade]) {
+      sh.position.set(0, 0);
+      sh.width = w;
+      sh.height = h;
+    }
     this.vignette.width = w * 1.15;
     this.vignette.height = h * 1.15;
     this.vignette.position.set(-w * 0.075, -h * 0.075);
@@ -1789,7 +1821,7 @@ export class StationScene {
     this.puffs.push({ s, life, max: life, grow: size });
   }
 
-  floatText(x: number, y: number, label: string, big = false): void {
+  floatText(x: number, y: number, label: string, big = false, color?: number, size?: number): void {
     if (!this.ready) return;
     let text = this.textPool.pop();
     if (!text) {
@@ -1808,8 +1840,8 @@ export class StationScene {
       text.anchor.set(0.5);
     }
     text.text = label;
-    text.style.fill = big ? COLORS.dock : this.boosting ? COLORS.boost : this.coreColor;
-    text.style.fontSize = big ? 34 : 24;
+    text.style.fill = color ?? (big ? COLORS.dock : this.boosting ? COLORS.boost : this.coreColor);
+    text.style.fontSize = size ?? (big ? 34 : 24);
     text.position.set(x + rand(-24, 24), y + rand(-10, 10));
     text.alpha = 1;
     text.scale.set(0.4);
@@ -1984,6 +2016,74 @@ export class StationScene {
   }
 
   /** Shows the active pet floating around the station, or none. */
+  /**
+   * A small JPEG of the station as it looks now, for friends to see when they visit (data URL),
+   * or null when the graphics aren't running. The picture is cropped to the open band between
+   * the HUD and the panel, where the station sits.
+   */
+  snapshot(maxW = 360): string | null {
+    if (!this.ready) return null;
+    try {
+      // Draw a fresh frame and copy it straight off the screen canvas (before the browser clears it).
+      this.app.renderer.render(this.app.stage);
+      const src = this.app.canvas;
+      const { width: w, height: h } = this.app.screen;
+      const top = Math.max(0, this.focus.top);
+      const bottom = Math.min(h, this.focus.bottom > top + 80 ? this.focus.bottom : h);
+      const bandH = bottom - top;
+      const k = Math.min(1, maxW / w);
+      const out = document.createElement('canvas');
+      out.width = Math.round(w * k);
+      out.height = Math.round(Math.min(bandH, w * 1.1) * k);
+      const g = out.getContext('2d');
+      if (!g) return null;
+      g.fillStyle = '#0b0d26';
+      g.fillRect(0, 0, out.width, out.height);
+      const sy = top + Math.max(0, (bandH - out.height / k) / 2);
+      const sx = src.width / w;
+      g.drawImage(src, 0, sy * sx, src.width, (out.height / k) * sx, 0, 0, out.width, out.height);
+      return out.toDataURL('image/jpeg', 0.72);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Day and night: `night` 0 (day) to 1 (deep night), `warm` 0 to 1 for the golden light of
+   * sunrise and sunset. Changes ease in over a few seconds; `instant` skips that (on start-up).
+   */
+  setDaylight(night: number, warm: number, instant = false): void {
+    this.daylightTarget = { night, warm };
+    if (instant) this.daylight = { night, warm };
+  }
+
+  private updateDaylight(dt: number): void {
+    const d = this.daylight;
+    const t = this.daylightTarget;
+    const k = Math.min(1, dt * 0.8);
+    d.night += (t.night - d.night) * k;
+    d.warm += (t.warm - d.warm) * k;
+    const n = d.night;
+    this.nightShade.alpha = n * 0.62;
+    this.warmShade.alpha = d.warm * 0.09;
+    // The station itself goes moonlit blue at night and honey gold at dawn and dusk.
+    this.world.tint = mixColor(mixColor(0xffffff, 0x8593e6, n * 0.85), 0xffd2a6, d.warm * 0.55);
+    this.planet.tint = mixColor(mixColor(0xffffff, 0x7f8ad8, n * 0.6), 0xffb27a, d.warm * 0.6);
+    this.keyLight.tint = mixColor(0x9fb0ff, 0xffa060, d.warm);
+    this.keyLight.alpha = 0.16 + d.warm * 0.18 - n * 0.06;
+    // Window light, gently flickering as people move about inside.
+    this.windowGlow.alpha = n * (0.42 + 0.04 * Math.sin(this.time * 1.3) + 0.03 * Math.sin(this.time * 4.1));
+    this.windowGlow.rotation = this.habitat.rotation;
+    // The crew are asleep: little z's drift up from the habitat now and then.
+    if (n > 0.6 && !this.cine) {
+      this.nextSnore -= dt;
+      if (this.nextSnore <= 0) {
+        this.nextSnore = rand(2.5, 5);
+        this.floatText(rand(-30, 30), this.hub.y - 40, Math.random() < 0.5 ? 'z' : 'Z', false, 0xcfd8ff, 18);
+      }
+    }
+  }
+
   setPet(id: PetId | null, tint = 0xffffff): void {
     if (!this.ready) return;
     if (this.pet?.id === id) {
@@ -2012,7 +2112,8 @@ export class StationScene {
   private updatePet(dt: number): void {
     const p = this.pet;
     if (!p) return;
-    p.angle += dt * 0.45;
+    // At night the pet ambles instead of trotting.
+    p.angle += dt * 0.45 * (1 - this.daylight.night * 0.7);
     p.pounce = Math.max(0, p.pounce - dt * 2.2);
     // A lazy figure-of-eight around the hub; a pounce pulls it to the core and back.
     const ox = Math.sin(p.angle) * 96;
@@ -2086,6 +2187,7 @@ export class StationScene {
     this.updatePet(dt);
     this.updateFx(dt);
     this.updateMarkFx(dt);
+    this.updateDaylight(dt);
     if (this.calmShake) this.shake = 0;
     if (!this.reducedMotion && this.shake > 0.05) {
       this.world.pivot.set(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);
@@ -2106,7 +2208,7 @@ export class StationScene {
         s.x = Math.random() * w;
       }
       const tw = this.reducedMotion ? 0.85 : 0.6 + 0.4 * Math.sin(this.time * 1.6 + st.phase);
-      s.alpha = tw * (0.4 + st.depth * 0.6);
+      s.alpha = Math.min(1, tw * (0.4 + st.depth * 0.6) * (1 + this.daylight.night * 0.6));
       // Overdrive stretches the stars into warp streaks.
       s.scale.set(st.base, st.base * (1 + this.warp * 10 * st.depth));
     }
@@ -2229,7 +2331,7 @@ export class StationScene {
       this.spawnDrift('crate');
       this.nextCrate = rand(90, 160) / this.crateRate;
     }
-    this.nextStar -= dt;
+    this.nextStar -= dt * nightStarRate(this.daylight.night);
     if (this.nextStar <= 0) {
       if (this.starsAllowed && !this.drifts.some((d) => d.kind === 'star')) this.spawnDrift('star');
       this.nextStar = rand(STAR_GAP[0], STAR_GAP[1]);

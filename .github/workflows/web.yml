@@ -51,3 +51,11 @@ jobs:
         run: |
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           npx --yes firebase-tools@14 deploy --only hosting --project scrap-orbit --non-interactive
+      # The database rules (firestore.rules) go live with the site, so new features that need a
+      # rule change (friend codes) work without a trip to the console. If the key isn't allowed
+      # to change rules, the site is still deployed and this step just leaves a note.
+      - name: Deploy Firestore rules
+        if: env.SA != ''
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@14 deploy --only firestore:rules --project scrap-orbit --non-interactive || echo "::warning::Firestore rules were not deployed; paste firestore.rules into the Firebase console."

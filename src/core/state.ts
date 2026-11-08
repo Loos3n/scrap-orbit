@@ -3,6 +3,7 @@ import { BOSS_NAMES, CREW, PETS, SECTORS, TUTORIAL, type CrewId, type EventKind,
 import { CHALLENGES, GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Offer, type Trip } from './expansion';
 import { SAFE_TYPES, SETS, SKINS, skinUnlocked } from './collection';
 import { ORNAMENTS } from './ornaments';
+import { FRIEND_LIMIT, cleanName, normalizeCode, type Friend } from './friends';
 import { STAR_NODES } from './galaxy';
 import { CONTRACTS, type ActiveContract, type ContractOffer } from './contracts';
 import { D, Decimal, type NumberStyle } from './num';
@@ -102,6 +103,11 @@ export interface GameState {
   ornaments: { got: Set<string>; on: Set<string> };
   /** Whether this sector's rig is built; it stays behind on a relocation. */
   rig: boolean;
+  /**
+   * Friend codes (core/friends.ts): this player's own code and station name once signed in,
+   * friends added, who got a gift today, and today's gift counters.
+   */
+  friends: { mine: string; name: string; list: Friend[]; sent: Record<string, string>; day: string; opened: number; sentRewards: number };
   stats: {
     crates: number;
     boosts: number;
@@ -152,6 +158,8 @@ export interface GameState {
     notifications: boolean;
     /** Offers to watch an optional ad for a bonus (core/rewards.ts). */
     adOffers: boolean;
+    /** Day and night follow the device clock (core/daynight.ts); off keeps it always day. */
+    dayNight: boolean;
   };
 }
 
@@ -207,6 +215,7 @@ interface SaveData {
   skin?: string | null;
   ornaments?: { got?: string[]; on?: string[] };
   rig?: boolean;
+  friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
   boostUntil: number;
   boostReadyAt: number;
@@ -277,6 +286,7 @@ export function newState(now: number): GameState {
     skin: null,
     ornaments: { got: new Set(), on: new Set() },
     rig: false,
+    friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
       crates: 0,
       boosts: 0,
@@ -294,7 +304,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true, adOffers: true },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true, adOffers: true, dayNight: true },
   };
 }
 
@@ -351,6 +361,7 @@ export function serialize(state: GameState): string {
     skin: state.skin,
     ornaments: { got: [...state.ornaments.got], on: [...state.ornaments.on] },
     rig: state.rig,
+    friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
     boostUntil: state.boostUntil,
     boostReadyAt: state.boostReadyAt,
@@ -520,6 +531,23 @@ export function deserialize(json: string | null, now: number): GameState | null 
   for (const id of strings(data.ornaments?.got)) if (ornamentIds.has(id)) state.ornaments.got.add(id);
   for (const id of strings(data.ornaments?.on)) if (state.ornaments.got.has(id)) state.ornaments.on.add(id);
   state.rig = data.rig === true;
+  const fr = data.friends;
+  if (fr && typeof fr === 'object') {
+    const f = state.friends;
+    f.mine = typeof fr.mine === 'string' && normalizeCode(fr.mine) ? fr.mine : '';
+    f.name = typeof fr.name === 'string' ? cleanName(fr.name) : '';
+    const seen = new Set<string>();
+    for (const x of Array.isArray(fr.list) ? fr.list : []) {
+      const code = x && typeof x.code === 'string' ? normalizeCode(x.code) : null;
+      if (!code || seen.has(code) || code === f.mine || seen.size >= FRIEND_LIMIT) continue;
+      seen.add(code);
+      f.list.push({ code, name: typeof x.name === 'string' ? cleanName(x.name) : '' });
+    }
+    if (fr.sent && typeof fr.sent === 'object') for (const [k, v] of Object.entries(fr.sent)) if (typeof v === 'string') f.sent[k] = v;
+    f.day = typeof fr.day === 'string' ? fr.day : '';
+    f.opened = Math.max(0, Math.floor(Number(fr.opened) || 0));
+    f.sentRewards = Math.max(0, Math.floor(Number(fr.sentRewards) || 0));
+  }
   if (!Array.isArray(data.collection)) {
     // Saves from before the book: credit what the save already shows.
     for (let i = 0; i <= Math.min(state.stats.relocations, SECTORS.length - 1); i++) state.collection.add(`sector:${i}`);
@@ -539,6 +567,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.settings.music = state.settings.musicVol > 0;
   state.settings.reduceFlash = settings.reduceFlash === true;
   state.settings.reduceShake = settings.reduceShake === true;
+  state.settings.dayNight = settings.dayNight !== false;
   state.settings.viewZoom = typeof settings.viewZoom === 'number' && Number.isFinite(settings.viewZoom) ? settings.viewZoom : 1;
   return state;
 }
