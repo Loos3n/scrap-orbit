@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { GENERATORS } from './config';
 import { SECTORS } from './content';
-import { baseIncome, boostDurationSec, buildRig, relocate, rigCost, tapValue } from './economy';
+import { baseIncome, boostDurationSec, buildRig, costDiscount, crewMult, generatorRate, relocate, rigCost, tapValue } from './economy';
 import { bossReward } from './meta';
 import { D } from './num';
-import { currentSector } from './sectors';
+import { currentSector, sectorCrateMult, sectorHappenings } from './sectors';
 import { deserialize, newState, serialize } from './state';
 
 const NOW = 1_000_000;
@@ -69,5 +70,48 @@ describe('Sector rigs', () => {
     s.allTime = D(1e15);
     expect(relocate(s, NOW)).toBeGreaterThan(0);
     expect(s.rig).toBe(false);
+  });
+});
+
+describe('Twists in sectors 2 to 6', () => {
+  const at = (name: string) => {
+    const s = newState(NOW);
+    s.stats.relocations = SECTORS.findIndex((x) => x.name === name);
+    s.owned.drone = 30;
+    s.owned.smelter = 10;
+    return s;
+  };
+
+  it('gives every sector after the first a twist', () => {
+    for (const sec of SECTORS.slice(1)) expect(sec.twist, sec.name).toBeTruthy();
+  });
+
+  it('heats up smelters and slows drones in Ember Reach', () => {
+    const home = at('Scrapyard Belt');
+    const ember = at('Ember Reach');
+    const rate = (s: ReturnType<typeof newState>, id: string) => generatorRate(s, GENERATORS.find((g) => g.id === id)!).toNumber();
+    expect(rate(ember, 'smelter')).toBeCloseTo(rate(home, 'smelter') * 3);
+    expect(rate(ember, 'drone')).toBeCloseTo(rate(home, 'drone') * 0.5);
+  });
+
+  it('makes machines cheaper in the Glass Sea', () => {
+    expect(costDiscount(at('Glass Sea'))).toBeCloseTo(costDiscount(at('Scrapyard Belt')) * 0.6);
+  });
+
+  it('doubles crew bonuses in the Rose Nebula', () => {
+    const home = at('Scrapyard Belt');
+    const rose = at('Rose Nebula');
+    home.crew.mika = rose.crew.mika = 4;
+    expect(crewMult(rose, 'drone') - 1).toBeCloseTo((crewMult(home, 'drone') - 1) * 2);
+  });
+
+  it('keeps wrecks and traders away in the Hollow Expanse, and runs faster', () => {
+    const hollow = at('Hollow Expanse');
+    expect(sectorHappenings(hollow)).toBe(false);
+    expect(baseIncome(hollow).toNumber()).toBeCloseTo(baseIncome(at('Scrapyard Belt')).toNumber() * 1.5);
+  });
+
+  it('doubles crates in the Verdant Drift', () => {
+    expect(sectorCrateMult(at('Verdant Drift'))).toBe(2);
   });
 });

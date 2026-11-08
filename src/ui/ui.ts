@@ -1,7 +1,11 @@
+import { Graphs } from './graphs';
+import { askPermission, notificationsAvailable } from '../notify';
+import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
+import { exportCode, importCode, type GameState } from '../core/state';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
@@ -30,10 +34,14 @@ const TAB_ACCENT: Record<string, string> = {
   build: '#4fe3c1',
   upgrades: '#ffd166',
   crew: '#ff8a4c',
+  trips: '#ff8a4c',
+  pets: '#ff8a4c',
   lab: '#7aa7ff',
   cores: '#c58cff',
-  station: '#ff7bb0',
+  challenges: '#c58cff',
   galaxy: '#ffe9a8',
+  station: '#ff7bb0',
+  decor: '#ff7bb0',
 };
 
 /** Fills every `data-icon="name"` placeholder in the static HTML. */
@@ -89,6 +97,25 @@ interface GenRow {
 }
 
 /** The HTML half of the game: readout, build list, upgrades, station stats and settings. */
+/** A speed-up as "x1.6", or "x12" once it is big. */
+export function fmtSpeed(x: number): string {
+  return `x${x >= 10 ? Math.round(x).toLocaleString('en-US') : (Math.floor(x * 10) / 10).toString()}`;
+}
+
+/** One cozy line about what the crew got up to while the player was away. */
+export function awayFlavour(seconds: number, state: GameState): string {
+  const hours = seconds / 3600;
+  const crew = Object.entries(state.crew).filter(([, l]) => (l as number) > 0).map(([id]) => CREW.find((c) => c.id === id)!.name);
+  const who = crew.length ? crew[Math.floor(seconds) % crew.length] : 'The drones';
+  const lines =
+    hours >= 8
+      ? [`${who} kept the night shift running and left a thermos of cocoa on the console.`, 'The station hummed through the night. Someone rearranged the cargo bay by colour.', `${who} logged a quiet shift: no alarms, just stars and scrap.`]
+      : hours >= 1
+        ? [`${who} kept the machines purring while you were gone.`, 'The drones sorted the haul into neat little stacks.', 'A passing freighter waved its lights at the station.']
+        : ['The drones barely noticed you left.', `${who} topped up the coolant and kept things ticking.`, 'Just a short break. The scrap kept rolling in.'];
+  return `<li class="away-flavour"><span>${lines[Math.floor(seconds / 7) % lines.length]}</span></li>`;
+}
+
 export class UI {
   private rows = new Map<GeneratorId, GenRow>();
   private upgradeKey = '';
@@ -97,6 +124,8 @@ export class UI {
   private achButtons = new Map<string, HTMLButtonElement>();
   private shown: Decimal = D(0);
   private lastScrapText = '';
+  private shownRate = D(0);
+  private graphs = new Graphs($('graphs'));
   private fmt = (v: Parameters<typeof format>[0]) => format(v, this.game.state.settings.numbers);
   private crew: CrewPanel;
   private lab: LabPanel;
@@ -121,12 +150,14 @@ export class UI {
   /** Called when the sound or music setting changes, so main can update the synth. */
   onSoundChange: ((sfx: number, music: number) => void) | null = null;
   onComfortChange: ((reduceFlash: boolean, reduceShake: boolean) => void) | null = null;
+  onPowerChange: ((saver: boolean) => void) | null = null;
   /** Called after the player confirms a relocation. */
   onRelocate: (() => void) | null = null;
 
   constructor(private game: Game) {
     fillIcons();
     this.shown = game.state.scrap;
+    window.addEventListener('resize', () => this.fitScrap($('scrap')));
     this.buildGenerators();
     this.bindTabs();
     this.bindBuyModes();
@@ -134,6 +165,7 @@ export class UI {
     this.bindRelocate();
     this.buildAchievements();
     this.bindSegments();
+    this.bindProfile();
     this.crew = new CrewPanel(game);
     this.lab = new LabPanel(game);
     this.decor = new DecorPanel(game);
@@ -224,6 +256,11 @@ export class UI {
     });
     document.querySelectorAll<HTMLButtonElement>('.tab').forEach((tab) =>
       tab.addEventListener('click', () => {
+        if (!tabOpen(this.game.state, tab.dataset.tab!)) {
+          const u = TAB_UNLOCKS.find((x) => x.tab === tab.dataset.tab)!;
+          this.toast(ICONS.lock, u.hint);
+          return;
+        }
         // One tap does it all: the open tab hides the panel, any other tab opens it.
         if (tab.getAttribute('aria-selected') === 'true' && this.panel.open) {
           this.panel.set(false);
@@ -231,6 +268,45 @@ export class UI {
         } else this.openTab(tab.dataset.tab!);
       }),
     );
+  }
+
+  /** Called when a tab opens for the first time while playing. */
+  onUnlock?: (u: TabUnlock) => void;
+  private unlocksChecked = false;
+  /** What each dot showed when its pane was last looked at, so it stays quiet until something changes. */
+  private seen: Record<string, string> = {};
+
+  /** Locks and unlocks the tabs; the first check after loading opens tabs quietly. */
+  private syncTabs(): void {
+    const s = this.game.state;
+    const opened = openReadyTabs(s);
+    if (this.unlocksChecked) for (const u of opened) this.onUnlock?.(u);
+    if (opened.length || !this.unlocksChecked) {
+      document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => {
+        const open = tabOpen(s, t.dataset.tab!);
+        t.classList.toggle('locked', !open);
+        let lock = t.querySelector<HTMLElement>('.tab-lock');
+        if (!open && !lock) {
+          lock = document.createElement('span');
+          lock.className = 'tab-lock';
+          lock.innerHTML = ICONS.lock;
+          t.appendChild(lock);
+        } else if (open) lock?.remove();
+        if (this.unlocksChecked && opened.some((u) => u.tab === t.dataset.tab)) {
+          t.classList.remove('fresh');
+          void t.offsetWidth;
+          t.classList.add('fresh');
+        }
+      });
+    }
+    this.unlocksChecked = true;
+  }
+
+  /** True when a dot has news: something is ready, and it changed since the pane was last open. */
+  private news(pane: string, ready: boolean, sig: string): boolean {
+    if (!ready) return false;
+    if (!$(`tab-${pane}`).hidden && this.panel.open) this.seen[pane] = sig;
+    return this.seen[pane] !== sig;
   }
 
   /** The pane each tab showed last, so a tab reopens where the player left it. */
@@ -255,6 +331,7 @@ export class UI {
     this.panel.set(true);
     this.coach.tabOpened(pane);
     this.render();
+    this.panel.fit();
   }
 
   private bindBuyModes(): void {
@@ -286,16 +363,54 @@ export class UI {
 
   private bindSegments(): void {
     document.querySelectorAll<HTMLButtonElement>('.pane-seg button').forEach((b) => b.addEventListener('click', () => this.openPane(b.dataset.pane!)));
-    // Each tab's segment bar switches only its own sections.
-    document.querySelectorAll<HTMLButtonElement>('.segments:not(.pane-seg) button').forEach((b) =>
+  }
+
+  private lastFit = 0;
+
+  /** Achievements earned when the profile was last open, so its dot only lights for new ones. */
+  private seenAch = 0;
+
+  /** The profile card: achievements and loot, the collection book, and stats with graphs. */
+  private bindProfile(): void {
+    this.seenAch = this.game.state.achievements.size;
+    const box = $('profile');
+    const buttons = document.querySelectorAll<HTMLButtonElement>('.profile-seg button');
+    const show = (name: string) =>
+      buttons.forEach((x) => {
+        x.setAttribute('aria-selected', String(x.dataset.prof === name));
+        $(`prof-${x.dataset.prof}`).hidden = x.dataset.prof !== name;
+      });
+    buttons.forEach((b) =>
       b.addEventListener('click', () => {
-        b.parentElement!.querySelectorAll<HTMLButtonElement>('button').forEach((x) => {
-          x.setAttribute('aria-selected', String(x === b));
-          $(`seg-${x.dataset.seg}`).hidden = x !== b;
-        });
-        this.render();
+        show(b.dataset.prof!);
+        this.renderProfile(true);
       }),
     );
+    $('profile-btn').addEventListener('click', () => {
+      box.hidden = false;
+      this.renderProfile(true);
+    });
+    $('profile-close').addEventListener('click', () => (box.hidden = true));
+    box.addEventListener('click', (e) => {
+      if (e.target === box) box.hidden = true;
+    });
+  }
+
+  private renderProfile(force = false): void {
+    const s = this.game.state;
+    if ($('profile').hidden) {
+      $('profile-dot').hidden = s.achievements.size <= this.seenAch;
+      return;
+    }
+    this.seenAch = s.achievements.size;
+    $('profile-dot').hidden = true;
+    if (!$('prof-awards').hidden) this.lootShelf.render();
+    if (!$('prof-book').hidden) this.book.render();
+    if (!$('prof-stats').hidden) {
+      this.renderStats(Date.now());
+      this.graphs.render(s, (v) => this.fmt(v));
+    }
+    if (force) $('profile').querySelector('.modal-card')!.scrollTop = 0;
   }
 
   private bindRelocate(): void {
@@ -346,6 +461,9 @@ export class UI {
       const o = settings();
       auto.checked = o.autoBuy;
       hap.checked = o.haptics;
+      ($('opt-battery') as HTMLInputElement).checked = o.batterySaver;
+      ($('opt-notify') as HTMLInputElement).checked = o.notifications;
+      $('opt-notify-row').hidden = !notificationsAvailable();
       sfxVol.value = String(Math.round(o.sfxVol * 100));
       musVol.value = String(Math.round(o.musicVol * 100));
       setText($('opt-sfx-val'), pct(o.sfxVol));
@@ -381,6 +499,23 @@ export class UI {
       }),
     );
     hap.addEventListener('change', () => (settings().haptics = hap.checked));
+    const notify = $('opt-notify') as HTMLInputElement;
+    notify.addEventListener('change', () => {
+      if (!notify.checked) {
+        settings().notifications = false;
+        return;
+      }
+      void askPermission().then((ok) => {
+        settings().notifications = ok;
+        notify.checked = ok;
+        if (!ok) this.toast(ICONS.gear, 'Notifications are off for Scrap Orbit in your phone settings.');
+      });
+    });
+    const battery = $('opt-battery') as HTMLInputElement;
+    battery.addEventListener('change', () => {
+      settings().batterySaver = battery.checked;
+      this.onPowerChange?.(battery.checked);
+    });
     auto.addEventListener('change', () => (settings().autoBuy = auto.checked));
     const volume = (input: HTMLInputElement, key: 'sfxVol' | 'musicVol', flag: 'sound' | 'music') =>
       input.addEventListener('input', () => {
@@ -402,6 +537,48 @@ export class UI {
       closeSettings();
       this.game.state.tutorial = 0;
       this.showTab('build');
+    });
+    const box = $('save-box');
+    const code = $('save-code') as HTMLTextAreaElement;
+    const paste = $('save-paste') as HTMLTextAreaElement;
+    const msg = $('save-msg');
+    let armed = false;
+    paste.addEventListener('input', () => {
+      armed = false;
+      msg.textContent = '';
+    });
+    $('save-open').addEventListener('click', () => {
+      box.hidden = !box.hidden;
+      armed = false;
+      code.value = exportCode(this.game.state);
+      paste.value = '';
+      msg.textContent = '';
+    });
+    $('save-copy').addEventListener('click', () => {
+      code.select();
+      const done = () => (msg.textContent = 'Copied.');
+      navigator.clipboard?.writeText(code.value).then(done, () => (document.execCommand('copy') ? done() : (msg.textContent = 'Select the code and copy it.')));
+    });
+    $('save-load').addEventListener('click', () => {
+      const state = importCode(paste.value, Date.now());
+      if (!state) {
+        msg.textContent = 'That code does not look right.';
+        return;
+      }
+      if (!armed) {
+        armed = true;
+        msg.textContent = 'This replaces the station you have now. Tap again to load.';
+        return;
+      }
+      armed = false;
+      this.game.load(state);
+      this.shown = state.scrap;
+      this.upgradeKey = '';
+      this.lastScrapText = '';
+      msg.textContent = 'Station loaded.';
+      code.value = exportCode(state);
+      paste.value = '';
+      sync();
     });
     const confirm = $('reset-confirm');
     $('reset').addEventListener('click', () => (confirm.hidden = false));
@@ -428,8 +605,22 @@ export class UI {
     }
     const text = this.fmt(this.shown);
     if (text !== this.lastScrapText) {
+      const el = $('scrap');
+      const grew = text.length !== this.lastScrapText.length;
       this.lastScrapText = text;
-      $('scrap').textContent = text;
+      el.textContent = text;
+      if (grew) this.fitScrap(el);
+    }
+  }
+
+  /** Shrinks the scrap counter's lettering when a long number would not fit beside the buttons. */
+  private fitScrap(el: HTMLElement): void {
+    el.style.fontSize = '';
+    const room = el.parentElement!.clientWidth;
+    const need = el.scrollWidth;
+    if (room > 0 && need > room) {
+      const size = parseFloat(getComputedStyle(el).fontSize);
+      el.style.fontSize = `${Math.max(18, Math.floor(size * (room / need)))}px`;
     }
   }
 
@@ -501,7 +692,11 @@ export class UI {
   render(): void {
     const s = this.game.state;
     const now = Date.now();
-    setText($('rate'), this.fmt(eco.income(s, now)));
+    // The income line eases toward its new value instead of jumping.
+    const rate = eco.income(s, now);
+    this.shownRate = rate.lt(this.shownRate.mul(0.5)) || this.shownRate.lte(0) ? rate : this.shownRate.add(rate.sub(this.shownRate).mul(0.35));
+    if (rate.sub(this.shownRate).abs().lt(rate.mul(0.002))) this.shownRate = rate;
+    setText($('rate'), this.fmt(this.shownRate));
     this.renderBoost(now);
     this.renderGoal();
     if (!$('tab-build').hidden) this.renderGenerators();
@@ -512,32 +707,34 @@ export class UI {
     $('pets-dot').hidden = !petsReady;
     const tripsReady = this.trips.anyReady();
     $('trips-dot').hidden = !tripsReady;
-    $('crew-dot').hidden = !this.crew.anyAffordable() && !petsReady && !tripsReady;
-    $('lab-dot').hidden = !this.lab.idle();
-    if (!$('tab-crew').hidden) {
-      if (!$('seg-crewlist').hidden) this.crew.render();
-      else if (!$('seg-trips').hidden) this.trips.render();
-      else this.pets.render();
-    }
+    this.syncTabs();
+    const crewReady = this.crew.anyAffordable();
+    $('crewlist-dot').hidden = !crewReady;
+    const crewSig = `${Object.values(s.crew).join()}|${s.pets.owned.size}|${s.trips.length}|${crewReady}${petsReady}${tripsReady}`;
+    $('crew-dot').hidden = !tabOpen(s, 'crew') || !this.news('crew', crewReady || petsReady || tripsReady, crewSig);
+    $('lab-dot').hidden = !tabOpen(s, 'lab') || !this.news('lab', this.lab.idle(), String(s.research.done.size));
+    if (!$('tab-crew').hidden) this.crew.render();
+    if (!$('tab-trips').hidden) this.trips.render();
+    if (!$('tab-pets').hidden) this.pets.render();
     if (!$('tab-lab').hidden) this.lab.render();
     // Tab dots gather their panes' dots.
     $('build-dot').hidden = $('upgrade-dot').hidden;
     $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
-    $('progress-dot').hidden = $('lab-dot').hidden && $('cores-dot').hidden && $('galaxy-dot').hidden;
+    $('prestige-dot').hidden = !tabOpen(s, 'prestige') || ($('cores-dot').hidden && $('galaxy-dot').hidden);
+    if (!tabOpen(s, 'station')) $('station-dot').hidden = true;
     // With the menu hidden, the square carries a dot when any tab has something new.
-    $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'progress-dot', 'station-dot'].every((id) => $(id).hidden);
-    if (!$('tab-station').hidden) {
-      if (!$('seg-decor').hidden) {
-        this.ornaments.render();
-        this.decor.render();
-        this.skins.render();
-      }
-      if (!$('seg-modules').hidden) this.modules.render();
-      if (!$('seg-awards').hidden) {
-        this.lootShelf.render();
-        this.book.render();
-        this.renderStats(now);
-      }
+    $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'lab-dot', 'prestige-dot', 'station-dot'].every((id) => $(id).hidden);
+    if (!$('tab-decor').hidden) {
+      this.ornaments.render();
+      this.decor.render();
+      this.skins.render();
+    }
+    if (!$('tab-station').hidden) this.modules.render();
+    this.renderProfile();
+    // The menu follows its pane's size as rows appear or fold away.
+    if (now - this.lastFit > 400) {
+      this.lastFit = now;
+      this.panel.fit();
     }
     this.missions.render();
     renderEventBanner(this.game);
@@ -564,6 +761,10 @@ export class UI {
     setText($('core-count'), s.cores.toLocaleString('en-US'));
     setText($('core-bonus'), `+${Math.round(s.cores * eco.perCoreBonus(s) * 100).toLocaleString('en-US')}% income`);
     setText($('core-claim'), claim.toLocaleString('en-US'));
+    const speed = eco.relocateSpeedup(s);
+    const speedText = claim > 0 ? `Station runs ${fmtSpeed(speed)} faster` : '';
+    setText($('core-speed'), speedText);
+    setText($('relocate-speed'), claim > 0 ? `the new station runs ${fmtSpeed(speed)} faster` : 'everything runs faster');
     const next = eco.nextCoreAt(s);
     const prev = eco.lastCoreAt(s);
     const span = next.sub(prev);
@@ -732,6 +933,7 @@ export class UI {
 
   private purchaseText(p: Purchase): string {
     if (p.kind === 'upgrade') return UPGRADES.find((u) => u.id === p.id)!.name;
+    if (p.kind === 'claw') return `Claw Lv ${this.game.state.claw + 1}`;
     const name = GENERATORS.find((g) => g.id === p.id)!.name;
     return p.count === 1 ? `1 ${name}` : `${p.count} ${name}s`;
   }
@@ -889,12 +1091,14 @@ export class UI {
   }
 
   showOffline(seconds: number, earned: Decimal, report: OfflineReport, onCollect: () => void): void {
-    $('modal-report').innerHTML = offlineReportHtml(report);
+    $('modal-report').innerHTML = awayFlavour(seconds, this.game.state) + offlineReportHtml(report);
     const modal = $('modal');
     const amount = $('modal-amount');
     const cap = eco.offlineCapSec(this.game.state);
     const capped = seconds >= cap - 1;
-    $('modal-time').textContent = `Gone for ${formatDuration(seconds)}.${capped ? ` Earnings are capped at ${formatDuration(cap)} for now.` : ''}`;
+    $('modal-time').textContent = capped
+      ? `Gone for over ${formatDuration(cap)}. Storage filled up at ${formatDuration(cap)}; the Night Shift perk and Lab research make it last longer.`
+      : `Gone for ${formatDuration(seconds)}.`;
     modal.hidden = false;
     // Count the amount up from zero.
     const start = performance.now();

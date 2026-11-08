@@ -37,6 +37,10 @@ export interface GameState {
   research: { done: Set<string>; active: { id: string; endsAt: number } | null };
   decor: { owned: Set<string>; theme: string; paint: string };
   missions: { day: string; daily: Mission[]; week: string; weekly: Mission | null };
+  /** This week's event (core/weekly.ts): which week, which event, its counter at the start, tiers claimed. */
+  weekly: { week: string; id: string; start: number; claimed: number };
+  /** Samples for the Stats graphs (core/history.ts). */
+  history: { income: { t: number; log: number }[]; runs: { t: number; sector: number; minutes: number; cores: number }[] };
   event: { kind: EventKind; endsAt: number } | null;
   nextEventAt: number;
   /** Tutorial step; -1 when finished. */
@@ -105,6 +109,7 @@ export interface GameState {
     golden?: number;
     trades?: number;
     safes?: number;
+    stars?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -128,6 +133,10 @@ export interface GameState {
     autoBuy: boolean;
     /** How far the player has pinched the station view in (1 = normal). */
     viewZoom: number;
+    /** Battery saver: 30 frames a second, lower resolution, no soft-focus blur. */
+    batterySaver: boolean;
+    /** Phone reminders in the Android app (storage full, research done, crew home). */
+    notifications: boolean;
   };
 }
 
@@ -147,6 +156,8 @@ interface SaveData {
   research?: { done?: string[]; active?: { id: string; endsAt: number } | null };
   decor?: { owned?: string[]; theme?: string; paint?: string };
   missions?: GameState['missions'];
+  weekly?: GameState['weekly'];
+  history?: GameState['history'];
   event?: GameState['event'];
   nextEventAt?: number;
   tutorial?: number;
@@ -211,6 +222,8 @@ export function newState(now: number): GameState {
     research: { done: new Set(), active: null },
     decor: { owned: new Set(['classic', 'standard']), theme: 'classic', paint: 'standard' },
     missions: { day: '', daily: [], week: '', weekly: null },
+    weekly: { week: '', id: '', start: 0, claimed: 0 },
+    history: { income: [], runs: [] },
     event: null,
     nextEventAt: 0,
     tutorial: 0,
@@ -256,7 +269,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1 },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true },
   };
 }
 
@@ -277,6 +290,8 @@ export function serialize(state: GameState): string {
     research: { done: [...state.research.done], active: state.research.active },
     decor: { owned: [...state.decor.owned], theme: state.decor.theme, paint: state.decor.paint },
     missions: state.missions,
+    weekly: state.weekly,
+    history: state.history,
     event: state.event,
     nextEventAt: state.nextEventAt,
     tutorial: state.tutorial,
@@ -354,6 +369,12 @@ export function deserialize(json: string | null, now: number): GameState | null 
   if (data.decor?.theme && state.decor.owned.has(data.decor.theme)) state.decor.theme = data.decor.theme;
   if (data.decor?.paint && state.decor.owned.has(data.decor.paint)) state.decor.paint = data.decor.paint;
   if (data.missions && Array.isArray(data.missions.daily)) state.missions = data.missions;
+  if (data.history) {
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
+    if (Array.isArray(data.history.income)) state.history.income = data.history.income.filter((x) => x && ok(x.t) && ok(x.log)).slice(-144);
+    if (Array.isArray(data.history.runs)) state.history.runs = data.history.runs.filter((x) => x && ok(x.t) && ok(x.cores) && ok(x.minutes) && ok(x.sector)).slice(-12);
+  }
+  if (data.weekly && typeof data.weekly.week === 'string') state.weekly = { week: data.weekly.week, id: String(data.weekly.id ?? ''), start: int(data.weekly.start), claimed: Math.min(3, int(data.weekly.claimed)) };
   state.event = data.event && typeof data.event.endsAt === 'number' ? data.event : null;
   state.nextEventAt = Number(data.nextEventAt) || 0;
   // Players from before the tutorial existed already know the basics. Saves from before the
@@ -477,4 +498,27 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.settings.reduceShake = settings.reduceShake === true;
   state.settings.viewZoom = typeof settings.viewZoom === 'number' && Number.isFinite(settings.viewZoom) ? settings.viewZoom : 1;
   return state;
+}
+
+const CODE_PREFIX = 'SCRAP1-';
+
+/** The save as a text code the player can copy somewhere safe: base64 of the save JSON. */
+export function exportCode(state: GameState): string {
+  const bytes = new TextEncoder().encode(serialize(state));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return CODE_PREFIX + btoa(bin);
+}
+
+/** Reads a code from exportCode back into a save, or null if it is not one. Spaces and line breaks are ignored. */
+export function importCode(code: string, now: number): GameState | null {
+  const clean = code.replace(/\s+/g, '');
+  if (!clean.startsWith(CODE_PREFIX)) return null;
+  try {
+    const bin = atob(clean.slice(CODE_PREFIX.length));
+    const json = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+    return deserialize(json, now);
+  } catch {
+    return null;
+  }
 }

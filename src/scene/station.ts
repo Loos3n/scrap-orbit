@@ -49,7 +49,7 @@ interface Orbiter { s: Sprite; radius: number; angle: number; speed: number; wob
 interface Spark { s: Sprite; vx: number; vy: number; life: number; max: number }
 interface Puff { s: Sprite; life: number; max: number; grow: number }
 interface Ring { x: number; y: number; r: number; life: number; color: number; width: number }
-type DriftKind = 'debris' | 'crate' | 'meteor' | 'convoy' | 'golden';
+type DriftKind = 'debris' | 'crate' | 'meteor' | 'convoy' | 'golden' | 'star';
 interface Drift { s: Sprite; vx: number; vy: number; vr: number; kind: DriftKind; glow?: Sprite; tail?: Sprite }
 interface Chunk { s: Sprite; x0: number; y0: number; t: number; dur: number; color: number }
 interface Floater { text: Text; vy: number; life: number; max: number }
@@ -80,6 +80,16 @@ class Pool {
     this.free.push(s);
   }
 }
+
+/** Highest drawing resolution, and the one battery saver uses. */
+const MAX_RES = 2;
+const SAVER_RES = 1.25;
+/** After this long without a touch the station draws at IDLE_FPS. */
+const IDLE_MS = 12_000;
+const IDLE_FPS = 30;
+
+/** Seconds between lucky shooting stars. */
+const STAR_GAP: [number, number] = [900, 1800];
 
 export class StationScene {
   readonly app = new Application();
@@ -179,6 +189,8 @@ export class StationScene {
   private warp = 0;
   private nextDebris = 1;
   private nextCrate = rand(40, 70);
+  /** Seconds until the next lucky shooting star: rare, so it feels like a find. */
+  private nextStar = rand(STAR_GAP[0] * 0.5, STAR_GAP[1] * 0.5);
   private nextComet = rand(6, 14);
   private nextWeld = 0;
   private nextEmber = 0;
@@ -232,8 +244,8 @@ export class StationScene {
       resizeTo: el,
       backgroundAlpha: 0,
       antialias: true,
-      // Full sharpness on 3x phone screens.
-      resolution: Math.min(window.devicePixelRatio || 1, 3),
+      // 2x is sharp on every phone; 3x costs more than twice the pixels for little gain.
+      resolution: Math.min(window.devicePixelRatio || 1, MAX_RES),
       autoDensity: true,
       // Skip WebGPU: when WebGL is unavailable, probing for WebGPU can hang some phone web
       // views. Canvas is a slower but dependable fallback.
@@ -296,7 +308,8 @@ export class StationScene {
     this.moon.texture = this.tex.moon;
     this.moon.anchor.set(0.5);
     // Foreground rocks are drawn soft, as if close to the camera and out of focus.
-    this.fgLayer.filters = [new BlurFilter({ strength: 2, quality: 2 })];
+    this.fgBlur = new BlurFilter({ strength: 2, quality: 2 });
+    this.fgLayer.filters = [this.fgBlur];
     this.flash.alpha = 0;
     this.vignette.texture = this.tex.vignette;
     this.keyLight.texture = this.tex.glow;
@@ -309,7 +322,7 @@ export class StationScene {
     this.flareGlow.blendMode = 'add';
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
-    this.world.addChild(this.farLayer, this.bossLayer, this.debrisLayer, this.lines, this.dockLayer, this.machineLayer, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
+    this.world.addChild(this.farLayer, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
     const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.flash, 30]];
     for (const [c, i] of z) {
@@ -323,7 +336,38 @@ export class StationScene {
       this.resizeTimer = window.setTimeout(() => this.layout(), 120);
     });
     this.app.ticker.add((t) => this.frame(Math.min(t.deltaMS / 1000, 0.1)));
+    window.addEventListener('pointerdown', () => this.wake(), { capture: true, passive: true });
+    window.addEventListener('wheel', () => this.wake(), { capture: true, passive: true });
     this.ready = true;
+    this.setBatterySaver(this.saver);
+  }
+
+  private fgBlur: BlurFilter | null = null;
+  private saver = false;
+  private lastInput = performance.now();
+
+  /** True while nobody has touched the screen for a while: the station then draws at half rate. */
+  get idle(): boolean {
+    return this.saver || performance.now() - this.lastInput > IDLE_MS;
+  }
+
+  /** A touch: back to full frame rate straight away. */
+  wake(): void {
+    this.lastInput = performance.now();
+    if (this.ready && !this.saver) this.app.ticker.maxFPS = 0;
+  }
+
+  /** Battery saver: 30 fps, a lower resolution and no soft-focus blur on the foreground rocks. */
+  setBatterySaver(on: boolean): void {
+    this.saver = on;
+    if (!this.ready) return;
+    this.app.ticker.maxFPS = on ? IDLE_FPS : 0;
+    this.fgLayer.filters = on || !this.fgBlur ? [] : [this.fgBlur];
+    const res = Math.min(window.devicePixelRatio || 1, on ? SAVER_RES : MAX_RES);
+    if (this.app.renderer.resolution !== res) {
+      this.app.renderer.resolution = res;
+      this.app.renderer.resize(this.app.screen.width, this.app.screen.height);
+    }
   }
 
   /** False until init finishes; every public method is a no-op before then. */
@@ -540,6 +584,102 @@ export class StationScene {
     s.position.set(x, y);
     parent.addChild(s);
     return s;
+  }
+
+  /** Hull pieces added as the station grows (see core/growth.ts): rings, spokes, beacons, crown. */
+  private growth = { stage: -1, inner: new Container(), outer: new Container(), crown: new Container(), beacons: [] as Sprite[], windows: [] as Graphics[] };
+
+  /** Shows the station's growth stage. Returns true when it grew. */
+  setGrowth(stage: number): boolean {
+    if (!this.ready || stage === this.growth.stage) return false;
+    const grew = this.growth.stage >= 0 && stage > this.growth.stage;
+    this.growth.stage = stage;
+    const g = this.growth;
+    for (const c of [g.inner, g.outer, g.crown]) c.removeChildren().forEach((x) => x.destroy());
+    g.beacons = [];
+    g.windows = [];
+    const INK = 0x262b58;
+    const LO = 0x4a5490;
+    const BASE = 0x8f9ad6;
+    const HI = 0xdfe5ff;
+    const WIN = 0xffd98a;
+    const ring = (r: number, w: number) => {
+      const ring = new Graphics();
+      ring.circle(0, 0, r).stroke({ width: w + 3, color: INK, alpha: 0.9 });
+      ring.circle(0, 0, r).stroke({ width: w, color: LO });
+      ring.circle(-0.6, -0.8, r).stroke({ width: w * 0.45, color: BASE });
+      ring.circle(-1, -1.4, r - w * 0.25).stroke({ width: 1, color: HI, alpha: 0.5 });
+      return ring;
+    };
+    if (stage >= 1) {
+      g.inner.addChild(ring(80, 5));
+      // Cabin modules with lit windows.
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * TAU;
+        const m = new Graphics();
+        m.roundRect(-9, -5, 18, 10, 3).fill({ color: INK }).roundRect(-8, -4, 16, 8, 2.5).fill({ color: BASE }).roundRect(-8, -4, 16, 3, 2).fill({ color: HI, alpha: 0.5 });
+        m.position.set(Math.cos(a) * 80, Math.sin(a) * 80);
+        m.rotation = a + Math.PI / 2;
+        const w = new Graphics();
+        for (let k = -1; k <= 1; k++) w.rect(k * 4.5 - 1.2, -0.5, 2.4, 2.4).fill({ color: WIN });
+        m.addChild(w);
+        g.windows.push(w);
+        g.inner.addChild(m);
+      }
+    }
+    if (stage >= 2) {
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU + Math.PI / 4;
+        const s = new Graphics();
+        s.rect(70, -3, 44, 6).fill({ color: INK }).rect(71, -2, 42, 4).fill({ color: LO }).rect(71, -2, 42, 1.4).fill({ color: HI, alpha: 0.45 });
+        // Cargo crates stacked along the spoke.
+        for (let k = 0; k < 3; k++) s.roundRect(80 + k * 11, -7, 8, 6, 1.5).fill({ color: [0xffb547, 0x7aa7ff, 0x4fe3c1][(i + k) % 3] }).roundRect(80 + k * 11, -7, 8, 2, 1).fill({ color: 0xffffff, alpha: 0.35 });
+        s.rotation = a;
+        g.outer.addChild(s);
+      }
+    }
+    if (stage >= 3) g.outer.addChildAt(ring(114, 4), 0);
+    if (stage >= 4) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU;
+        const sp = new Graphics();
+        sp.moveTo(-3, 0).lineTo(0, -16).lineTo(3, 0).closePath().fill({ color: INK }).moveTo(-1.8, -1).lineTo(0, -13).lineTo(1.4, -1).closePath().fill({ color: BASE });
+        sp.position.set(Math.cos(a) * 116, Math.sin(a) * 116);
+        sp.rotation = a + Math.PI / 2;
+        g.outer.addChild(sp);
+        const b = this.sprite(this.tex.glow, g.outer, Math.cos(a) * 132, Math.sin(a) * 132);
+        b.blendMode = 'add';
+        b.scale.set(0.24);
+        b.tint = i % 2 ? 0xffd166 : 0xff6b9a;
+        g.beacons.push(b);
+      }
+    }
+    if (stage >= 5) {
+      // A crown of starlight: flat stacked dots, no gradients.
+      for (let i = 0; i < 48; i++) {
+        const a = (i / 48) * TAU;
+        const d = this.sprite(this.tex.glow, g.crown, Math.cos(a) * 150, Math.sin(a) * 150);
+        d.blendMode = 'add';
+        d.scale.set(i % 4 === 0 ? 0.16 : 0.08);
+        d.tint = i % 4 === 0 ? 0xffe9a8 : 0x9fd8ff;
+      }
+    }
+    if (grew) this.squash = 1;
+    return grew;
+  }
+
+  private updateGrowth(dt: number): void {
+    const g = this.growth;
+    if (g.stage <= 0) return;
+    const t = this.time;
+    g.inner.rotation = t * 0.06;
+    g.outer.rotation = -t * 0.025;
+    g.crown.rotation = t * 0.04;
+    g.inner.y = g.outer.y = g.crown.y = this.hub.y;
+    g.windows.forEach((w, i) => (w.alpha = 0.6 + 0.4 * Math.sin(t * 0.7 + i * 1.9)));
+    g.beacons.forEach((b, i) => (b.alpha = Math.sin(t * 2.2 + i) > 0.3 ? 0.95 : 0.15));
+    g.crown.alpha = 0.55 + 0.25 * Math.sin(t * 0.9);
+    void dt;
   }
 
   private buildHub(): void {
@@ -1173,6 +1313,8 @@ export class StationScene {
 
   /** While the tutorial asks for a crate, a slow one is always drifting past. */
   holdCrate = false;
+  /** Off during the tutorial, so a new player isn't distracted. */
+  starsAllowed = false;
 
   /** The station's middle on screen, where bought machines fly in. */
   hubOnScreen(): { x: number; y: number } | null {
@@ -1243,23 +1385,24 @@ export class StationScene {
     if (this.ready && !this.drifts.some((d) => d.kind === 'golden')) this.spawnDrift('golden');
   }
 
-  hitSpecial(sx: number, sy: number): 'crate' | 'meteor' | 'convoy' | 'golden' | null {
+  hitSpecial(sx: number, sy: number): 'crate' | 'meteor' | 'convoy' | 'golden' | 'star' | null {
     if (!this.ready) return null;
     const p = this.toWorld(sx, sy);
-    const reach: Record<DriftKind, number> = { debris: 0, crate: 34, meteor: 32, convoy: 46, golden: 42 };
+    const reach: Record<DriftKind, number> = { debris: 0, crate: 34, meteor: 32, convoy: 46, golden: 42, star: 52 };
     const hit = this.drifts.find((d) => d.kind !== 'debris' && Math.hypot(d.s.x - p.x, d.s.y - p.y) < reach[d.kind]);
     if (!hit) return null;
     // Read the position before removing it: a destroyed sprite has none.
     const { x, y } = hit.s;
     this.removeDrift(hit);
     this.lastHit = { x, y };
-    const color = hit.kind === 'meteor' ? 0xff9a4c : hit.kind === 'convoy' ? 0x5cd6ff : hit.kind === 'golden' ? 0xffe27a : COLORS.dock;
+    const color = hit.kind === 'meteor' ? 0xff9a4c : hit.kind === 'convoy' ? 0x5cd6ff : hit.kind === 'golden' || hit.kind === 'star' ? 0xffe27a : COLORS.dock;
     this.burst(x, y, color, hit.kind === 'meteor' ? 22 : hit.kind === 'golden' ? 60 : 34, hit.kind === 'golden' ? 2.4 : 1.7);
-    if (hit.kind === 'golden') this.rings.push({ x, y, r: 20, life: 1.4, color: 0xffffff, width: 5 });
+    if (hit.kind === 'golden' || hit.kind === 'star') this.rings.push({ x, y, r: 20, life: 1.4, color: 0xffffff, width: 5 });
+    if (hit.kind === 'star') this.fireworks([0xffe27a, 0xffffff, 0x9fd8ff]);
     this.puff(x, y, color, 3, 0.6);
     this.rings.push({ x, y, r: 10, life: 1, color, width: 3 });
     this.shake = Math.max(this.shake, hit.kind === 'meteor' ? 4 : 6);
-    return hit.kind as 'crate' | 'meteor' | 'convoy' | 'golden';
+    return hit.kind as 'crate' | 'meteor' | 'convoy' | 'golden' | 'star';
   }
 
   /**
@@ -1390,7 +1533,8 @@ export class StationScene {
   setBoss(kind: number | null, defeated = false): void {
     if (!this.ready) return;
     if (kind === null) {
-      if (!this.boss) return;
+      // Already on its way out: let it finish.
+      if (!this.boss || this.boss.state === 'out' || this.boss.state === 'dead') return;
       if (defeated) this.explodeBoss();
       else this.boss.state = 'out';
       this.boss.t = 0;
@@ -1614,6 +1758,8 @@ export class StationScene {
   }
 
   private frame(dt: number): void {
+    // Drop to half rate when idle; wake() restores it on the next touch.
+    if (!this.saver && this.app.ticker.maxFPS === 0 && this.idle) this.app.ticker.maxFPS = IDLE_FPS;
     this.time += dt;
     this.jump = Math.max(0, this.jump - dt);
     const warpTarget = this.jump > 0.6 ? 2.6 : this.boosting ? 1 : 0;
@@ -1707,7 +1853,7 @@ export class StationScene {
   private spawnDrift(kind: DriftKind): void {
     const half = WORLD * 0.8;
     const fromLeft = Math.random() < 0.5;
-    const tex = kind === 'golden' ? this.tex.golden : kind === 'crate' ? this.tex.crate : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
+    const tex = kind === 'star' ? this.tex.flare : kind === 'golden' ? this.tex.golden : kind === 'crate' ? this.tex.crate : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
     const s = new Sprite(tex);
     s.anchor.set(0.5);
     let vx = (fromLeft ? 1 : -1) * rand(12, 28);
@@ -1734,6 +1880,15 @@ export class StationScene {
       vy = Math.sin(a) * v;
       s.scale.set(rand(1.1, 1.5));
     }
+    if (kind === 'star') {
+      // A quick diagonal streak high across the view: catchable, but you have to be watching.
+      s.position.set(fromLeft ? -half : half, rand(-WORLD * 0.45, -WORLD * 0.2));
+      vx = (fromLeft ? 1 : -1) * rand(85, 105);
+      vy = rand(18, 34);
+      s.scale.set(0.9);
+      s.blendMode = 'add';
+      s.tint = 0xfff2c0;
+    }
     if (kind === 'convoy') {
       s.scale.set(fromLeft ? 2.8 : -2.8, 2.8);
       s.tint = 0xd8f6ff;
@@ -1747,14 +1902,14 @@ export class StationScene {
       glow = new Sprite(this.tex.glow);
       glow.anchor.set(0.5);
       glow.blendMode = 'add';
-      glow.tint = kind === 'meteor' ? 0xff7a3d : kind === 'convoy' ? 0x5cd6ff : kind === 'golden' ? 0xffd84a : COLORS.dock;
+      glow.tint = kind === 'meteor' ? 0xff7a3d : kind === 'convoy' ? 0x5cd6ff : kind === 'golden' || kind === 'star' ? 0xffd84a : COLORS.dock;
       this.debrisLayer.addChild(glow);
     }
-    if (kind === 'meteor') {
+    if (kind === 'meteor' || kind === 'star') {
       tail = new Sprite(this.tex.streak);
       tail.anchor.set(1, 0.5);
       tail.blendMode = 'add';
-      tail.tint = 0xffa060;
+      tail.tint = kind === 'star' ? 0xfff2c0 : 0xffa060;
       tail.rotation = Math.atan2(vy, vx);
       tail.scale.set(3.2, 1.6);
       this.debrisLayer.addChild(tail);
@@ -1774,6 +1929,11 @@ export class StationScene {
     if (this.nextCrate <= 0) {
       this.spawnDrift('crate');
       this.nextCrate = rand(90, 160) / this.crateRate;
+    }
+    this.nextStar -= dt;
+    if (this.nextStar <= 0) {
+      if (this.starsAllowed && !this.drifts.some((d) => d.kind === 'star')) this.spawnDrift('star');
+      this.nextStar = rand(STAR_GAP[0], STAR_GAP[1]);
     }
     if (this.holdCrate && !this.drifts.some((d) => d.kind === 'crate')) {
       this.spawnDrift('crate');
@@ -1799,11 +1959,17 @@ export class StationScene {
       if (d.glow) {
         d.glow.position.copyFrom(d.s.position);
         const p = 0.5 + 0.5 * Math.sin(this.time * 5);
-        const base = d.kind === 'convoy' ? 2.4 : d.kind === 'meteor' ? 0.9 : d.kind === 'golden' ? 2.2 : 1.3;
+        const base = d.kind === 'convoy' ? 2.4 : d.kind === 'meteor' ? 0.9 : d.kind === 'golden' ? 2.2 : d.kind === 'star' ? 2.6 : 1.3;
         d.glow.scale.set(base + p * 0.4);
         d.glow.alpha = 0.55 + p * 0.3;
       }
       d.tail?.position.copyFrom(d.s.position);
+      // Shooting stars twinkle and shed sparkles.
+      if (d.kind === 'star') {
+        d.s.rotation = this.time * 2;
+        d.s.scale.set(1.3 + 0.35 * Math.sin(this.time * 12));
+        if (Math.random() < dt * 30) this.burst(d.s.x + rand(-6, 6), d.s.y + rand(-6, 6), 0xfff2c0, 1, 0.4);
+      }
       // Golden crates glitter and bob gently.
       if (d.kind === 'golden') {
         d.s.rotation = Math.sin(this.time * 2) * 0.15;
@@ -2202,6 +2368,7 @@ export class StationScene {
       l.alpha = on ? 0.9 : 0.15;
     });
     this.updatePolish(dt, color, beat);
+    this.updateGrowth(dt);
 
     // Smelter pods breathe heat and throw the odd ember.
     this.pods.forEach((p, i) => (p.alpha = 0.85 + 0.15 * Math.sin(t * 4 + i)));

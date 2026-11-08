@@ -23,9 +23,9 @@ export interface GeneratorDef {
 }
 
 export const GENERATORS: readonly GeneratorDef[] = [
-  { id: 'drone', name: 'Salvage Drone', blurb: 'Nibbles bolts off passing wrecks.', baseCost: 15, baseOutput: 0.4, growth: 1.07, color: 0x4fe3c1 },
-  { id: 'hauler', name: 'Hauler', blurb: 'Tows whole hull plates back home.', baseCost: 220, baseOutput: 3.2, growth: 1.09, color: 0x7aa7ff },
-  { id: 'smelter', name: 'Smelter', blurb: 'Melts junk into tidy ingots.', baseCost: 3_500, baseOutput: 22.4, growth: 1.11, color: 0xff8a4c },
+  { id: 'drone', name: 'Salvage Drone', blurb: 'Nibbles bolts off passing wrecks.', baseCost: 15, baseOutput: 0.6, growth: 1.07, color: 0x4fe3c1 },
+  { id: 'hauler', name: 'Hauler', blurb: 'Tows whole hull plates back home.', baseCost: 140, baseOutput: 3.2, growth: 1.09, color: 0x7aa7ff },
+  { id: 'smelter', name: 'Smelter', blurb: 'Melts junk into tidy ingots.', baseCost: 2_400, baseOutput: 22.4, growth: 1.11, color: 0xff8a4c },
   { id: 'fabricator', name: 'Fabricator', blurb: 'Prints parts nobody asked for.', baseCost: 60_000, baseOutput: 168, growth: 1.12, color: 0xc58cff },
   { id: 'dock', name: 'Orbital Dock', blurb: 'Whole derelicts, parked and stripped.', baseCost: 1_100_000, baseOutput: 1_280, growth: 1.13, color: 0xffd166 },
   { id: 'laser', name: 'Mining Laser', blurb: 'Slices asteroids into bite-size chunks.', baseCost: 2e7, baseOutput: 9_600, growth: 1.13, color: 0xff5d6c },
@@ -99,7 +99,9 @@ export const BOOST = {
   cooldownSec: 300,
 };
 
-export const OFFLINE_CAP_SEC = 2 * 60 * 60;
+/** Offline earnings run this long at the start; perks and research stretch it up to OFFLINE_MAX_SEC. */
+export const OFFLINE_CAP_SEC = 8 * 60 * 60;
+export const OFFLINE_MAX_SEC = 24 * 60 * 60;
 export const SAVE_VERSION = 3;
 
 /**
@@ -119,7 +121,7 @@ export type PerkId = 'headstart' | 'longshift' | 'longboost' | 'autobuy' | 'magn
 /** Permanent perks unlocked by how many Star Cores you hold. */
 export const CORE_PERKS: readonly { id: PerkId; at: number; name: string; desc: string }[] = [
   { id: 'headstart', at: 3, name: 'Head Start', desc: 'Start each run with 10 Salvage Drones.' },
-  { id: 'longshift', at: 10, name: 'Night Shift', desc: 'Offline earnings last up to 4 hours.' },
+  { id: 'longshift', at: 10, name: 'Night Shift', desc: 'Offline earnings last 8 hours longer.' },
   { id: 'longboost', at: 25, name: 'Afterburners', desc: 'Overdrive lasts 60 seconds.' },
   { id: 'autobuy', at: 50, name: 'Auto-Builder', desc: 'Buys your cheapest machine every 2 seconds.' },
   { id: 'magnet', at: 100, name: 'Crate Magnet', desc: 'Salvage crates drift by twice as often.' },

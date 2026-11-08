@@ -206,14 +206,24 @@ export class Sfx {
   }
 
   /** A two-note wooden mallet. */
-  buy(): void {
+  /**
+   * A two-bell blip. Each machine tier rings its own note of a pentatonic scale, so the station
+   * sounds different as it grows; buying many at once adds a third bell and a sparkle.
+   */
+  buy(tier = 0, count = 1): void {
     if (!this.ready()) return;
     // Holding a buy button fires many buys a second; keep the blips from piling up.
     const now = performance.now();
     if (now - this.lastBuy < 70) return;
     this.lastBuy = now;
-    this.bell(784, 0, 0.14, 0.24, 4, 1.6, 0.1);
-    this.bell(1175, 0.055, 0.2, 0.24, 4, 1.6, 0.15);
+    const scale = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3];
+    const root = 784 * scale[tier % 5] * (tier >= 5 ? 0.5 : 1);
+    this.bell(root, 0, 0.14, 0.24, 4, 1.6, 0.1);
+    this.bell(root * 1.5, 0.055, 0.2, 0.24, 4, 1.6, 0.15);
+    if (count >= 10) {
+      this.bell(root * 2, 0.11, 0.3, 0.18, 4, 1.6, 0.25);
+      this.voice({ freq: root * 4, dur: 0.35, vol: 0.03, start: 0.12, attack: 0.02, echo: 0.4 });
+    }
     this.noise(0, 0.02, 0.08, { type: 'bandpass', freq: 2500, q: 2 });
   }
 

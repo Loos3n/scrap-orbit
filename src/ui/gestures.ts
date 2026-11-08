@@ -4,8 +4,10 @@
  */
 
 const PANEL_KEY = 'scrap-orbit-panel';
-/** The open menu's height, as a fraction of the screen. */
-const OPEN = 0.5;
+/** The tallest the open menu gets, as a fraction of the screen. Shorter panes get a shorter menu. */
+const OPEN = 0.55;
+/** The least room the open menu gives its pane, so short panes don't look squashed. */
+const MIN_CONTENT = 190;
 
 function loadOpen(): boolean {
   try {
@@ -26,22 +28,44 @@ function storeOpen(open: boolean): void {
 export interface PanelToggle {
   readonly open: boolean;
   set(open: boolean): void;
+  /** Resizes the open menu to its pane's content, after the pane or its contents change. */
+  fit(): void;
 }
 
 /**
  * The menu is either hidden, leaving just a small square button over the station, or open edge
- * to edge across the bottom half of the screen with its tabs along the top. The square toggles it
+ * to edge across the bottom of the screen with its tabs along the top, as tall as its pane needs
+ * up to about half the screen. The square toggles it
  * and rides along on the right of the tab row. No dragging: the apps that host the game grab
  * vertical swipes.
  */
 export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLElement, button: HTMLElement): PanelToggle {
   let open = loadOpen();
-  const height = () => (open ? Math.max(tabs.offsetHeight + 160, Math.min(app.clientHeight * OPEN, app.clientHeight - hud.offsetHeight - 120)) : 0);
+  /** How tall the open pane wants to be: its segment bar plus everything in it. */
+  const content = () => {
+    const sheet = tabs.nextElementSibling as HTMLElement | null;
+    if (!sheet) return Infinity;
+    let h = 0;
+    for (const el of sheet.children) {
+      const child = el as HTMLElement;
+      if (child.hidden) continue;
+      const css = getComputedStyle(child);
+      h += (child.classList.contains('tab-body') ? child.scrollHeight : child.offsetHeight) + parseFloat(css.marginTop) + parseFloat(css.marginBottom);
+    }
+    return h;
+  };
+  const height = () => {
+    if (!open) return 0;
+    const max = Math.max(tabs.offsetHeight + MIN_CONTENT, Math.min(app.clientHeight * OPEN, app.clientHeight - hud.offsetHeight - 120));
+    return Math.min(max, tabs.offsetHeight + Math.max(MIN_CONTENT, content()));
+  };
+  let shown = -1;
   // Set the row sizes directly: some web views mishandle var() fallbacks inside grid templates.
   const apply = (animate: boolean) => {
     app.classList.toggle('snapping', animate);
     app.classList.toggle('panel-closed', !open);
     const h = Math.round(height());
+    shown = h;
     app.style.gridTemplateRows = `auto minmax(120px, 1fr) ${h}px`;
     // Open, the square sits at the right end of the tab row; closed, in the bottom corner.
     button.style.bottom = open ? `${Math.round(h - tabs.offsetHeight + (tabs.offsetHeight - button.offsetHeight) / 2)}px` : '';
@@ -59,6 +83,10 @@ export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLEl
       open = next;
       storeOpen(open);
       apply(true);
+    },
+    fit() {
+      // Small changes (a number growing a line) aren't worth a jiggle.
+      if (open && Math.abs(Math.round(height()) - shown) > 8) apply(true);
     },
   };
 }
