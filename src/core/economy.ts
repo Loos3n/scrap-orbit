@@ -252,6 +252,23 @@ export function upgradeVisible(state: GameState, u: UpgradeDef): boolean {
   return state.owned[u.requires.gen] >= u.requires.count;
 }
 
+/**
+ * The upgrades "Install all" would buy now: cheapest first, for as long as the scrap lasts.
+ * Empty while upgrades are switched off by a challenge.
+ */
+export function affordableUpgrades(state: GameState): UpgradeDef[] {
+  if (challengeOn(state, 'noupg')) return [];
+  const out: UpgradeDef[] = [];
+  let left = state.scrap;
+  const open = UPGRADES.filter((u) => !state.upgrades.has(u.id) && upgradeVisible(state, u)).sort((a, b) => a.cost - b.cost);
+  for (const u of open) {
+    if (left.lt(u.cost)) break;
+    left = left.sub(u.cost);
+    out.push(u);
+  }
+  return out;
+}
+
 export function buyUpgrade(state: GameState, id: string): boolean {
   const u = UPGRADES.find((x) => x.id === id);
   if (!u || state.upgrades.has(id) || !upgradeVisible(state, u) || challengeOn(state, 'noupg')) return false;

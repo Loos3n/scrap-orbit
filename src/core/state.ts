@@ -70,6 +70,8 @@ export interface GameState {
   golden: { until: number; nextAt: number };
   /** Lucky crate buffs: each ends at this epoch ms (0 = off). */
   crateBuffs: { surge: number; frenzy: number };
+  /** Rewarded ads watched today, by kind (core/rewards.ts); `day` is the local date. */
+  ads: { day: string; used: Record<string, number> };
   /** The trading post: docked until `until` with these offers; the next visit is due at `nextAt`. */
   trader: { until: number; nextAt: number; name: number; offers: Offer[] };
   /** The challenge run in progress, if any, and the ones already beaten. */
@@ -114,6 +116,8 @@ export interface GameState {
     stars?: number;
     /** Crates that opened into something other than plain scrap. */
     surprises?: number;
+    /** Optional rewarded ads watched (core/rewards.ts). */
+    adsWatched?: number;
   };
   /** Epoch ms when the active boost ends (0 = none). */
   boostUntil: number;
@@ -141,6 +145,8 @@ export interface GameState {
     batterySaver: boolean;
     /** Phone reminders in the Android app (storage full, research done, crew home). */
     notifications: boolean;
+    /** Offers to watch an optional ad for a bonus (core/rewards.ts). */
+    adOffers: boolean;
   };
 }
 
@@ -180,6 +186,7 @@ interface SaveData {
   skins?: Partial<Record<PetId, string>>;
   golden?: GameState['golden'];
   crateBuffs?: Partial<GameState['crateBuffs']>;
+  ads?: { day?: string; used?: Record<string, number> };
   trader?: GameState['trader'];
   challenge?: string | null;
   challengeGoal?: string;
@@ -246,6 +253,7 @@ export function newState(now: number): GameState {
     skins: {},
     golden: { until: 0, nextAt: 0 },
     crateBuffs: { surge: 0, frenzy: 0 },
+    ads: { day: '', used: {} },
     trader: { until: 0, nextAt: 0, name: 0, offers: [] },
     challenge: null,
     challengeGoal: D(0),
@@ -275,7 +283,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true, adOffers: true },
   };
 }
 
@@ -316,6 +324,7 @@ export function serialize(state: GameState): string {
     skins: { ...state.skins },
     golden: { ...state.golden },
     crateBuffs: { ...state.crateBuffs },
+    ads: { day: state.ads.day, used: { ...state.ads.used } },
     trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
     challenge: state.challenge,
     challengeGoal: state.challengeGoal.toString(),
@@ -431,6 +440,11 @@ export function deserialize(json: string | null, now: number): GameState | null 
   for (const p of PETS) {
     const skin = data.skins?.[p.id];
     if (typeof skin === 'string' && state.loot.has(skin)) state.skins[p.id] = skin;
+  }
+  if (data.ads && typeof data.ads.day === 'string') {
+    const used: Record<string, number> = {};
+    for (const [k, v] of Object.entries(data.ads.used ?? {})) if (Number.isFinite(Number(v))) used[k] = Math.max(0, Math.floor(Number(v)));
+    state.ads = { day: data.ads.day, used };
   }
   if (data.crateBuffs) state.crateBuffs = { surge: Number(data.crateBuffs.surge) || 0, frenzy: Number(data.crateBuffs.frenzy) || 0 };
   if (data.golden) state.golden = { until: Number(data.golden.until) || 0, nextAt: Number(data.golden.nextAt) || 0 };

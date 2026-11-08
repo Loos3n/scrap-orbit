@@ -1,4 +1,7 @@
 import { Graphs } from './graphs';
+import { CloudPanel } from './cloud-ui';
+import { playRewardedAd } from '../ads';
+import { adsLeft, type AdReward } from '../core/rewards';
 import { askPermission, notificationsAvailable } from '../notify';
 import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
@@ -189,9 +192,17 @@ export class UI {
     this.galaxy = new GalaxyPanel(game);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
-    $('boost').addEventListener('click', () => game.boost());
+    new CloudPanel(game, (d) => this.fmt(d));
+    $('boost').addEventListener('click', () => {
+      // While Overdrive cools down, the button offers an optional ad to recharge it.
+      const now = Date.now();
+      if (now < game.state.boostReadyAt && !eco.boostActive(game.state, now) && adsLeft(game.state, 'overdrive', now) > 0) void this.watchAd('overdrive');
+      else game.boost();
+    });
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
     $('rig-buy').addEventListener('click', () => game.buildRig());
+    $('install-all').addEventListener('click', () => game.installAll());
+    $('supply-drop').addEventListener('click', () => void this.watchAd('crystals'));
     holdToRepeat($('best-buy') as HTMLButtonElement, () => {
       game.buyBest();
       this.renderBest();
@@ -470,6 +481,7 @@ export class UI {
       auto.checked = o.autoBuy;
       hap.checked = o.haptics;
       ($('opt-battery') as HTMLInputElement).checked = o.batterySaver;
+      ($('opt-ads') as HTMLInputElement).checked = o.adOffers;
       ($('opt-notify') as HTMLInputElement).checked = o.notifications;
       $('opt-notify-row').hidden = !notificationsAvailable();
       sfxVol.value = String(Math.round(o.sfxVol * 100));
@@ -519,6 +531,8 @@ export class UI {
         if (!ok) this.toast(ICONS.gear, 'Notifications are off for Scrap Orbit in your phone settings.');
       });
     });
+    const adsOpt = $('opt-ads') as HTMLInputElement;
+    adsOpt.addEventListener('change', () => (settings().adOffers = adsOpt.checked));
     const battery = $('opt-battery') as HTMLInputElement;
     battery.addEventListener('change', () => {
       settings().batterySaver = battery.checked;
@@ -706,6 +720,7 @@ export class UI {
     if (rate.sub(this.shownRate).abs().lt(rate.mul(0.002))) this.shownRate = rate;
     setText($('rate'), this.fmt(this.shownRate));
     this.renderBoost(now);
+    this.renderAdOffers(now);
     this.renderGoal();
     if (!$('tab-build').hidden) this.renderGenerators();
     this.renderUpgrades();
@@ -815,7 +830,9 @@ export class UI {
     } else if (now < s.boostReadyAt) {
       state = 'cooldown';
       p = 1 - (s.boostReadyAt - now) / (BOOST.cooldownSec * 1000);
-      setText(sub, `Ready in ${formatDuration((s.boostReadyAt - now) / 1000)}`);
+      // With an ad recharge on offer, the line takes turns with the offer every few seconds.
+      const offer = adsLeft(s, 'overdrive', now) > 0 && Math.floor(now / 3000) % 2 === 1;
+      setText(sub, offer ? '▶ Tap: ad recharge' : `Ready in ${formatDuration((s.boostReadyAt - now) / 1000)}`);
     } else {
       state = 'ready';
       setText(sub, `${BOOST.mult}x for ${eco.boostDurationSec(s)}s`);
@@ -1038,6 +1055,14 @@ export class UI {
         list.innerHTML = '<li class="empty">Every upgrade is installed. More arrive with the next sector.</li>';
       }
     }
+    // Install all: shown once two or more upgrades are affordable together.
+    const all = eco.affordableUpgrades(s);
+    const allBtn = $('install-all') as HTMLButtonElement;
+    allBtn.hidden = all.length < 2;
+    if (all.length >= 2) {
+      setText($('install-all-what'), `${all.length} upgrades, cheapest first`);
+      setText($('install-all-cost'), this.fmt(all.reduce((sum, u) => sum.add(u.cost), D(0))));
+    }
     list.querySelectorAll<HTMLButtonElement>('.buy').forEach((b) => {
       const can = s.scrap.gte(Number(b.dataset.cost));
       b.disabled = !can;
@@ -1131,6 +1156,50 @@ export class UI {
       modal.hidden = true;
       onCollect();
     };
+    // Optional: watch an ad to double what came in.
+    const ad = $('modal-ad') as HTMLButtonElement;
+    const left = adsLeft(this.game.state, 'offline', Date.now());
+    ad.hidden = left <= 0 || earned.lte(0);
+    ad.disabled = false;
+    setText($('modal-ad-left'), `${left} left today`);
+    ad.onclick = async () => {
+      ad.disabled = true;
+      if (await this.watchAd('offline', earned)) {
+        ad.hidden = true;
+        amount.textContent = `+${this.fmt(earned.mul(2))}`;
+        amount.classList.remove('bump');
+        void amount.offsetWidth;
+        amount.classList.add('bump');
+      } else ad.disabled = false;
+    };
+  }
+
+  private adBusy = false;
+
+  /** Plays an optional ad, and pays its reward if it was watched through. */
+  private async watchAd(kind: AdReward, earned?: Decimal): Promise<boolean> {
+    if (this.adBusy || adsLeft(this.game.state, kind, Date.now()) <= 0) return false;
+    this.adBusy = true;
+    try {
+      const watched = await playRewardedAd();
+      if (!watched) {
+        this.toast(ICONS.gear, 'The ad did not finish, so no reward this time.');
+        return false;
+      }
+      return this.game.adReward(kind, earned);
+    } finally {
+      this.adBusy = false;
+    }
+  }
+
+  /** Shows or hides the ad offers that depend on the moment: Overdrive cooling and the mission board. */
+  private renderAdOffers(now: number): void {
+    const s = this.game.state;
+    if (!$('missions').hidden) {
+      const left = adsLeft(s, 'crystals', now);
+      $('supply-drop').hidden = left <= 0;
+      setText($('supply-drop-left'), `${left} left today`);
+    }
   }
 
   toast(icon: string, html: string): void {

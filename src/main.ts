@@ -16,6 +16,7 @@ import './style.css';
 import { Sfx } from './audio';
 import { CLAW, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES } from './core/config';
 import { modelName } from './core/evolve';
+import { AD_CRYSTALS } from './core/rewards';
 import { MARK_COLORS } from './art/kit';
 import { BOSS_NAMES, CREW, EVENTS, PAINTS, PETS, RESEARCH, THEMES, TUTORIAL_DRONES, TUTORIAL_TAPS, sectorFor } from './core/content';
 import { SAFE_TYPES, SETS, SKINS } from './core/collection';
@@ -239,6 +240,21 @@ async function boot(): Promise<void> {
         buzz([30, 40, 60]);
         break;
       }
+      case 'adReward':
+        if (e.kind === 'overdrive') ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Overdrive recharged!</b> Fire it when you are ready');
+        else if (e.kind === 'crystals') ui.toast(ICONS.crystal.replace('currentColor', '#5cd6ff'), `<b>Supply drop!</b> +${AD_CRYSTALS} crystals`);
+        else ui.toast(ICONS.scrap, '<b>Doubled!</b> Your time-away earnings came in twice');
+        sfx.coins();
+        buzz(30);
+        break;
+      case 'upgradeAll':
+        ui.toast(ICONS.star, `<b>${e.ids.length} upgrades</b> installed`);
+        game.advanceTutorial('upgrade');
+        scene.celebrate();
+        scene.fireworks([0xffd166, 0x5ce1ff, 0xc58cff]);
+        sfx.upgrade();
+        buzz([15, 30, 15]);
+        break;
       case 'upgrade': {
         const u = UPGRADES.find((x) => x.id === e.id)!;
         ui.toast(ICONS.star, `<b>${u.name}</b> installed`);

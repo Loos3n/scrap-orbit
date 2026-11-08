@@ -394,3 +394,47 @@ export function vortex(): SpriteArt {
   ].join('');
   return { w: 90, h: 90, scale: 1, markup: m, res: 3 };
 }
+
+/**
+ * Extra parts an evolved machine wears on the station (core/evolve.ts), drawn around any
+ * sprite's outline: Mk II adds chrome running lights, Mk III a cyan power ring, Mk IV gold
+ * fins and Mk V four prism crystals. The canvas grows evenly, so the anchor stays centred.
+ */
+export function evolveParts(a: SpriteArt, mark: number): SpriteArt {
+  if (mark <= 0) return a;
+  const W = a.w * a.scale;
+  const H = a.h * a.scale;
+  const cx = W / 2;
+  const cy = H / 2;
+  const big = Math.max(W, H);
+  const pad = big * 0.22;
+  const rx = W / 2 + pad * 0.5;
+  const ry = H / 2 + pad * 0.5;
+  const r = Math.max(1.4, big * 0.035);
+  const back: string[] = [];
+  const front: string[] = [];
+  if (mark >= 2) {
+    back.push(glow(cx, cy, Math.max(rx, ry) * 0.95, P.cyan.base, 0.22));
+    back.push(line(ell(cx, cy, rx, ry), P.cyan.ink, r * 1.5, ' opacity=".8"') + line(ell(cx, cy, rx, ry), P.cyan.base, r * 0.75) + line(ell(cx, cy, rx, ry), '#fff', r * 0.25, ' opacity=".7"'));
+  }
+  if (mark >= 3) {
+    const fw = W * 0.16;
+    const fh = pad * 0.85;
+    for (const s of [-1, 1]) {
+      const y0 = cy + s * (H / 2 - fh * 0.15);
+      const tip = cy + s * (H / 2 + fh);
+      front.push(cel(poly(cx - fw, y0, cx + fw, y0, cx + fw * 0.25, tip, cx - fw * 0.25, tip), P.gold, [cx, (y0 + tip) / 2, fw], { hl: 0, ink: r * 0.8 }));
+    }
+  }
+  if (mark >= 4) {
+    for (const [x, y] of [[cx - rx, cy], [cx + rx, cy], [cx, cy - ry], [cx, cy + ry]]) {
+      front.push(glow(x, y, r * 4, P.purple.base, 0.45) + cel(poly(x, y - r * 2.4, x + r * 1.5, y, x, y + r * 2.4, x - r * 1.5, y), P.purple, [x, y, r * 2], { hl: 0.4, ink: r * 0.6 }) + glint(x - r * 0.3, y - r * 0.6, r * 0.9));
+    }
+  }
+  // Mk II lights sit last, so they shine over the fins and ring.
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    front.push(lamp(cx + sx * (W / 2) * 0.82, cy + sy * (H / 2) * 0.82, r * 0.8, mark >= 4 ? '#f3d2ff' : mark >= 3 ? P.gold.base : mark >= 2 ? P.cyan.base : '#eaf2ff'));
+  }
+  const markup = `<g transform="translate(${n(pad)} ${n(pad)})">${back.join('')}${a.markup}${front.join('')}</g>`;
+  return { ...a, w: a.w + (2 * pad) / a.scale, h: a.h + (2 * pad) / a.scale, markup };
+}

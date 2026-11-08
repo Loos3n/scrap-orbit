@@ -125,6 +125,7 @@
           <p class="hold-hint">Tip: press and hold a machine on the station to see it up close.</p>
         </div>
         <div id="tab-upgrades" class="tab-body" hidden>
+          <button id="install-all" class="best-buy install-all" type="button" hidden><span class="best-icon" data-icon="star"></span><span class="best-info"><b>Install all</b><span id="install-all-what"></span></span><span class="buy-cost"><span data-icon="scrap"></span><span id="install-all-cost" class="n"></span></span></button>
           <ul id="upgrade-list" class="list"></ul>
         </div>
         <div id="tab-crew" class="tab-body" hidden>
@@ -208,6 +209,7 @@
         <div id="modal-amount" class="modal-amount">+0</div>
         <p id="modal-time" class="modal-time"></p>
         <ul id="modal-report" class="modal-report"></ul>
+        <button id="modal-ad" class="ad-btn" type="button" hidden><span class="ad-play"></span><span>Watch an ad to double it<small id="modal-ad-left"></small></span></button>
         <button id="modal-ok" class="primary" type="button">Collect</button>
       </div>
     </div>
@@ -225,6 +227,7 @@
             <label id="opt-notify-row" class="toggle" hidden><input id="opt-notify" type="checkbox" /><span>Reminders<small>When storage fills up, research finishes or crew come home</small></span></label>
             <label class="toggle"><input id="opt-battery" type="checkbox" /><span>Battery saver<small>Smoother on older phones and easier on the battery</small></span></label>
             <h3 class="section-title">Game</h3>
+            <label class="toggle"><input id="opt-ads" type="checkbox" /><span>Ad offers<small>Optional bonuses for watching an ad. An ad only plays when you tap one.</small></span></label>
             <label id="opt-auto-row" class="toggle" hidden><input id="opt-auto" type="checkbox" /><span>Auto-Builder</span></label>
             <div class="setting-row">
               <span>Numbers</span>
@@ -232,6 +235,21 @@
                 <button type="button" role="radio" data-num="letters">15M</button>
                 <button type="button" role="radio" data-num="scientific">1.5e7</button>
                 <button type="button" role="radio" data-num="engineering">15e6</button>
+              </div>
+            </div>
+            <div id="cloud-box" class="cloud-box" hidden>
+              <h3 class="section-title">Cloud save</h3>
+              <p id="cloud-status" class="cloud-status">Sign in to keep your station safe and play it on any phone or browser.</p>
+              <div id="cloud-choice" class="cloud-choice" hidden>
+                <p id="cloud-choice-text"></p>
+                <button id="cloud-use" type="button" class="danger">Use the cloud save</button>
+                <button id="cloud-keep" type="button">Keep this one</button>
+              </div>
+              <div class="cloud-actions">
+                <button id="cloud-signin" type="button" class="cloud-main">Sign in with Google</button>
+                <button id="cloud-backup" type="button" hidden>Back up now</button>
+                <button id="cloud-restore" type="button" hidden>Load cloud save</button>
+                <button id="cloud-signout" type="button" hidden>Sign out</button>
               </div>
             </div>
             <button id="save-open" class="reset" type="button">Back up or move your save</button>
@@ -331,8 +349,17 @@
         <h2 id="missions-title">Today's missions</h2>
         <ul id="mission-list" class="mission-list"></ul>
         <p id="mission-reset" class="mission-reset"></p>
+        <button id="supply-drop" class="ad-btn" type="button" hidden><span class="ad-play"></span><span>Supply drop: watch an ad for 10 crystals<small id="supply-drop-left"></small></span></button>
         <h3 class="section-title">Weekly challenge</h3>
         <ul id="weekly-list" class="mission-list"></ul>
+      </div>
+    </div>
+    <div id="sample-ad" class="sample-ad" hidden role="dialog" aria-label="Sample ad">
+      <div class="sample-ad-card">
+        <small>Sample ad</small>
+        <b>A real ad plays here in the Android app</b>
+        <span>Reward in <b id="sample-ad-left">4</b></span>
+        <button id="sample-ad-skip" type="button">Skip (no reward)</button>
       </div>
     </div>
     <div id="fanfare" class="fanfare" hidden aria-live="polite">

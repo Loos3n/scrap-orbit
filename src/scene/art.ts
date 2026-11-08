@@ -1958,5 +1958,7 @@ export function machineMark(id: GeneratorId, mark: number, dockRadius: number): 
     dyson: sprites.dysonPanel,
   };
   const a = make[id as Exclude<GeneratorId, 'nanite'>]();
-  return vector({ ...a, markup: refit(a.markup, mark) });
+  const plated = { ...a, markup: refit(a.markup, mark) };
+  // The dock is one slice of a whole ring, so it has no outline to dress up.
+  return vector(id === 'dock' ? plated : sprites.evolveParts(plated, mark));
 }
