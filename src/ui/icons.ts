@@ -1,5 +1,5 @@
 import type { GeneratorId } from '../core/config';
-import { P, circ, ell, rrect, poly, ngon, fill, line, outline, glint, glow, cel, tube, facetStar, n, svg } from '../art/kit';
+import { P, circ, ell, rrect, poly, ngon, fill, line, outline, glint, glow, cel, tube, facetStar, n, svg, refit, markBadge } from '../art/kit';
 
 /**
  * The menu art set, drawn as inline SVG on a 48x48 grid with the drawing kit in
@@ -390,4 +390,19 @@ function fresh<T extends Record<string, string>>(raw: T): T {
 }
 
 export const GEN_ICONS = fresh(RAW_GEN_ICONS);
+
+const GEN_BODIES: Record<GeneratorId, () => string> = { drone, hauler, smelter, fabricator, dock, laser, gravity, nanite, gate, dyson };
+const markIcons = new Map<string, string>();
+
+/** A machine's icon for its current model (see core/evolve.ts): refitted plating and a mark badge. */
+export function genIcon(id: GeneratorId, mark: number): string {
+  if (mark <= 0) return GEN_ICONS[id];
+  const key = `${id}:${mark}`;
+  let raw = markIcons.get(key);
+  if (!raw) {
+    raw = svg(refit(GEN_BODIES[id](), mark) + markBadge(mark));
+    markIcons.set(key, raw);
+  }
+  return uniqueIds(raw);
+}
 export const ICONS = fresh(RAW_ICONS);

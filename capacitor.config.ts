@@ -13,6 +13,11 @@ const config: CapacitorConfig = {
       // Light status bar icons on the dark sky.
       style: 'DARK',
     },
+    // Cloud save sign-in (src/cloud.ts): the phone's Google account picker; the web SDK signs in with its token.
+    FirebaseAuthentication: {
+      skipNativeAuth: true,
+      providers: ['google.com'],
+    },
   },
 };
 

@@ -1,8 +1,11 @@
 import { Graphs } from './graphs';
+import { CloudPanel } from './cloud-ui';
+import { playRewardedAd } from '../ads';
+import { adsLeft, type AdReward } from '../core/rewards';
 import { askPermission, notificationsAvailable } from '../notify';
 import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
-import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
+import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
 import { exportCode, importCode, type GameState } from '../core/state';
@@ -10,7 +13,8 @@ import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
 import type { Game } from '../game';
-import { GEN_ICONS, ICONS } from './icons';
+import { GEN_ICONS, ICONS, genIcon } from './icons';
+import { markOf, modelName, nextMark } from '../core/evolve';
 import { holdToRepeat, makePanelToggle, type PanelToggle } from './gestures';
 import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderCrateBuffs, renderGoldenBanner } from './expansion-ui';
@@ -87,6 +91,10 @@ const setText = (el: HTMLElement, text: string) => {
 
 interface GenRow {
   li: HTMLLIElement;
+  icon: HTMLElement;
+  name: HTMLElement;
+  /** The model on show, so the icon is only redrawn when the machine evolves. */
+  mark: number;
   count: HTMLElement;
   rate: HTMLElement;
   bar: HTMLElement;
@@ -184,9 +192,17 @@ export class UI {
     this.galaxy = new GalaxyPanel(game);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
-    $('boost').addEventListener('click', () => game.boost());
+    new CloudPanel(game, (d) => this.fmt(d));
+    $('boost').addEventListener('click', () => {
+      // While Overdrive cools down, the button offers an optional ad to recharge it.
+      const now = Date.now();
+      if (now < game.state.boostReadyAt && !eco.boostActive(game.state, now) && adsLeft(game.state, 'overdrive', now) > 0) void this.watchAd('overdrive');
+      else game.boost();
+    });
     holdToRepeat($('claw-buy') as HTMLButtonElement, () => game.levelClaw());
     $('rig-buy').addEventListener('click', () => game.buildRig());
+    $('install-all').addEventListener('click', () => game.installAll());
+    $('supply-drop').addEventListener('click', () => void this.watchAd('crystals'));
     holdToRepeat($('best-buy') as HTMLButtonElement, () => {
       game.buyBest();
       this.renderBest();
@@ -207,7 +223,7 @@ export class UI {
       li.className = 'gen';
       li.style.setProperty('--c', hex(g.color));
       li.innerHTML = `
-        <button class="gen-icon" type="button" aria-label="About ${g.name}">${GEN_ICONS[g.id]}<span class="gen-count">0</span><span class="info-dot">i</span></button>
+        <button class="gen-icon" type="button" aria-label="About ${g.name}"><span class="gen-art">${GEN_ICONS[g.id]}</span><span class="gen-count">0</span><span class="info-dot">i</span></button>
         <div class="gen-info">
           <div class="gen-name"></div>
           <div class="gen-rate"></div>
@@ -219,6 +235,9 @@ export class UI {
       li.querySelector('.gen-name')!.textContent = g.name;
       const row: GenRow = {
         li,
+        icon: li.querySelector('.gen-art')!,
+        name: li.querySelector('.gen-name')!,
+        mark: 0,
         count: li.querySelector('.gen-count')!,
         rate: li.querySelector('.gen-rate')!,
         bar: li.querySelector('.bar > i')!,
@@ -462,6 +481,7 @@ export class UI {
       auto.checked = o.autoBuy;
       hap.checked = o.haptics;
       ($('opt-battery') as HTMLInputElement).checked = o.batterySaver;
+      ($('opt-ads') as HTMLInputElement).checked = o.adOffers;
       ($('opt-notify') as HTMLInputElement).checked = o.notifications;
       $('opt-notify-row').hidden = !notificationsAvailable();
       sfxVol.value = String(Math.round(o.sfxVol * 100));
@@ -511,6 +531,8 @@ export class UI {
         if (!ok) this.toast(ICONS.gear, 'Notifications are off for Scrap Orbit in your phone settings.');
       });
     });
+    const adsOpt = $('opt-ads') as HTMLInputElement;
+    adsOpt.addEventListener('change', () => (settings().adOffers = adsOpt.checked));
     const battery = $('opt-battery') as HTMLInputElement;
     battery.addEventListener('change', () => {
       settings().batterySaver = battery.checked;
@@ -698,6 +720,7 @@ export class UI {
     if (rate.sub(this.shownRate).abs().lt(rate.mul(0.002))) this.shownRate = rate;
     setText($('rate'), this.fmt(this.shownRate));
     this.renderBoost(now);
+    this.renderAdOffers(now);
     this.renderGoal();
     if (!$('tab-build').hidden) this.renderGenerators();
     this.renderUpgrades();
@@ -807,7 +830,9 @@ export class UI {
     } else if (now < s.boostReadyAt) {
       state = 'cooldown';
       p = 1 - (s.boostReadyAt - now) / (BOOST.cooldownSec * 1000);
-      setText(sub, `Ready in ${formatDuration((s.boostReadyAt - now) / 1000)}`);
+      // With an ad recharge on offer, the line takes turns with the offer every few seconds.
+      const offer = adsLeft(s, 'overdrive', now) > 0 && Math.floor(now / 3000) % 2 === 1;
+      setText(sub, offer ? '▶ Tap: ad recharge' : `Ready in ${formatDuration((s.boostReadyAt - now) / 1000)}`);
     } else {
       state = 'ready';
       setText(sub, `${BOOST.mult}x for ${eco.boostDurationSec(s)}s`);
@@ -935,7 +960,7 @@ export class UI {
   private purchaseText(p: Purchase): string {
     if (p.kind === 'upgrade') return UPGRADES.find((u) => u.id === p.id)!.name;
     if (p.kind === 'claw') return `Claw Lv ${this.game.state.claw + 1}`;
-    const name = GENERATORS.find((g) => g.id === p.id)!.name;
+    const name = modelName(p.id, this.game.state.owned[p.id]);
     return p.count === 1 ? `1 ${name}` : `${p.count} ${name}s`;
   }
 
@@ -961,13 +986,21 @@ export class UI {
       const affordable = quote.cost.lte(s.scrap);
       row.li.classList.toggle('locked', owned === 0 && !affordable);
       setText(row.count, String(owned));
+      const mark = markOf(owned);
+      if (mark !== row.mark) {
+        row.mark = mark;
+        row.icon.innerHTML = genIcon(g.id, mark);
+        row.name.textContent = modelName(g.id, owned);
+        for (let m = 1; m <= MARKS.length; m++) row.li.classList.toggle(`mk-${m}`, m === mark);
+      }
       const rateHtml = owned > 0 ? `<b>+${this.fmt(eco.generatorRate(s, g))}</b> / sec` : g.blurb;
       if (row.rate.innerHTML !== rateHtml) row.rate.innerHTML = rateHtml;
       const next = eco.nextMilestone(owned);
       if (next) {
         const pct = ((owned - next.prev) / (next.at - next.prev)) * 100;
         row.bar.style.width = `${pct}%`;
-        const html = `${owned} / ${next.at} <b>→ 2x output</b>`;
+        const model = nextMark(owned);
+        const html = model && model.at === next.at ? `${owned} / ${next.at} <b class="mk-next">→ ${model.name} · ${MILESTONE_MULT * model.mult}x output</b>` : `${owned} / ${next.at} <b>→ 2x output</b>`;
         if (row.milestone.innerHTML !== html) row.milestone.innerHTML = html;
       } else {
         row.bar.style.width = '100%';
@@ -982,8 +1015,8 @@ export class UI {
 
   private renderUpgrades(): void {
     const s = this.game.state;
-    const available = UPGRADES.filter((u) => !s.upgrades.has(u.id) && eco.upgradeVisible(s, u));
-    const teaser = UPGRADES.find((u) => !s.upgrades.has(u.id) && !eco.upgradeVisible(s, u));
+    const available = UPGRADES.filter((u) => !s.upgrades.has(u.id) && eco.upgradeVisible(s, u)).sort((a, b) => a.cost - b.cost);
+    const teaser = UPGRADES.filter((u) => !s.upgrades.has(u.id) && !eco.upgradeVisible(s, u)).sort((a, b) => a.cost - b.cost)[0];
     $('upgrade-dot').hidden = !available.some((u) => s.scrap.gte(u.cost));
     if ($('tab-upgrades').hidden) return;
 
@@ -1021,6 +1054,14 @@ export class UI {
       if (!available.length && !teaser) {
         list.innerHTML = '<li class="empty">Every upgrade is installed. More arrive with the next sector.</li>';
       }
+    }
+    // Install all: shown once two or more upgrades are affordable together.
+    const all = eco.affordableUpgrades(s);
+    const allBtn = $('install-all') as HTMLButtonElement;
+    allBtn.hidden = all.length < 2;
+    if (all.length >= 2) {
+      setText($('install-all-what'), `${all.length} upgrades, cheapest first`);
+      setText($('install-all-cost'), this.fmt(all.reduce((sum, u) => sum.add(u.cost), D(0))));
     }
     list.querySelectorAll<HTMLButtonElement>('.buy').forEach((b) => {
       const can = s.scrap.gte(Number(b.dataset.cost));
@@ -1115,6 +1156,50 @@ export class UI {
       modal.hidden = true;
       onCollect();
     };
+    // Optional: watch an ad to double what came in.
+    const ad = $('modal-ad') as HTMLButtonElement;
+    const left = adsLeft(this.game.state, 'offline', Date.now());
+    ad.hidden = left <= 0 || earned.lte(0);
+    ad.disabled = false;
+    setText($('modal-ad-left'), `${left} left today`);
+    ad.onclick = async () => {
+      ad.disabled = true;
+      if (await this.watchAd('offline', earned)) {
+        ad.hidden = true;
+        amount.textContent = `+${this.fmt(earned.mul(2))}`;
+        amount.classList.remove('bump');
+        void amount.offsetWidth;
+        amount.classList.add('bump');
+      } else ad.disabled = false;
+    };
+  }
+
+  private adBusy = false;
+
+  /** Plays an optional ad, and pays its reward if it was watched through. */
+  private async watchAd(kind: AdReward, earned?: Decimal): Promise<boolean> {
+    if (this.adBusy || adsLeft(this.game.state, kind, Date.now()) <= 0) return false;
+    this.adBusy = true;
+    try {
+      const watched = await playRewardedAd();
+      if (!watched) {
+        this.toast(ICONS.gear, 'The ad did not finish, so no reward this time.');
+        return false;
+      }
+      return this.game.adReward(kind, earned);
+    } finally {
+      this.adBusy = false;
+    }
+  }
+
+  /** Shows or hides the ad offers that depend on the moment: Overdrive cooling and the mission board. */
+  private renderAdOffers(now: number): void {
+    const s = this.game.state;
+    if (!$('missions').hidden) {
+      const left = adsLeft(s, 'crystals', now);
+      $('supply-drop').hidden = left <= 0;
+      setText($('supply-drop-left'), `${left} left today`);
+    }
   }
 
   toast(icon: string, html: string): void {

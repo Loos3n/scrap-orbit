@@ -1,3 +1,5 @@
+import { AD_CRYSTALS, useAd, type AdReward } from './core/rewards';
+import { markOf } from './core/evolve';
 import { recordIncome, recordRun } from './core/history';
 import { catchStar, type StarPrize } from './core/lucky';
 import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
@@ -28,6 +30,10 @@ export type GameEvent =
   | { type: 'tap'; value: Decimal }
   | { type: 'bought'; gen: GeneratorId; count: number }
   | { type: 'milestone'; gen: GeneratorId; at: number }
+  /** A machine reached a new model: `mark` 1 is Mk II. */
+  | { type: 'evolve'; gen: GeneratorId; mark: number }
+  | { type: 'upgradeAll'; ids: string[] }
+  | { type: 'adReward'; kind: AdReward; earned?: Decimal }
   | { type: 'upgrade'; id: string }
   | { type: 'boost' }
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
@@ -446,6 +452,12 @@ export class Game {
     if (count === 0) return;
     this.emit({ type: 'bought', gen: id, count });
     const after = this.state.owned[id];
+    const mark = markOf(after);
+    if (mark > markOf(before)) {
+      // A new model outshines the milestone it lands on, so only the evolution is announced.
+      this.emit({ type: 'evolve', gen: id, mark });
+      return;
+    }
     for (const m of MILESTONES) {
       if (before < m && after >= m) this.emit({ type: 'milestone', gen: id, at: m });
     }
@@ -472,6 +484,30 @@ export class Game {
 
   buyUpgrade(id: string): void {
     if (eco.buyUpgrade(this.state, id)) this.emit({ type: 'upgrade', id });
+  }
+
+  /**
+   * Pays an optional ad's reward, once the ad has been watched: doubles the welcome-back
+   * earnings (`earned` is what came in), recharges Overdrive, or drops crystals.
+   */
+  adReward(kind: AdReward, earned?: Decimal): boolean {
+    const now = Date.now();
+    if (kind === 'overdrive' && now >= this.state.boostReadyAt) return false;
+    if (!useAd(this.state, kind, now)) return false;
+    if (kind === 'offline' && earned) eco.earn(this.state, earned);
+    if (kind === 'overdrive') this.state.boostReadyAt = now;
+    if (kind === 'crystals') meta.addCrystals(this.state, AD_CRYSTALS);
+    this.emit({ type: 'adReward', kind, earned });
+    this.save();
+    return true;
+  }
+
+  /** Installs every upgrade the scrap covers, cheapest first, with one announcement for the lot. */
+  installAll(): number {
+    const ids = eco.affordableUpgrades(this.state).map((u) => u.id).filter((id) => eco.buyUpgrade(this.state, id));
+    if (ids.length === 1) this.emit({ type: 'upgrade', id: ids[0] });
+    else if (ids.length > 1) this.emit({ type: 'upgradeAll', ids });
+    return ids.length;
   }
 
   boost(): void {

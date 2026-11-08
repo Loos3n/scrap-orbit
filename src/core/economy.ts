@@ -1,3 +1,4 @@
+import { markMult } from './evolve';
 import {
   ACHIEVEMENT_BONUS,
   BOOST,
@@ -156,7 +157,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id);
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * markMult(owned) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;
@@ -249,6 +250,23 @@ export function buyGenerator(state: GameState, id: GeneratorId, mode: BuyMode | 
 
 export function upgradeVisible(state: GameState, u: UpgradeDef): boolean {
   return state.owned[u.requires.gen] >= u.requires.count;
+}
+
+/**
+ * The upgrades "Install all" would buy now: cheapest first, for as long as the scrap lasts.
+ * Empty while upgrades are switched off by a challenge.
+ */
+export function affordableUpgrades(state: GameState): UpgradeDef[] {
+  if (challengeOn(state, 'noupg')) return [];
+  const out: UpgradeDef[] = [];
+  let left = state.scrap;
+  const open = UPGRADES.filter((u) => !state.upgrades.has(u.id) && upgradeVisible(state, u)).sort((a, b) => a.cost - b.cost);
+  for (const u of open) {
+    if (left.lt(u.cost)) break;
+    left = left.sub(u.cost);
+    out.push(u);
+  }
+  return out;
 }
 
 export function buyUpgrade(state: GameState, id: string): boolean {

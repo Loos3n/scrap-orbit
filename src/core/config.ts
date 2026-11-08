@@ -36,8 +36,30 @@ export const GENERATORS: readonly GeneratorDef[] = [
 ];
 
 /** Owning this many of a generator multiplies its output by MILESTONE_MULT (cumulative). */
-export const MILESTONES = [10, 25, 50, 100, 150, 200, 250, 300, 400, 500] as const;
+export const MILESTONES = [10, 25, 50, 100, 150, 200, 250, 300, 400, 500, 600, 750, 1000] as const;
 export const MILESTONE_MULT = 2;
+
+/**
+ * Machine evolutions: owning this many of a machine refits it into a new model, with a new look
+ * on the station and in the menu, and multiplies its output by `mult` on top of the milestone.
+ */
+export interface MarkDef {
+  at: number;
+  /** Shown after the machine's name, like "Salvage Drone Mk II". */
+  name: string;
+  /** The model's class, for the evolution card. */
+  title: string;
+  /** What changes on the station, in words. */
+  look: string;
+  mult: number;
+}
+
+export const MARKS: readonly MarkDef[] = [
+  { at: 100, name: 'Mk II', title: 'Refit', look: 'Chrome plating and brighter running lights.', mult: 1.5 },
+  { at: 250, name: 'Mk III', title: 'Prototype', look: 'Carbon armour and a humming power core.', mult: 1.5 },
+  { at: 500, name: 'Mk IV', title: 'Masterwork', look: 'Gold plating that sparkles as it works.', mult: 2 },
+  { at: 1000, name: 'Mk V', title: 'Legendary', look: 'A prismatic hull that shifts colour.', mult: 3 },
+];
 
 export type UpgradeEffect =
   | { kind: 'tapMult'; mult: number }
@@ -61,7 +83,7 @@ export interface UpgradeDef {
  */
 export const CLAW = { baseCost: 20, growth: 1.45, doubleEvery: 10 };
 
-export const UPGRADES: readonly UpgradeDef[] = [
+const HAND_MADE: readonly UpgradeDef[] = [
   { id: 'claw1', name: 'Reinforced Claw', desc: 'Taps are worth 2x.', cost: 75, requires: { gen: 'drone', count: 1 }, effects: [{ kind: 'tapMult', mult: 2 }] },
   { id: 'grip1', name: 'Servo Grip', desc: 'Taps are worth 2x.', cost: 600, requires: { gen: 'drone', count: 5 }, effects: [{ kind: 'tapMult', mult: 2 }] },
   { id: 'grip2', name: 'Hauler Hooks', desc: 'Taps 2x, and each tap gives 1% of your income per second.', cost: 3_000, requires: { gen: 'hauler', count: 1 }, effects: [{ kind: 'tapMult', mult: 2 }, { kind: 'tapIncomeShare', share: 0.01 }] },
@@ -91,7 +113,57 @@ export const UPGRADES: readonly UpgradeDef[] = [
   { id: 'claw5', name: 'Event Claw', desc: 'Each tap also gives 10% of your income per second.', cost: 2e13, requires: { gen: 'nanite', count: 25 }, effects: [{ kind: 'tapIncomeShare', share: 0.1 }] },
   { id: 'dyson1', name: 'Stellar Mirrors', desc: 'Dyson Collectors produce 2x.', cost: 1.5e14, requires: { gen: 'dyson', count: 10 }, effects: [{ kind: 'genMult', gen: 'dyson', mult: 2 }] },
   { id: 'all3', name: 'Galactic Franchise', desc: 'Everything produces 3x.', cost: 2e15, requires: { gen: 'gate', count: 25 }, effects: [{ kind: 'allMult', mult: 3 }] },
+  { id: 'claw6', name: 'Gravity Grapple', desc: 'Taps 5x.', cost: 3e12, requires: { gen: 'gravity', count: 50 }, effects: [{ kind: 'tapMult', mult: 5 }] },
+  { id: 'claw7', name: 'Portal Pincers', desc: 'Taps 5x.', cost: 5e15, requires: { gen: 'gate', count: 50 }, effects: [{ kind: 'tapMult', mult: 5 }] },
+  { id: 'claw8', name: 'Star Claw', desc: 'Each tap also gives 10% of your income per second.', cost: 1e19, requires: { gen: 'dyson', count: 50 }, effects: [{ kind: 'tapIncomeShare', share: 0.1 }] },
+  { id: 'all4', name: 'Hollow Fleet Charts', desc: 'Everything produces 2x.', cost: 1e17, requires: { gen: 'dyson', count: 25 }, effects: [{ kind: 'allMult', mult: 2 }] },
+  { id: 'all5', name: 'Salvage Guild', desc: 'Everything produces 3x.', cost: 1e20, requires: { gen: 'dyson', count: 75 }, effects: [{ kind: 'allMult', mult: 3 }] },
+  { id: 'all6', name: 'Cosmic Scrapyard', desc: 'Everything produces 3x.', cost: 1e24, requires: { gen: 'dyson', count: 150 }, effects: [{ kind: 'allMult', mult: 3 }] },
+  { id: 'all7', name: 'Heart of the Orbit', desc: 'Everything produces 5x.', cost: 1e30, requires: { gen: 'dyson', count: 250 }, effects: [{ kind: 'allMult', mult: 5 }] },
 ];
+
+
+/**
+ * The long tail: every machine gets a 2x upgrade at each of these counts it doesn't already
+ * have one for, so there is always another upgrade a few minutes away, even late in a run.
+ */
+export const TAIL_COUNTS = [100, 150, 200, 250, 300, 400, 500, 750] as const;
+export const TAIL_COST = 50;
+
+const TAIL_NAMES: Record<GeneratorId, readonly string[]> = {
+  drone: ['Tether Lines', 'Homing Beacons', 'Swarm Choir', 'Bolt Sniffers', 'Hive Relay', 'Drone Ballet', 'Pocket Tugs', 'Golden Rotors'],
+  hauler: ['Spare Tow Hooks', 'Cargo Tetris', 'Convoy Lanes', 'Long-Haul Coffee', 'Freight Wings', 'Bulk Grapples', 'Slipstream Routes', 'Titan Haulers'],
+  smelter: ['Hotter Coals', 'Slag Skimmers', 'Ingot Stackers', 'Crucible Choir', 'White-Hot Cores', 'Starmetal Molds', 'Lava Lamps', 'Sunheart Furnaces'],
+  fabricator: ['Ink Refills', 'Faster Nozzles', 'Batch Printing', 'Print Farms', 'Nano Inks', 'Dream Printers', 'Print-a-Printer', 'Infinite Spools'],
+  dock: ['Wider Berths', 'Strip Crews', 'Night Docking', 'Hull Recyclers', 'Grand Moorings', 'Wreck Magnets', 'Dry Dock Choir', 'Harbour of Stars'],
+  laser: ['Cooling Fins', 'Split Beams', 'Pulse Lenses', 'Asteroid Carving', 'Prism Arrays', 'Beam Weaving', 'Twin Barrels', 'Starcutter'],
+  gravity: ['Denser Cores', 'Orbit Shepherds', 'Tidal Sieves', 'Lensing Nets', 'Deep Pull', 'Singularity Taps', 'Spin Locks', 'Pocket Horizons'],
+  nanite: ['Smarter Swarms', 'Nanite Nurseries', 'Hive Songs', 'Grey Gardens', 'Million Hands', 'Swarm Dreams', 'Hive Cities', 'Living Metal'],
+  gate: ['Gate Tuning', 'Toll Booths', 'Twin Portals', 'Wormhole Maps', 'Fold Space', 'Gate Network', 'Express Lanes', 'Starways'],
+  dyson: ['Mirror Polish', 'Solar Sails', 'Ring Weaving', 'Star Lifting', 'Full Shell', 'Second Sun', 'Star Choir', 'Stellar Engine'],
+};
+
+function tailUpgrades(): UpgradeDef[] {
+  const out: UpgradeDef[] = [];
+  for (const g of GENERATORS) {
+    const names = TAIL_NAMES[g.id];
+    TAIL_COUNTS.forEach((count, i) => {
+      if (HAND_MADE.some((u) => u.requires.gen === g.id && u.requires.count === count && u.effects.some((e) => e.kind === 'genMult'))) return;
+      const plural = g.name.endsWith('s') ? g.name : `${g.name}s`;
+      out.push({
+        id: `${g.id}-t${count}`,
+        name: names[i],
+        desc: `${plural} produce 2x.`,
+        cost: Math.round(g.baseCost * g.growth ** count * TAIL_COST),
+        requires: { gen: g.id, count },
+        effects: [{ kind: 'genMult', gen: g.id, mult: 2 }],
+      });
+    });
+  }
+  return out;
+}
+
+export const UPGRADES: readonly UpgradeDef[] = [...HAND_MADE, ...tailUpgrades()];
 
 export const BOOST = {
   mult: 2,

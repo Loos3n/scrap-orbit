@@ -1,0 +1,53 @@
+name: Web
+
+# Publishes the web version to Firebase Hosting (https://scrap-orbit.web.app) on every push to
+# main or a claude/ work branch, so the site always runs the newest build. Needs the repository
+# secret FIREBASE_SERVICE_ACCOUNT (a Firebase service account key, as JSON); without it the
+# deploy step is skipped.
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+concurrency:
+  group: web-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Skip deploy until the secret is set
+        if: env.SA == ''
+        run: echo "::notice::FIREBASE_SERVICE_ACCOUNT is not set, so the site was not deployed."
+      # Keys copied on a phone often come back with the private key's \n escapes turned into real
+      # line breaks, which is not valid JSON. Read it leniently and rebuild a clean key file.
+      - name: Prepare the Firebase key
+        if: env.SA != ''
+        run: |
+          python3 - <<'PY'
+          import json, os, re, textwrap
+          sa = json.loads(os.environ['SA'].strip(), strict=False)
+          m = re.search(r'-----BEGIN PRIVATE KEY-----(.*?)-----END PRIVATE KEY-----', sa['private_key'], re.S)
+          body = re.sub(r'\\n|\s', '', m.group(1))
+          sa['private_key'] = '-----BEGIN PRIVATE KEY-----\n' + '\n'.join(textwrap.wrap(body, 64)) + '\n-----END PRIVATE KEY-----\n'
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'sa.json'), 'w') as f:
+              json.dump(sa, f)
+          PY
+      - name: Deploy to Firebase Hosting
+        if: env.SA != ''
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@14 deploy --only hosting --project scrap-orbit --non-interactive

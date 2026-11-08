@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "360096936500",
+    "project_id": "scrap-orbit",
+    "storage_bucket": "scrap-orbit.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:360096936500:android:aa1239c93f910efc399061",
+        "android_client_info": {
+          "package_name": "io.github.scraporbit.game"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "360096936500-i0os8o3f5jtjo5fifog6jj9k4bfaibad.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.github.scraporbit.game",
+            "certificate_hash": "359bf7de303736a3c7c329b11971d724d22916f3"
+          }
+        },
+        {
+          "client_id": "360096936500-2jth99vbf210oull0nnfgg5uo3ht4os8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDKVqrPDHXpLRSAGJgb_OlxFazlEWLzYsw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "360096936500-2jth99vbf210oull0nnfgg5uo3ht4os8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

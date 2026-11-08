@@ -1,6 +1,8 @@
 import { CanvasSource, Texture } from 'pixi.js';
 import * as sprites from './sprites';
 import { drawMarkup } from './vector';
+import { refit } from '../art/kit';
+import type { GeneratorId } from '../core/config';
 
 /**
  * All of the station's art is painted once at startup with Canvas 2D (gradients, soft light,
@@ -1940,4 +1942,23 @@ export function rigUrl(look: string): string {
     ctx.translate(px, py);
     drawRigPart(ctx, look);
   }, 2);
+}
+
+/** A machine's station sprite for an evolved model (core/evolve.ts): the same art with refitted plating. */
+export function machineMark(id: GeneratorId, mark: number, dockRadius: number): Texture {
+  const make: Record<Exclude<GeneratorId, 'nanite'>, () => sprites.SpriteArt> = {
+    drone: sprites.drone,
+    hauler: sprites.hauler,
+    smelter: sprites.smelter,
+    fabricator: sprites.fabricator,
+    dock: () => sprites.dockSegment(dockRadius),
+    laser: sprites.laserTurret,
+    gravity: sprites.vortex,
+    gate: sprites.warpGate,
+    dyson: sprites.dysonPanel,
+  };
+  const a = make[id as Exclude<GeneratorId, 'nanite'>]();
+  const plated = { ...a, markup: refit(a.markup, mark) };
+  // The dock is one slice of a whole ring, so it has no outline to dress up.
+  return vector(id === 'dock' ? plated : sprites.evolveParts(plated, mark));
 }
