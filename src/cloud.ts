@@ -19,7 +19,17 @@ export interface CloudSave {
   relocations: number;
 }
 
-export const cloudAvailable = (): boolean => FIREBASE_CONFIG !== null;
+/**
+ * Cloud save shows in the Android app and on the web only where Google sign-in is allowed for
+ * the project (its own hosting and localhost). Elsewhere, like an embedded preview, it stays hidden.
+ */
+export function cloudAvailable(): boolean {
+  if (!FIREBASE_CONFIG) return false;
+  if (Capacitor.isNativePlatform()) return true;
+  const host = location.hostname;
+  const id = FIREBASE_CONFIG.projectId;
+  return host === 'localhost' || host === FIREBASE_CONFIG.authDomain || host === `${id}.web.app`;
+}
 
 let services: Promise<{ auth: Auth; db: Firestore }> | null = null;
 
