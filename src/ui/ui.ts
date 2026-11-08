@@ -1,4 +1,5 @@
 import { Graphs } from './graphs';
+import { ContractPanel } from './contract-ui';
 import { CloudPanel } from './cloud-ui';
 import { playRewardedAd } from '../ads';
 import { adsLeft, type AdReward } from '../core/rewards';
@@ -151,6 +152,7 @@ export class UI {
   private skins: SkinPanel;
   safeGame!: SafeGame;
   private challenges: ChallengePanel;
+  private contracts: ContractPanel;
   private galaxy: GalaxyPanel;
   private panel!: PanelToggle;
   readonly streak: StreakModal;
@@ -189,6 +191,7 @@ export class UI {
     this.book = new BookPanel(game);
     this.skins = new SkinPanel(game);
     this.challenges = new ChallengePanel(game, this.fmt);
+    this.contracts = new ContractPanel(game);
     this.galaxy = new GalaxyPanel(game);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
@@ -767,6 +770,7 @@ export class UI {
     this.trader.render();
     this.safeGame?.render();
     this.challenges.render();
+    this.contracts.render();
     this.galaxy.render();
     this.coach.render();
     this.info.render();
@@ -854,12 +858,25 @@ export class UI {
     if (line.hidden) return;
     const color = hex(sector.rig?.color ?? 0x9fe6ff);
     if (this.rigLook !== sector.name) {
+      // Folded to one line to save room; it opens by itself only when a relocation brings a new rule.
+      const fresh = this.rigLook !== '';
       this.rigLook = sector.name;
+      line.classList.toggle('open', fresh);
+      line.setAttribute('aria-expanded', String(fresh));
+      if (!line.dataset.bound) {
+        line.dataset.bound = '1';
+        line.addEventListener('click', () => {
+          const open = !line.classList.contains('open');
+          line.classList.toggle('open', open);
+          line.setAttribute('aria-expanded', String(open));
+          this.panel.fit();
+        });
+      }
       line.style.setProperty('--c', color);
       row.style.setProperty('--c', color);
-      setText($('sector-line-where'), `Sector rule · ${sector.name}`);
+      setText($('sector-line-where'), 'Sector rule');
       setText($('sector-line-name'), sector.twist!.name);
-      setText($('sector-line-text'), sector.twist!.text);
+      setText($('sector-line-text'), `${sector.name}: ${sector.twist!.text}`);
       if (sector.rig) {
         ($('rig-img') as HTMLImageElement).src = rigUrl(sector.look!);
         setText($('rig-name'), sector.rig.name);
@@ -1017,7 +1034,9 @@ export class UI {
     const s = this.game.state;
     const available = UPGRADES.filter((u) => !s.upgrades.has(u.id) && eco.upgradeVisible(s, u)).sort((a, b) => a.cost - b.cost);
     const teaser = UPGRADES.filter((u) => !s.upgrades.has(u.id) && !eco.upgradeVisible(s, u)).sort((a, b) => a.cost - b.cost)[0];
-    $('upgrade-dot').hidden = !available.some((u) => s.scrap.gte(u.cost));
+    // Lit only for upgrades that became affordable since the pane was last looked at.
+    const affordable = available.filter((u) => s.scrap.gte(u.cost));
+    $('upgrade-dot').hidden = !this.news('upgrades', affordable.length > 0, affordable.map((u) => u.id).join());
     if ($('tab-upgrades').hidden) return;
 
     // Rebuild only when the set of cards changes; otherwise just toggle buttons.
@@ -1094,6 +1113,7 @@ export class UI {
         ['Events seen', n(s.stats.events)],
         ['Overdrives fired', n(s.stats.boosts)],
         ['Relocations', n(s.stats.relocations)],
+        ['Contracts met', n(s.contractsDone)],
         ['Current sector', `${s.stats.relocations + 1}: ${sectorFor(s.stats.relocations).name}`],
       ]],
       ['Collection', [

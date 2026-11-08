@@ -6,6 +6,8 @@
 const PANEL_KEY = 'scrap-orbit-panel';
 /** The tallest the open menu gets, as a fraction of the screen. Shorter panes get a shorter menu. */
 const OPEN = 0.55;
+/** On short screens the menu takes a little less, so the station stays readable. */
+const SHORT_OPEN = 0.48;
 /** The least room the open menu gives its pane, so short panes don't look squashed. */
 const MIN_CONTENT = 190;
 
@@ -56,7 +58,7 @@ export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLEl
   };
   const height = () => {
     if (!open) return 0;
-    const max = Math.max(tabs.offsetHeight + MIN_CONTENT, Math.min(app.clientHeight * OPEN, app.clientHeight - hud.offsetHeight - 120));
+    const max = Math.max(tabs.offsetHeight + MIN_CONTENT, Math.min(app.clientHeight * (app.clientHeight < 700 ? SHORT_OPEN : OPEN), app.clientHeight - hud.offsetHeight - 120));
     return Math.min(max, tabs.offsetHeight + Math.max(MIN_CONTENT, content()));
   };
   let shown = -1;

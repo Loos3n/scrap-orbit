@@ -26,13 +26,18 @@ export class CloudPanel {
   private pending: CloudSave | null = null;
   /** True once Firebase has said whether someone is signed in. */
   private authKnown = false;
+  /**
+   * True once this session has compared the local save with the cloud. Until then nothing is
+   * uploaded, so a device opened with an older station never overwrites newer cloud progress.
+   */
+  private synced = false;
   private readonly openedAt = Date.now();
 
   constructor(private game: Game, private fmt: (d: Decimal) => string) {
     if (!cloudAvailable()) return;
     $('cloud-box').hidden = false;
     $('cloud-signin').addEventListener('click', () => void this.run(() => this.signIn()));
-    $('cloud-backup').addEventListener('click', () => void this.run(() => this.backup(true)));
+    $('cloud-backup').addEventListener('click', () => void this.run(() => (this.synced ? this.backup(true) : this.compare(true).then(() => undefined))));
     $('cloud-restore').addEventListener('click', () => void this.run(() => this.offerRestore()));
     $('cloud-signout').addEventListener('click', () => void this.run(async () => {
       await signOut();
@@ -42,16 +47,25 @@ export class CloudPanel {
     $('cloud-keep').addEventListener('click', () => void this.run(async () => {
       $('cloud-choice').hidden = true;
       this.pending = null;
+      this.synced = true;
       await this.backup(true);
     }));
     void watchUser((user) => {
       this.authKnown = true;
+      const wasSignedIn = this.signedIn;
       this.signedIn = !!user;
+      if (!user) this.synced = false;
+      // Already signed in when the game opened: check the cloud before backing anything up.
+      else if (!wasSignedIn && !this.synced && !this.busy) void this.run(() => this.checkOnOpen());
       $('cloud-signin').hidden = this.signedIn;
       for (const id of ['cloud-backup', 'cloud-restore', 'cloud-signout']) $(id).hidden = !this.signedIn;
       if (user) this.status(`Signed in as ${user.displayName || user.email || 'you'}. ${this.lastText()}`);
     });
-    window.setInterval(() => void this.backup(false), 30_000);
+    window.setInterval(() => {
+      // The check on opening failed (offline, say): try again before any backup.
+      if (this.signedIn && !this.synced && !this.pending && !this.busy) void this.run(() => this.checkOnOpen());
+      else void this.backup(false);
+    }, 30_000);
     this.setupInvite();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void this.backup(false, true);
@@ -143,14 +157,27 @@ export class CloudPanel {
   private async signIn(): Promise<void> {
     this.status('Signing in…');
     await signIn();
+    await this.compare(true);
+  }
+
+  /** On opening the game signed in: bring up the choice if another device got further. */
+  private async checkOnOpen(): Promise<void> {
+    if (await this.compare(false)) $('settings-btn').click();
+  }
+
+  /**
+   * Compares the local save with the cloud. A cloud save further along waits for the player's
+   * choice (returns true); otherwise this device may back up, straight away if `backupNow`.
+   */
+  private async compare(backupNow: boolean): Promise<boolean> {
     const cloud = await download();
-    if (!cloud) {
-      await this.backup(true);
-      return;
+    if (cloud && D(cloud.allTime).gt(this.game.state.allTime)) {
+      this.ask(cloud);
+      return true;
     }
-    // A cloud save further along than this one: let the player pick.
-    if (D(cloud.allTime).gt(this.game.state.allTime)) this.ask(cloud);
-    else await this.backup(true);
+    this.synced = true;
+    if (backupNow) await this.backup(true);
+    return false;
   }
 
   private async offerRestore(): Promise<void> {
@@ -180,17 +207,28 @@ export class CloudPanel {
     $('cloud-choice').hidden = true;
     this.pending = null;
     this.game.load(state);
+    this.synced = true;
     this.lastBackup = Date.now();
     this.status('Cloud save loaded.');
   }
 
   /** Backs up when signed in: on demand, or when the last backup is old enough. */
   private async backup(force: boolean, leaving = false): Promise<void> {
-    if (!this.signedIn || this.pending) return;
+    if (!this.signedIn || this.pending || !this.synced) return;
     const age = Date.now() - this.lastBackup;
     if (!force && age < (leaving ? LEAVE_MS : BACKUP_MS)) return;
     const s = this.game.state;
     try {
+      // A timed backup first checks that another device hasn't got further since (played on both).
+      if (!force && !leaving) {
+        const cloud = await download();
+        if (cloud && cloud.savedAt > this.lastBackup && D(cloud.allTime).gt(s.allTime)) {
+          this.synced = false;
+          this.ask(cloud);
+          $('settings-btn').click();
+          return;
+        }
+      }
       await upload({ code: exportCode(s), savedAt: Date.now(), allTime: s.allTime.toString(), relocations: s.stats.relocations });
       this.lastBackup = Date.now();
       if (force) this.status(`Backed up. ${this.lastText()}`);

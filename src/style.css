@@ -1094,7 +1094,41 @@ button.gen-icon:active { transform: scale(0.94); }
 .crew-btn.armed { background: var(--boost); color: #fff; }
 .crew-btn.quiet { background: rgb(255 255 255 / 0.08); color: var(--ink-dim); box-shadow: none; }
 .challenge-line { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; gap: 8px; align-items: center; margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; background: rgb(255 209 102 / 0.08); border: 1px solid rgb(255 209 102 / 0.3); font-size: 13px; color: var(--ink-dim); }
+/* Combo heat: a slim thermometer down the left edge of the view while taps come quickly. */
+.combo { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); z-index: 4; display: grid; justify-items: center; gap: 6px; pointer-events: none; transition: opacity 0.3s; }
+.combo-bar { position: relative; width: 10px; height: 120px; border-radius: 6px; background: rgb(10 12 34 / 0.55); border: 1px solid rgb(255 255 255 / 0.18); overflow: hidden; }
+.combo-bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: inherit; background: linear-gradient(0deg, #ffd166, #ff8a4c 60%, #ff4f6d); }
+.combo b { font-family: var(--font-display); font-weight: 700; font-size: 13px; color: #ffd166; text-shadow: 0 1px 3px rgb(0 0 0 / 0.6); font-variant-numeric: tabular-nums; }
+.combo.hot .combo-bar { box-shadow: 0 0 14px rgb(255 120 80 / 0.8); border-color: rgb(255 170 120 / 0.8); }
+.combo.hot b { color: #ff9a6b; animation: combo-pulse 0.5s ease-in-out infinite alternate; }
+@keyframes combo-pulse { to { transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .combo.hot b { animation: none; } }
+@media (max-height: 700px) { .combo-bar { height: 84px; } }
+.contract-line { --c: #ffd166; display: grid; grid-template-columns: 18px minmax(0, 1fr) 54px auto; gap: 8px; align-items: center; margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--c) 9%, transparent); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); font-size: 12.5px; color: var(--ink-dim); }
+.contract-line > span:first-child { color: var(--c); width: 18px; height: 18px; }
+.contract-line-text { min-width: 0; display: grid; line-height: 1.25; }
+.contract-line-text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.contract-line-text span { font-size: 11.5px; }
+.contract-line-text b { color: var(--ink); font-family: var(--font-display); font-weight: 600; }
+.contract-line .bar { height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.1); overflow: hidden; }
+.contract-line .bar i { display: block; height: 100%; width: 0; background: var(--c); border-radius: inherit; transition: width 0.3s; }
+.contract-line > b { font-size: 12px; color: var(--c); font-variant-numeric: tabular-nums; }
+.contract-line.done { opacity: 0.75; }
+.contract-options { display: grid; gap: 10px; margin: 14px 0 10px; text-align: left; }
+.contract-opt { --c: #ffd166; display: grid; gap: 3px; width: 100%; padding: 12px 14px; border-radius: 14px; font: inherit; text-align: left; color: var(--ink-dim); background: linear-gradient(100deg, color-mix(in srgb, var(--c) 18%, transparent), rgb(10 12 34 / 0.6) 75%); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); cursor: pointer; transition: transform 0.12s; }
+.contract-opt:active { transform: scale(0.98); }
+.contract-opt b { font-family: var(--font-display); font-weight: 600; font-size: 16px; color: var(--ink); }
+.contract-opt .rule { font-size: 13px; color: var(--c); }
+.contract-opt .goal { font-size: 13px; }
+.contract-skip { margin-top: 4px; background: none; border: 0; color: var(--ink-dim); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 8px; }
 .sector-line { display: grid; gap: 2px; margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; --c: #9fe6ff; background: linear-gradient(100deg, color-mix(in srgb, var(--c) 16%, transparent), rgb(10 12 34 / 0.5) 70%); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); font-size: 12.5px; line-height: 1.35; color: var(--ink-dim); }
+.sector-line { width: 100%; text-align: left; font: inherit; font-size: 12.5px; grid-template-columns: auto minmax(0, 1fr) 14px; align-items: baseline; column-gap: 8px; cursor: pointer; }
+.sector-line::after { content: '⌄'; grid-column: 3; grid-row: 1; color: var(--c); font-size: 14px; line-height: 1; transition: transform 0.2s; }
+.sector-line.open::after { transform: rotate(180deg); }
+.sector-line small { grid-column: 1; grid-row: 1; white-space: nowrap; }
+.sector-line b { grid-column: 2; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sector-line span { grid-column: 1 / -1; display: none; }
+.sector-line.open span { display: block; }
 .sector-line small { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c); }
 .sector-line b { font-family: var(--font-display); font-weight: 600; font-size: 15px; color: var(--ink); }
 .gen.rig .gen-icon img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 60%, transparent)); }
@@ -1417,6 +1451,15 @@ button.gen-icon:active { transform: scale(0.94); }
   .hud-btn small { font-size: 9px; }
   .hud-btn .round-btn { width: 34px; height: 34px; padding: 7px; }
   .side-rail { gap: 8px; }
+}
+/* Short phones: the buttons line up across the top corner instead of down over the station. */
+@media (max-height: 700px) {
+  .side-rail { flex-direction: row; gap: 6px; }
+  .hud-btn small { display: none; }
+  .hud-btn .round-btn { width: 32px; height: 32px; padding: 6px; }
+  .event-banner { top: 46px; right: 12px; }
+  body.golden .event-banner { top: 84px; }
+  .boss-banner { right: 12px; }
 }
 
 .goal-row { grid-column: 1 / -1; display: flex; align-items: stretch; gap: 6px; min-width: 0; }

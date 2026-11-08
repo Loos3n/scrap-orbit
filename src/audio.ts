@@ -205,6 +205,13 @@ export class Sfx {
     this.voice({ freq: 150, slideTo: 70, dur: 0.06, vol: 0.2 * vol, type: 'sine' });
   }
 
+  /** Combo heat at the top: a quick bright sparkle over the tap note, kept soft so mashing stays pleasant. */
+  comboMax(): void {
+    if (!this.ready()) return;
+    [1047, 1319, 1568, 2093].forEach((f, i) => this.bell(f, i * 0.045, 0.35, 0.09, 3, 1.6, 0.3));
+    this.noise(0.05, 0.25, 0.04, { type: 'highpass', freq: 6000 });
+  }
+
   /** A two-note wooden mallet. */
   /**
    * A two-bell blip. Each machine tier rings its own note of a pentatonic scale, so the station

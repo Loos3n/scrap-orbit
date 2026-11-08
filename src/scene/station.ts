@@ -1744,15 +1744,17 @@ export class StationScene {
   lastHit = { x: 0, y: 0 };
 
   /** Effects for a tap at screen point (sx, sy) worth `label`. */
-  tapAt(sx: number, sy: number, label: string): void {
+  /** A tap on the station; `heat` (0 to 1, combo tapping) makes the sparks hotter and wilder. */
+  tapAt(sx: number, sy: number, label: string, heat = 0): void {
     if (!this.ready) return;
     const p = this.toWorld(sx, sy);
-    const color = this.boosting ? COLORS.boost : this.flare > 0.5 ? 0xfff0c0 : this.coreColor;
+    const base = this.boosting ? COLORS.boost : this.flare > 0.5 ? 0xfff0c0 : this.coreColor;
+    const color = heat >= 1 ? 0xff7a4c : heat > 0.5 ? 0xffb066 : base;
     this.squash = 1;
     this.clawSnap = 1;
     this.puff(0, 0, color, 1.6, 0.25);
-    this.rings.push({ x: 0, y: 0, r: 36, life: 1, color, width: 2.5 });
-    this.burst(p.x, p.y, color, 6, 0.6);
+    this.rings.push({ x: 0, y: 0, r: 36 + heat * 18, life: 1, color, width: 2.5 + heat * 1.5 });
+    this.burst(p.x, p.y, color, 6 + Math.round(heat * 8), 0.6 + heat * 0.5);
     this.floatText(p.x, p.y - 18, label);
     // A piece of scrap gets yanked in from the dark toward the claw.
     if (this.chunks.length < 14) {

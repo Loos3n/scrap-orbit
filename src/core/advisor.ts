@@ -131,7 +131,7 @@ function goals(state: GameState): Goal[] {
       continue;
     }
     const next = nextMilestone(owned);
-    if (next) out.push({ key: `ms:${id}:${next.at}`, text: `${owned} / ${next.at} ${g.name}s for 2x output`, cost: costFor(g, owned, next.at - owned, discount), pane: 'build' });
+    if (next) out.push({ key: `ms:${id}:${next.at}`, text: `${owned}/${next.at} ${g.name}s → 2x`, cost: costFor(g, owned, next.at - owned, discount), pane: 'build' });
   }
   if (!challengeOn(state, 'noupg')) {
     for (const u of UPGRADES) {
