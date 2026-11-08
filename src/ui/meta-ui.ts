@@ -641,7 +641,7 @@ export class Coach {
         return { text: `An upgrade is ready! ${paneHint('upgrades')}`, target: paneTarget('upgrades') };
       case 'upgrade':
         return {
-          text: 'Upgrades make your machines much stronger. Install one!',
+          text: 'Upgrades make your station much stronger. This one doubles every tap. Install it!',
           target: document.querySelector('#upgrade-list .upg.can .buy') ? '#upgrade-list .upg.can .buy' : '#upgrade-list .upg .buy',
           tab: 'upgrades',
         };
@@ -753,10 +753,10 @@ export class Coach {
     spot.style.width = `${sr.width}px`;
     spot.style.height = `${sr.height}px`;
     if (crate) {
-      // The crate moves, so the card stays put at the top of the view.
+      // The crate moves, so the card stays put at the foot of the view, clear of the HUD and side buttons.
       const stage = $('stage').getBoundingClientRect();
       coach.style.left = `${(window.innerWidth - w) / 2}px`;
-      coach.style.top = `${stage.top + 8}px`;
+      coach.style.top = `${Math.max(stage.top + 8, stage.bottom - coach.offsetHeight - 8)}px`;
       delete coach.dataset.place;
       coach.classList.add('centre');
       return;

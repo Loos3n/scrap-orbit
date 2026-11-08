@@ -1,12 +1,12 @@
 name: Web
 
 # Publishes the web version to Firebase Hosting (https://scrap-orbit.web.app) on every push to
-# main or a claude/ work branch, so the site always runs the newest build. Needs the repository
-# secret FIREBASE_SERVICE_ACCOUNT (a Firebase service account key, as JSON); without it the
+# main. Only main: a work branch would put unfinished code live, or roll the site back to older
+# code that drops newer parts of players' saves. Needs the repository secret FIREBASE_SERVICE_ACCOUNT (a Firebase service account key, as JSON); without it the
 # deploy step is skipped.
 on:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
   workflow_dispatch:
 
 concurrency:

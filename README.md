@@ -4,7 +4,7 @@ A cozy space-salvage idle clicker for phones and the web. Tap your station's cla
 
 <img src="docs/screenshot.png" alt="The station mid-game, with drones, haulers and smelters in orbit" width="320">
 
-This is the **prototype**: the core loop with placeholder-quality art, built to find out whether the game is fun before the real art goes in.
+It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and as an Android app. The art, sounds and music are all made in code.
 
 ## What's in the game so far
 
@@ -55,7 +55,10 @@ This is the **prototype**: the core loop with placeholder-quality art, built to 
 - Asteroids, meteors and moons painted per pixel from a height map: lumpy outlines, crater bowls with raised rims, lit from the same direction as the station
 - Lucky salvage crates drift past every couple of minutes. Each is sealed until you tap it: most hold scrap, the rest hold a Power surge (5x income for 45s), a Claw frenzy (20x taps for 12s), a big haul that grows with your banked scrap, a swarm of little crates to catch, a crystal stash or a spare battery that recharges Overdrive. Buffs stack with Overdrive and golden rushes
 - Autosave every 30 seconds and when the app is hidden
-- Offline earnings for up to 2 hours (4 with a perk), shown when you come back
+- Offline earnings for up to 8 hours (up to 24 with perks and research), shown when you come back
+- Combo tapping: quick taps heat the claw up, and heat makes every tap worth up to 3x. A thermometer on the left shows it; at full heat the sparks run hot and a chime plays. Stop tapping and it cools
+- Run contracts: from the second relocation on, pick one of three rule cards for the new run (Haulers 4x, taps 10x, machines 40% cheaper, a 20 minute sprint, and more), or none. Each sets a goal sized from the run before; meeting it pays 15 crystals and +2% income for good. A slim line at the top of Build tracks it
+- Cloud save: sign in with Google to back up the station and play it on the web or another phone. Opening the game checks the cloud first, so an older device never overwrites newer progress
 
 ## Running it
 

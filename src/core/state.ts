@@ -4,6 +4,7 @@ import { CHALLENGES, GRID, LOOT, MODULES, TRIPS, TRIP_SLOTS, type Offer, type Tr
 import { SAFE_TYPES, SETS, SKINS, skinUnlocked } from './collection';
 import { ORNAMENTS } from './ornaments';
 import { STAR_NODES } from './galaxy';
+import { CONTRACTS, type ActiveContract, type ContractOffer } from './contracts';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -84,6 +85,10 @@ export interface GameState {
   galaxy: { earned: number; stars: number; shifts: number; base: Decimal; bestCores: number; map: Set<string>; forge: number };
   /** The running challenge's goal, fixed when it started. */
   challengeGoal: Decimal;
+  /** This run's contract (core/contracts.ts), the three on offer after a relocation, and how many were ever met. */
+  contract: ActiveContract | null;
+  contractOffers: ContractOffer[];
+  contractsDone: number;
   challengesDone: Set<string>;
   /** When the last event, boss, golden crate, trader or cargo pod began, to keep calm time between them. */
   lastHappening: number;
@@ -190,6 +195,9 @@ interface SaveData {
   trader?: GameState['trader'];
   challenge?: string | null;
   challengeGoal?: string;
+  contract?: ActiveContract | null;
+  contractOffers?: ContractOffer[];
+  contractsDone?: number;
   galaxy?: { earned?: number; stars?: number; shifts?: number; base?: string; bestCores?: number; map?: string[]; forge?: number };
   challengesDone?: string[];
   lastHappening?: number;
@@ -257,6 +265,9 @@ export function newState(now: number): GameState {
     trader: { until: 0, nextAt: 0, name: 0, offers: [] },
     challenge: null,
     challengeGoal: D(0),
+    contract: null,
+    contractOffers: [],
+    contractsDone: 0,
     galaxy: { earned: 0, stars: 0, shifts: 0, base: D(0), bestCores: 0, map: new Set(), forge: 0 },
     challengesDone: new Set(),
     lastHappening: 0,
@@ -328,6 +339,9 @@ export function serialize(state: GameState): string {
     trader: { ...state.trader, offers: state.trader.offers.map((o) => ({ ...o })) },
     challenge: state.challenge,
     challengeGoal: state.challengeGoal.toString(),
+    contract: state.contract ? { ...state.contract } : null,
+    contractOffers: state.contractOffers.map((o) => ({ ...o })),
+    contractsDone: state.contractsDone,
     galaxy: { ...state.galaxy, base: state.galaxy.base.toString(), map: [...state.galaxy.map] },
     challengesDone: [...state.challengesDone],
     lastHappening: state.lastHappening,
@@ -463,6 +477,13 @@ export function deserialize(json: string | null, now: number): GameState | null 
         : [],
     };
   }
+  const contractIds = new Set<string>(CONTRACTS.map((c) => c.id));
+  const offerOk = (o: unknown): o is ContractOffer => !!o && typeof o === 'object' && contractIds.has((o as ContractOffer).id) && Number.isFinite(Number((o as ContractOffer).goal));
+  state.contractOffers = Array.isArray(data.contractOffers) ? data.contractOffers.filter(offerOk).slice(0, 3).map((o) => ({ id: o.id, goal: int(o.goal) })) : [];
+  const c = data.contract;
+  state.contract = offerOk(c) ? { id: c.id, goal: int(c.goal), base: int(c.base), done: !!c.done } : null;
+  if (state.contract && c && Number.isFinite(Number(c.deadline)) && Number(c.deadline) > 0) state.contract.deadline = Number(c.deadline);
+  state.contractsDone = int(data.contractsDone);
   const challengeIds = new Set(CHALLENGES.map((c) => c.id));
   for (const id of strings(data.challengesDone)) if (challengeIds.has(id)) state.challengesDone.add(id);
   state.challenge = typeof data.challenge === 'string' && challengeIds.has(data.challenge) && !state.challengesDone.has(data.challenge) ? data.challenge : null;

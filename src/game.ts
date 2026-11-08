@@ -1,5 +1,7 @@
 import { AD_CRYSTALS, useAd, type AdReward } from './core/rewards';
 import { markOf } from './core/evolve';
+import { comboMult, cooled, heatAfterTap } from './core/combo';
+import { CONTRACT_CRYSTALS, checkContract, contractAutoBuyOff, makeOffers, pickContract, type ContractId } from './core/contracts';
 import { recordIncome, recordRun } from './core/history';
 import { catchStar, type StarPrize } from './core/lucky';
 import { claimWeekly, updateWeekly, weeklyProgress, type WeeklyId } from './core/weekly';
@@ -33,7 +35,7 @@ export type GameEvent =
   /** A machine reached a new model: `mark` 1 is Mk II. */
   | { type: 'evolve'; gen: GeneratorId; mark: number }
   | { type: 'upgradeAll'; ids: string[] }
-  | { type: 'adReward'; kind: AdReward; earned?: Decimal }
+  | { type: 'adReward'; kind: AdReward; earned?: Decimal; fired?: boolean }
   | { type: 'upgrade'; id: string }
   | { type: 'boost' }
   | { type: 'offline'; seconds: number; earned: Decimal; report: OfflineReport }
@@ -78,6 +80,10 @@ export type GameEvent =
   | { type: 'trade'; result: meta.TradeResult }
   | { type: 'challenge'; id: string; phase: 'start' | 'done' | 'abandon'; cores?: number }
   | { type: 'reset' }
+  /** Combo heat reached the top. */
+  | { type: 'comboMax' }
+  /** Contracts: offered after a relocation, signed (or skipped), met or failed. */
+  | { type: 'contract'; phase: 'start' | 'done' | 'failed'; id?: ContractId }
   | { type: 'star'; prize: StarPrize }
   | { type: 'weekly'; phase: 'start' | 'tier'; id: WeeklyId }
   | { type: 'weeklyClaim'; crystals: number; paint?: string };
@@ -176,7 +182,7 @@ export class Game {
     }
     if (now - this.lastAutoBuy > AUTOBUY_MS) {
       this.lastAutoBuy = now;
-      if (eco.hasPerk(this.state, 'autobuy') && this.state.settings.autoBuy) this.autoBuy();
+      if (eco.hasPerk(this.state, 'autobuy') && this.state.settings.autoBuy && !contractAutoBuyOff(this.state)) this.autoBuy();
     }
     if (now - this.lastCheck > ACHIEVEMENT_CHECK_MS) {
       this.lastCheck = now;
@@ -209,6 +215,10 @@ export class Game {
     for (const set of meta.checkSets(s)) this.emit({ type: 'set', id: set.id });
     // Decorations wait for the tutorial to finish, so it stays uncluttered.
     if (s.tutorial < 0) for (const o of checkOrnaments(s)) this.emit({ type: 'ornament', id: o.id, fresh: true });
+    const deal = s.contract;
+    const outcome = checkContract(s, now);
+    if (outcome === 'done') meta.addCrystals(s, CONTRACT_CRYSTALS);
+    if (outcome) this.emit({ type: 'contract', phase: outcome, id: deal!.id });
     const beaten = meta.checkChallenge(s);
     if (beaten) this.emit({ type: 'challenge', id: beaten.id, phase: 'done' });
     for (const t of s.trips) {
@@ -419,12 +429,29 @@ export class Game {
     };
     const { seconds, earned } = eco.applyOffline(s, now);
     this.lastFrame = now;
-    if (seconds >= 30 && earned.gt(0)) this.emit({ type: 'offline', seconds, earned, report });
+    // Time spent watching an optional ad is credited quietly, not greeted with "welcome back".
+    if (seconds >= 30 && earned.gt(0) && !this.adPlaying) this.emit({ type: 'offline', seconds, earned, report });
+  }
+
+  /** True while an optional ad plays (and a moment after), when the game may be paused behind it. */
+  adPlaying = false;
+
+  /** Combo heat as of the last tap, and when that was (core/combo.ts). */
+  private heat = 0;
+  private lastTapAt = 0;
+
+  /** Combo heat right now, 0 to 1. */
+  heatNow(now = Date.now()): number {
+    return cooled(this.heat, (now - this.lastTapAt) / 1000);
   }
 
   tap(): Decimal {
     const now = Date.now();
-    const value = eco.tap(this.state, now);
+    const before = this.heatNow(now);
+    this.heat = heatAfterTap(this.heat, (now - this.lastTapAt) / 1000);
+    this.lastTapAt = now;
+    if (this.heat >= 1 && before < 1) this.emit({ type: 'comboMax' });
+    const value = eco.tap(this.state, now, comboMult(this.heat));
     this.emit({ type: 'tap', value });
     this.hitBoss(value, now);
     return value;
@@ -492,12 +519,15 @@ export class Game {
    */
   adReward(kind: AdReward, earned?: Decimal): boolean {
     const now = Date.now();
-    if (kind === 'overdrive' && now >= this.state.boostReadyAt) return false;
     if (!useAd(this.state, kind, now)) return false;
     if (kind === 'offline' && earned) eco.earn(this.state, earned);
-    if (kind === 'overdrive') this.state.boostReadyAt = now;
+    // Overdrive may have finished recharging while the ad played: then the ad pays a free
+    // Overdrive that leaves the cooldown alone, so watching it is never wasted.
+    const fired = kind === 'overdrive' && now >= this.state.boostReadyAt;
+    if (fired) this.state.boostUntil = Math.max(this.state.boostUntil, now) + eco.boostDurationSec(this.state) * 1000;
+    else if (kind === 'overdrive') this.state.boostReadyAt = now;
     if (kind === 'crystals') meta.addCrystals(this.state, AD_CRYSTALS);
-    this.emit({ type: 'adReward', kind, earned });
+    this.emit({ type: 'adReward', kind, earned, fired });
     this.save();
     return true;
   }
@@ -525,13 +555,23 @@ export class Game {
     const speed = eco.relocateSpeedup(this.state);
     const claim = eco.claimableCores(this.state);
     if (claim > 0) recordRun(this.state, claim, Date.now());
+    // Contract offers are sized from the run that is ending, so they are drawn before the reset.
+    const offers = claim > 0 ? makeOffers(this.state) : [];
     const cores = eco.relocate(this.state, Date.now());
     if (cores > 0) {
+      this.state.contractOffers = offers;
       meta.addCrystals(this.state, RELOCATE_CRYSTALS);
       this.save();
       this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS, speed });
     }
     return cores;
+  }
+
+  /** Signs the offered contract at `index`, or none with null. */
+  pickContract(index: number | null): void {
+    const offer = pickContract(this.state, index, Date.now());
+    this.save();
+    this.emit({ type: 'contract', phase: 'start', id: offer?.id });
   }
 
   /** Shifts to a new galaxy for Galaxy Stars. */

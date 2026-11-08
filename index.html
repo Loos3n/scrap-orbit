@@ -35,6 +35,7 @@
         </div>
       </div>
       <div id="stage">
+        <div id="combo" class="combo" hidden aria-hidden="true"><div class="combo-bar"><i id="combo-fill"></i></div><b id="combo-x">x1</b></div>
         <nav class="side-rail" aria-label="Missions, profile and settings">
           <button id="missions-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></span><small>Missions</small></button>
           <button id="profile-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="profile"></span><span id="profile-dot" class="dot" hidden></span></span><small>Profile</small></button>
@@ -90,8 +91,9 @@
           <button type="button" data-pane="decor" aria-selected="false">Decor</button>
         </div>
         <div id="tab-build" class="tab-body">
+          <div id="contract-line" class="contract-line" hidden><span id="contract-line-icon" data-icon="trophy"></span><span class="contract-line-text"><b id="contract-line-name"></b> <span id="contract-line-goal"></span></span><div class="bar"><i id="contract-line-bar"></i></div><b id="contract-line-pct"></b></div>
           <div id="challenge-line" class="challenge-line" hidden><span data-icon="trophy"></span><span>Challenge: <b id="challenge-line-name"></b></span><div class="bar"><i id="challenge-line-bar"></i></div><b id="challenge-line-pct"></b></div>
-          <div id="sector-line" class="sector-line" hidden><small id="sector-line-where"></small><b id="sector-line-name"></b><span id="sector-line-text"></span></div>
+          <button id="sector-line" class="sector-line" type="button" hidden aria-expanded="false"><small id="sector-line-where"></small><b id="sector-line-name"></b><span id="sector-line-text"></span></button>
           <button id="best-buy" class="best-buy" type="button"><span class="best-icon" data-icon="star"></span><span class="best-info"><b>Buy best</b><span id="best-what"></span></span><span class="buy-cost"><span data-icon="scrap"></span><span id="best-cost" class="n"></span></span></button>
           <ul class="list claw-list">
             <li id="claw-row" class="gen claw">
@@ -242,8 +244,8 @@
               <p id="cloud-status" class="cloud-status">Sign in to keep your station safe and play it on any phone or browser.</p>
               <div id="cloud-choice" class="cloud-choice" hidden>
                 <p id="cloud-choice-text"></p>
-                <button id="cloud-use" type="button" class="danger">Use the cloud save</button>
-                <button id="cloud-keep" type="button">Keep this one</button>
+                <button id="cloud-use" type="button">Use the cloud save</button>
+                <button id="cloud-keep" type="button" class="danger">Keep this one</button>
               </div>
               <div class="cloud-actions">
                 <button id="cloud-signin" type="button" class="cloud-main">Sign in with Google</button>
@@ -266,7 +268,7 @@
             <button id="replay-tutorial" class="reset" type="button">Replay the tutorial</button>
             <button id="reset" class="reset" type="button">Reset progress</button>
             <div id="reset-confirm" class="reset-confirm" hidden>
-              <span>Erase this station and start over?</span>
+              <span>Erase this station and start over? If cloud save is on, the cloud copy is replaced too.</span>
               <button id="reset-yes" type="button" class="danger">Erase</button>
               <button id="reset-no" type="button">Keep playing</button>
             </div>
@@ -395,6 +397,15 @@
         <p id="streak-sub" class="modal-time"></p>
         <ol id="streak-days" class="streak-days"></ol>
         <button id="streak-claim" class="primary" type="button">Claim</button>
+      </div>
+    </div>
+    <div id="contract-pick" class="modal" hidden>
+      <div class="modal-card contract-card" role="dialog" aria-modal="true" aria-labelledby="contract-title">
+        <div class="eyebrow">New sector</div>
+        <h2 id="contract-title">Pick a contract</h2>
+        <p class="modal-time">One rule for this run. Meet the goal for <b>15 crystals</b> and <b>+2% income for good</b>.</p>
+        <div id="contract-options" class="contract-options"></div>
+        <button id="contract-skip" class="contract-skip" type="button">No contract this time</button>
       </div>
     </div>
     <div id="cloud-ask" class="modal" hidden>

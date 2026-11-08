@@ -28,6 +28,8 @@ import { Game } from './game';
 import * as art from './scene/art';
 import { JUMP_SWAP_MS, StationScene } from './scene/station';
 import { sectorCrateMult, timeStretch } from './core/sectors';
+import { comboMult } from './core/combo';
+import { CONTRACT_CRYSTALS, contractCrateMult, contractDef, goalText } from './core/contracts';
 import { CRATE_BUFFS } from './core/crate-buffs';
 import { GEN_ICONS, ICONS, genIcon } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
@@ -37,6 +39,7 @@ import { tradeText } from './ui/trade-ui';
 import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
 import { blockPageZoom } from './ui/nozoom';
+import { setupBackButton } from './back';
 import { ORNAMENTS } from './core/ornaments';
 
 /**
@@ -100,6 +103,7 @@ const hexColor = (c: number) => '#' + c.toString(16).padStart(6, '0');
 
 async function boot(): Promise<void> {
   blockPageZoom();
+  setupBackButton();
   const game = new Game();
   /** The tint of the skin the active pet wears, if any. */
   const petTint = () => {
@@ -145,7 +149,7 @@ async function boot(): Promise<void> {
   scene.setViewZoom(game.state.settings.viewZoom);
   scene.setBatterySaver(game.state.settings.batterySaver);
   const syncPerks = () =>
-    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state) * (weeklyOn(game.state, 'comets') ? 2 : 1));
+    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state) * contractCrateMult(game.state) * (weeklyOn(game.state, 'comets') ? 2 : 1));
   syncPerks();
   const syncDecor = () => {
     const s = game.state;
@@ -241,7 +245,8 @@ async function boot(): Promise<void> {
         break;
       }
       case 'adReward':
-        if (e.kind === 'overdrive') ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Overdrive recharged!</b> Fire it when you are ready');
+        if (e.kind === 'overdrive' && e.fired) ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Free Overdrive!</b> It had already recharged, so this one is on the house');
+        else if (e.kind === 'overdrive') ui.toast(ICONS.bolt.replace('currentColor', '#ff6b9a'), '<b>Overdrive recharged!</b> Fire it when you are ready');
         else if (e.kind === 'crystals') ui.toast(ICONS.crystal.replace('currentColor', '#5cd6ff'), `<b>Supply drop!</b> +${AD_CRYSTALS} crystals`);
         else ui.toast(ICONS.scrap, '<b>Doubled!</b> Your time-away earnings came in twice');
         sfx.coins();
@@ -654,6 +659,27 @@ async function boot(): Promise<void> {
         sfx.coins();
         buzz(20);
         break;
+      case 'comboMax':
+        sfx.comboMax();
+        buzz(15);
+        break;
+      case 'contract': {
+        // A contract can change the crate rate (Crate Season), so the scene follows it.
+        syncPerks();
+        if (!e.id) break;
+        const d = contractDef(e.id);
+        const icon = ICONS.trophy.replace('currentColor', hexColor(d.color));
+        if (e.phase === 'start') {
+          ui.toast(icon, `<b>Contract: ${d.name}</b> ${goalText(game.state.contract!)}`);
+          ui.showTab('build');
+        } else if (e.phase === 'done') {
+          sfx.fanfare();
+          fanfare.confetti();
+          fanfare.cheer({ icon, kicker: 'Contract met', title: d.name, sub: `+${CONTRACT_CRYSTALS} crystals and +2% income for good. The rule stays until you relocate.`, color: hexColor(d.color) });
+          buzz([30, 40, 30]);
+        } else ui.toast(icon, `<b>Contract missed</b> The ${d.name} clock ran out. Its rule is lifted.`);
+        break;
+      }
       case 'challenge': {
         const c = CHALLENGES.find((x) => x.id === e.id)!;
         if (e.phase === 'start') {
@@ -858,7 +884,7 @@ async function boot(): Promise<void> {
     }
     const value = game.tap();
     if (game.state.taps >= TUTORIAL_TAPS) game.advanceTutorial('tap');
-    scene.tapAt(x, y, `+${fmt(value)}`);
+    scene.tapAt(x, y, `+${fmt(value)}`, game.heatNow());
     ui.bumpScrap();
     sfx.tap();
     buzz(8);
@@ -873,6 +899,21 @@ async function boot(): Promise<void> {
   if (game.state.boss) scene.setBoss(game.state.boss.name);
   scene.setTrader(meta.traderHere(game.state, Date.now()));
   scene.setOrnaments(game.state.ornaments.on);
+
+  // Combo heat meter (core/combo.ts), redrawn only when it moves.
+  const comboEl = document.getElementById('combo')!;
+  const comboFill = document.getElementById('combo-fill')!;
+  const comboX = document.getElementById('combo-x')!;
+  let comboShown = -1;
+  const renderCombo = (now: number) => {
+    const h = Math.round(game.heatNow(now) * 100) / 100;
+    if (h === comboShown) return;
+    comboShown = h;
+    comboEl.hidden = h < 0.02 || game.state.challenge === 'notap';
+    comboEl.classList.toggle('hot', h >= 1);
+    comboFill.style.height = `${h * 100}%`;
+    comboX.textContent = `x${comboMult(h).toFixed(1)}`;
+  };
 
   let lastUi = 0;
   let lastFrame = performance.now();
@@ -891,6 +932,7 @@ async function boot(): Promise<void> {
     // A relocation, challenge or galaxy shift clears the wreck without a goodbye; send it off here.
     if (!game.state.boss) scene.setBoss(null);
     ui.renderHud((t - lastFrame) / 1000);
+    renderCombo(now);
     lastFrame = t;
     if (now - lastUi > 100) {
       lastUi = now;

@@ -1,4 +1,5 @@
 import { markMult } from './evolve';
+import { contractCooldownMult, contractCostMult, contractGenMult, contractIncomeMult, contractTapMult } from './contracts';
 import {
   ACHIEVEMENT_BONUS,
   BOOST,
@@ -51,7 +52,7 @@ export function maxAffordable(gen: GeneratorDef, owned: number, scrap: Decimal, 
 
 /** Price multiplier for machines from research. */
 export function costDiscount(state: GameState): number {
-  return researchProduct(state, 'costMult') * (challengeOn(state, 'pricey') ? 3 : 1) * sectorCostMult(state);
+  return researchProduct(state, 'costMult') * (challengeOn(state, 'pricey') ? 3 : 1) * sectorCostMult(state) * contractCostMult(state);
 }
 
 /** Units and price for a buy button in the given mode. Max with nothing affordable shows 1. */
@@ -126,7 +127,7 @@ export function hasPerk(state: GameState, id: PerkId): boolean {
 /** Permanent multiplier from Star Cores, Galaxy Stars and achievements; applies to machines and taps. */
 export function globalMult(state: GameState): number {
   const perCore = PRESTIGE.perCore + researchSum(state, 'corePerCore');
-  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult') * starIncomeMult(state);
+  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult') * starIncomeMult(state) * contractIncomeMult(state);
 }
 
 /** How many times faster the station runs after relocating now, from the cores it would bank. */
@@ -157,7 +158,7 @@ export function boostActive(state: GameState, now: number): boolean {
 export function generatorRate(state: GameState, gen: GeneratorDef): Decimal {
   const owned = state.owned[gen.id];
   if (owned === 0) return D(0);
-  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * markMult(owned) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id);
+  let mult = Math.pow(MILESTONE_MULT, milestonesReached(owned)) * markMult(owned) * globalMult(state) * crewMult(state, gen.id) * (1 + bonuses(state).income) * sectorGenMult(state, gen.id) * contractGenMult(state, gen.id);
   for (const u of upgradeDefs(state)) {
     for (const e of u.effects) {
       if (e.kind === 'genMult' && e.gen === gen.id) mult *= e.mult;
@@ -209,6 +210,7 @@ export function tapValue(state: GameState, now: number, plain = false): Decimal 
     }
   }
   if (weeklyOn(state, 'taps')) mult *= 2;
+  mult *= contractTapMult(state);
   const value = D(mult * globalMult(state) * (1 + bonuses(state).tap)).add(baseIncome(state).mul(share));
   if (plain) return value;
   const boosted = (boostActive(state, now) ? value.mul(BOOST.mult) : value).mul(crateTapMult(state, now));
@@ -227,8 +229,9 @@ export function tick(state: GameState, dt: number, now: number): void {
   earn(state, income(state, now).mul(dt));
 }
 
-export function tap(state: GameState, now: number): Decimal {
-  const value = tapValue(state, now);
+/** One tap of the claw; `mult` is the combo heat's bonus (core/combo.ts). */
+export function tap(state: GameState, now: number, mult = 1): Decimal {
+  const value = mult === 1 ? tapValue(state, now) : tapValue(state, now).mul(mult);
   earn(state, value);
   state.taps++;
   return value;
@@ -283,7 +286,7 @@ export function activateBoost(state: GameState, now: number): boolean {
   if (now < state.boostReadyAt) return false;
   const duration = boostDurationSec(state);
   state.boostUntil = now + duration * 1000;
-  state.boostReadyAt = now + (duration + BOOST.cooldownSec * (weeklyOn(state, 'solar') ? 0.5 : 1)) * 1000;
+  state.boostReadyAt = now + (duration + BOOST.cooldownSec * (weeklyOn(state, 'solar') ? 0.5 : 1) * contractCooldownMult(state)) * 1000;
   state.stats.boosts++;
   return true;
 }
@@ -384,6 +387,9 @@ export function resetRun(state: GameState, now: number): void {
   state.boostUntil = 0;
   state.boostReadyAt = 0;
   state.crateBuffs = { surge: 0, frenzy: 0 };
+  // A contract lasts one run; new offers are made by the relocation itself.
+  state.contract = null;
+  state.contractOffers = [];
   // A wreck sized for the old station would be unbreakable (and overpaid) in the new one.
   state.boss = null;
   state.nextBossAt = now + BOSS.gap[0] * 60_000;
