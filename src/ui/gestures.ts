@@ -27,6 +27,13 @@ function storeOpen(open: boolean): void {
   }
 }
 
+/**
+ * Wide screens (desktops, tablets and phones held sideways) show the station on the left and the
+ * menu as a column on the right that is always open. Keep in step with the same query in style.css.
+ */
+export const WIDE_QUERY = '(min-width: 760px) and (min-aspect-ratio: 5/4)';
+export const isWide = (): boolean => typeof matchMedia === 'function' && matchMedia(WIDE_QUERY).matches;
+
 export interface PanelToggle {
   readonly open: boolean;
   set(open: boolean): void;
@@ -64,6 +71,16 @@ export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLEl
   let shown = -1;
   // Set the row sizes directly: some web views mishandle var() fallbacks inside grid templates.
   const apply = (animate: boolean) => {
+    if (isWide()) {
+      // Side by side: the menu column is always open and the stylesheet sizes it.
+      app.classList.remove('snapping', 'panel-closed');
+      app.style.gridTemplateRows = '';
+      button.style.bottom = '';
+      // The menu sits beside the station, not over it, so zoom and the back button act as if it were closed.
+      button.setAttribute('aria-expanded', 'false');
+      shown = -1;
+      return;
+    }
     app.classList.toggle('snapping', animate);
     app.classList.toggle('panel-closed', !open);
     const h = Math.round(height());
@@ -78,15 +95,24 @@ export function makePanelToggle(app: HTMLElement, tabs: HTMLElement, hud: HTMLEl
   window.addEventListener('resize', () => apply(false));
   return {
     get open() {
-      return open;
+      return open || isWide();
     },
     set(next: boolean) {
+      if (isWide()) {
+        // Remember an "open" request for when the window gets narrow again; never hide the column.
+        if (next && !open) {
+          open = true;
+          storeOpen(true);
+        }
+        return;
+      }
       if (next === open) return;
       open = next;
       storeOpen(open);
       apply(true);
     },
     fit() {
+      if (isWide()) return;
       // Small changes (a number growing a line) aren't worth a jiggle.
       if (open && Math.abs(Math.round(height()) - shown) > 8) apply(true);
     },

@@ -243,7 +243,7 @@ export class StationScene {
   /** Scenery for the deep sectors (ice shards, city ruins, the black hole's swirl), placed in screen space. */
   private sectorDecor = new Container();
   private decor: { s: Container; fx: number; fy: number; depth: number; spin: number; phase: number; scale: number }[] = [];
-  private decorBox = { w: 0, top: 0, fh: 0 };
+  private decorBox = { w: 0, left: 0, top: 0, fh: 0 };
   private rig: { c: Container; part: Sprite; glow: Sprite; look: string; grow: number } | null = null;
   private coreColor: number = COLORS.scrap;
   private hullSprites: Sprite[] = [];
@@ -287,7 +287,7 @@ export class StationScene {
   }
   private resizeTimer = 0;
   /** The open band of screen between the HUD and the panel, where the station sits. */
-  private focus = { top: 0, bottom: 0 };
+  private focus = { top: 0, bottom: 0, left: 0, right: 0 };
   /** Where layout() puts things before the player's pan is added. */
   private home = { world: { x: 0, y: 0 }, planet: { x: 0, y: 0 }, galaxy: { x: 0, y: 0 } };
   /** The view's offset in screen pixels: `raw` follows the finger, `pan` is what is shown. */
@@ -839,9 +839,15 @@ export class StationScene {
     const top = this.focus.bottom > this.focus.top ? this.focus.top : 0;
     const bottom = this.focus.bottom > this.focus.top ? this.focus.bottom : h;
     const fh = bottom - top;
-    this.baseScale = Math.min(w, fh * 1.08) / WORLD;
+    // On wide screens the menu is a column on the right, so the station centres in what's left.
+    const left = this.focus.right > this.focus.left + 100 ? Math.max(0, this.focus.left) : 0;
+    const right = this.focus.right > this.focus.left + 100 ? Math.min(w, this.focus.right) : w;
+    const fw = right - left;
+    const cx = left + fw / 2;
+    // Capped so a big monitor shows the station with sky around it, not a giant close-up.
+    this.baseScale = Math.min(fw, fh * 1.08, 600) / WORLD;
     this.scale = (this.baseScale * this.viewZoom) / this.zoom;
-    this.home.world = { x: w / 2, y: top + fh / 2 };
+    this.home.world = { x: cx, y: top + fh / 2 };
     this.world.scale.set(this.scale);
 
     // Painting the sky and scattering stars is slow, so only redo it when the screen size or
@@ -859,14 +865,14 @@ export class StationScene {
     this.flareGlow.scale.set(Math.max(w, h) / 40);
 
     // The gas giant rises from behind the panel, off to one side.
-    const ps = Math.min(w, fh, 520) * 0.62;
+    const ps = Math.min(fw, fh, 520) * 0.62;
     this.planet.width = ps * 1.7;
     this.planet.height = ps * 1.7;
-    this.home.planet = { x: w / 2 + Math.min(w, 540) * 0.52, y: bottom - ps * 0.02 };
+    this.home.planet = { x: cx + Math.min(fw, 540) * 0.52, y: bottom - ps * 0.02 };
     // The black hole hangs high in the sky instead, where the whole disk shows.
-    if (this.sector.look === 'hole') this.home.planet = { x: w / 2 + Math.min(w, 540) * 0.3, y: top + fh * 0.1 };
+    if (this.sector.look === 'hole') this.home.planet = { x: cx + Math.min(fw, 540) * 0.3, y: top + fh * 0.1 };
     this.moon.scale.set(ps / 220);
-    this.home.galaxy = { x: w * 0.16, y: top + fh * 0.86 };
+    this.home.galaxy = { x: left + fw * 0.16, y: top + fh * 0.86 };
     this.galaxyScale = Math.min(w, 600) / 300;
     this.galaxy.scale.set(this.galaxyScale);
     this.flash.width = w;
@@ -881,7 +887,7 @@ export class StationScene {
     this.vignette.position.set(-w * 0.075, -h * 0.075);
     this.keyLight.position.set(w * 0.1, top + fh * 0.1);
     this.keyLight.scale.set(Math.max(w, h) / 34);
-    this.decorBox = { w, top, fh };
+    this.decorBox = { w: fw, left, top, fh };
     this.placePan();
 
     if (!repaint) return;
@@ -1277,7 +1283,7 @@ export class StationScene {
   }
 
   private placeDecor(): void {
-    const { w, top, fh } = this.decorBox;
+    const { w, left, top, fh } = this.decorBox;
     for (const d of this.decor) {
       if (d.fx < 0) {
         // The swirl sits on the black hole.
@@ -1286,7 +1292,7 @@ export class StationScene {
         d.s.scale.set(k * 2.6, k * 2.6 * 0.24);
         continue;
       }
-      d.s.position.set(d.fx * w + this.pan.x * d.depth, top + d.fy * fh + this.pan.y * d.depth + Math.sin(this.time * 0.4 + d.phase) * 4);
+      d.s.position.set(left + d.fx * w + this.pan.x * d.depth, top + d.fy * fh + this.pan.y * d.depth + Math.sin(this.time * 0.4 + d.phase) * 4);
     }
   }
 
@@ -1611,9 +1617,10 @@ export class StationScene {
     this.galaxy.tint = tints[n % tints.length];
   }
 
-  setFocus(top: number, bottom: number): void {
-    if (top === this.focus.top && bottom === this.focus.bottom) return;
-    this.focus = { top, bottom };
+  setFocus(top: number, bottom: number, left = 0, right = 0): void {
+    const f = this.focus;
+    if (top === f.top && bottom === f.bottom && left === f.left && right === f.right) return;
+    this.focus = { top, bottom, left, right };
     if (this.tex) this.layout();
   }
 
@@ -2031,17 +2038,20 @@ export class StationScene {
       const top = Math.max(0, this.focus.top);
       const bottom = Math.min(h, this.focus.bottom > top + 80 ? this.focus.bottom : h);
       const bandH = bottom - top;
-      const k = Math.min(1, maxW / w);
+      // Only the station's part of the screen, not the menu column beside it on wide screens.
+      const left = this.focus.right > this.focus.left + 100 ? Math.max(0, this.focus.left) : 0;
+      const bandW = (this.focus.right > this.focus.left + 100 ? Math.min(w, this.focus.right) : w) - left;
+      const k = Math.min(1, maxW / bandW);
       const out = document.createElement('canvas');
-      out.width = Math.round(w * k);
-      out.height = Math.round(Math.min(bandH, w * 1.1) * k);
+      out.width = Math.round(bandW * k);
+      out.height = Math.round(Math.min(bandH, bandW * 1.1) * k);
       const g = out.getContext('2d');
       if (!g) return null;
       g.fillStyle = '#0b0d26';
       g.fillRect(0, 0, out.width, out.height);
       const sy = top + Math.max(0, (bandH - out.height / k) / 2);
       const sx = src.width / w;
-      g.drawImage(src, 0, sy * sx, src.width, (out.height / k) * sx, 0, 0, out.width, out.height);
+      g.drawImage(src, left * sx, sy * sx, bandW * sx, (out.height / k) * sx, 0, 0, out.width, out.height);
       return out.toDataURL('image/jpeg', 0.72);
     } catch {
       return null;

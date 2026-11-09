@@ -1604,3 +1604,52 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 .visit-pic { margin: 8px auto 10px; border-radius: 14px; overflow: hidden; background: #0b0d26; min-height: 120px; display: grid; place-items: center; color: var(--ink-dim); font-size: 13px; }
 .visit-pic img { display: block; width: 100%; height: auto; }
 .visit-stats { text-align: left; margin-bottom: 12px; }
+
+/* ---------- Wide screens: station on the left, menu column on the right ----------
+   Desktops, tablets and phones held sideways. The menu is always open, so the corner square
+   goes away. Keep the query in step with WIDE_QUERY in ui/gestures.ts. */
+@media (min-width: 760px) and (min-aspect-ratio: 5/4) {
+  :root { --menu-w: clamp(340px, 31vw, 460px); }
+  #app {
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr) var(--menu-w);
+    grid-template-rows: auto minmax(0, 1fr);
+    padding-top: 0;
+  }
+  #hud {
+    grid-column: 1; grid-row: 1;
+    width: 100%; max-width: 760px; justify-self: center; box-sizing: border-box;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  }
+  #stage { grid-column: 1; grid-row: 2; }
+  #panel {
+    grid-column: 2; grid-row: 1 / -1;
+    border-radius: 0;
+    border-top: 0;
+    border-left: 1px solid color-mix(in srgb, var(--accent) 30%, rgb(120 130 220 / 0.2));
+    box-shadow: -14px 0 34px rgb(0 0 0 / 0.35), inset 1px 0 0 rgb(255 255 255 / 0.06);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  #app.panel-closed #panel { border-left-color: transparent; }
+  #panel .tabs { padding: 8px 8px 6px; }
+  #panel .sheet { flex: 1 1 auto; }
+  #panel .tab-body { flex: 1 1 auto; }
+  #menu-btn { display: none; }
+  /* Pop-ups that float over the station stay over the station, not the menu. */
+  #toasts { left: calc((100% - var(--menu-w)) / 2); }
+  .fanfare, .sector-card, .boss-alert { right: calc(var(--menu-w) + 16px); }
+  .boss-alert { left: 0; }
+  .crash { right: calc(var(--menu-w) + 12px); }
+}
+/* Mouse and trackpad: buttons light up under the pointer. */
+@media (hover: hover) and (pointer: fine) {
+  .tab:not([aria-selected='true']):hover { color: var(--ink); background: rgb(255 255 255 / 0.05); }
+  .hud-btn:hover .round-btn { color: #fff; border-color: rgb(255 255 255 / 0.3); }
+  .buy:not(:disabled):hover, .best-buy:not(:disabled):hover, .primary:hover { filter: brightness(1.08); }
+  .boost:not(:disabled):hover { filter: brightness(1.12); }
+}
+.keys-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 12px; align-items: center; font-size: 13px; }
+.keys-list dt { margin: 0; }
+.keys-list dd { margin: 0; color: var(--ink-dim); }
+.keys-list kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: rgb(46 52 107 / 0.6); color: var(--ink); font: 600 12px var(--font-body); text-align: center; }
