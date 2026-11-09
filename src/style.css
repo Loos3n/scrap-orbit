@@ -1452,20 +1452,23 @@ button.gen-icon:active { transform: scale(0.94); }
 .hud-btn:active .round-btn { transform: scale(0.94); }
 .hud-btn .dot { top: -1px; right: -1px; }
 /* They sit in a column down the right edge of the view, clear of the scrap counter. */
-.side-rail { position: absolute; top: 8px; right: 8px; z-index: 5; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
-.event-banner, .boss-banner { right: 64px; }
+.side-rail { position: absolute; top: 8px; right: 8px; z-index: 5; display: flex; flex-direction: column; gap: 10px; pointer-events: auto; transition: top 0.3s ease; }
+.boss-banner { right: 64px; }
+/* Event banners (meteor shower, convoy, flare) run the full width across the top of the view,
+   and the button column steps down below them so nothing overlaps. */
+#stage { --banner-h: 52px; }
+#stage:has(> #event-banner:not([hidden])) .side-rail { top: calc(6px + var(--banner-h) + 8px); }
+body.golden #stage:has(> #event-banner:not([hidden])) .side-rail { top: calc(50px + var(--banner-h) + 8px); }
 @media (max-width: 380px) {
   .hud-btn small { font-size: 9px; }
   .hud-btn .round-btn { width: 34px; height: 34px; padding: 7px; }
   .side-rail { gap: 8px; }
 }
-/* Short phones: the buttons line up across the top corner instead of down over the station. */
+/* Short phones: the column stays down the right edge, just smaller and without the words. */
 @media (max-height: 700px) {
-  .side-rail { flex-direction: row; gap: 6px; }
+  .side-rail { gap: 6px; }
   .hud-btn small { display: none; }
   .hud-btn .round-btn { width: 32px; height: 32px; padding: 6px; }
-  .event-banner { top: 46px; right: 12px; }
-  body.golden .event-banner { top: 84px; }
   .boss-banner { right: 12px; }
 }
 
