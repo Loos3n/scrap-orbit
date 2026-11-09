@@ -2,6 +2,7 @@ import { askPermission, cancelReminders, notificationsAvailable, scheduleReminde
 import { WEEKLIES, allPaints, weeklyOn } from './core/weekly';
 import { GROWTH, growthStage } from './core/growth';
 import { GROUP_NAMES } from './ui/panes';
+import { introShowing, showIntro } from './ui/intro';
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
 // Content-Security-Policy hosts (embedded pages, some app stores' web views).
 import 'pixi.js/unsafe-eval';
@@ -141,7 +142,10 @@ async function boot(): Promise<void> {
   ui.syncSettings();
   const sceneEl = document.getElementById('scene')!;
   const stage = document.getElementById('stage')!;
+  let gliding = false;
   const syncFocus = () => {
+    // The title screen frames the camera itself until it has glided back.
+    if (introShowing() || gliding) return;
     const r = stage.getBoundingClientRect();
     scene.setFocus(r.top, r.bottom, r.left, r.right);
   };
@@ -157,6 +161,14 @@ async function boot(): Promise<void> {
   syncFocus();
   if (scene.ready) ui.coach.crate = () => scene.crateOnScreen();
   new ResizeObserver(syncFocus).observe(stage);
+  showIntro(game, {
+    focus: (top, bottom, left, right) => scene.setFocus(top, bottom, left, right),
+    glide: (on) => {
+      gliding = on;
+      if (!on) syncFocus();
+    },
+    start: () => sfx.achievement(),
+  });
   scene.setOwned(game.state.owned);
   scene.setViewZoom(game.state.settings.viewZoom);
   scene.setBatterySaver(game.state.settings.batterySaver);

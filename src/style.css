@@ -1728,3 +1728,25 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 .galaxy-trait { margin: 6px 0 2px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); font-size: 13px; line-height: 1.4; text-align: left; }
 .galaxy-trait b { color: var(--c); }
 .star-node.locked { opacity: 0.55; }
+
+/* ---------- Intro: the title screen ----------
+   Plays over the live station when the game opens: the logo above it, a button below it, and
+   the menus out of the way until the captain taps in. */
+.intro { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top, 0px) + 7vh) 24px calc(env(safe-area-inset-bottom, 0px) + 6vh); text-align: center; background: linear-gradient(rgb(6 7 24 / 0.75), rgb(6 7 24 / 0) 30%, rgb(6 7 24 / 0) 62%, rgb(6 7 24 / 0.85)); cursor: pointer; animation: fade 0.6s ease-out; transition: opacity 0.6s ease; }
+.intro.leaving { opacity: 0; pointer-events: none; }
+.intro-top { display: grid; justify-items: center; gap: 10px; animation: intro-drop 1s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+.intro-logo { position: relative; display: grid; justify-items: center; line-height: 0.86; }
+.intro-ring { position: absolute; left: 50%; top: 50%; width: min(118%, 420px); transform: translate(-50%, -46%); overflow: visible; filter: drop-shadow(0 0 6px rgb(79 227 193 / 0.6)); }
+.intro-scrap, .intro-orbit { position: relative; font-family: var(--font-display); font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; background: linear-gradient(#fff4cc, #ffd166 45%, #ff9a3c); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 0 #9a4f0c) drop-shadow(0 0 18px rgb(255 181 71 / 0.45)); }
+.intro-scrap { font-size: clamp(30px, 10vw, 54px); letter-spacing: 0.22em; padding-left: 0.22em; }
+.intro-orbit { font-size: clamp(56px, 19vw, 104px); }
+.intro-tag { margin: 6px 0 0; color: #cfd4ff; font-size: 15px; letter-spacing: 0.04em; text-shadow: 0 1px 6px rgb(0 0 0 / 0.8); }
+.intro-bottom { width: min(340px, 100%); display: grid; justify-items: center; gap: 10px; animation: intro-rise 0.9s 0.35s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+.intro-save { margin: 0; padding: 6px 14px; border-radius: 99px; background: rgb(10 12 40 / 0.7); border: 1px solid rgb(120 130 220 / 0.3); color: #dfe3ff; font-size: 13px; }
+.intro-play { font-size: 21px; padding: 16px; animation: intro-glow 2.2s ease-in-out 1.3s infinite; }
+.intro-hint { color: var(--ink-dim); font-size: 11.5px; letter-spacing: 0.06em; }
+@keyframes intro-drop { from { opacity: 0; transform: translateY(-24px) scale(0.92); } }
+@keyframes intro-rise { from { opacity: 0; transform: translateY(24px); } }
+@keyframes intro-glow { 50% { box-shadow: 0 5px 0 var(--scrap-deep), 0 0 40px rgb(255 181 71 / 0.75); } }
+@media (prefers-reduced-motion: reduce) { .intro-top, .intro-bottom, .intro-play { animation: none; } }
+body.intro :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach-spot, #menu-btn, #combo) { opacity: 0; pointer-events: none; }

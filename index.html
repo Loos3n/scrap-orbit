@@ -408,6 +408,36 @@
         </div>
       </div>
     </div>
+    <div id="intro" class="intro" hidden>
+      <div class="intro-top">
+        <div class="intro-logo" role="img" aria-label="Scrap Orbit">
+          <svg class="intro-ring" viewBox="0 0 320 120" aria-hidden="true">
+            <ellipse cx="160" cy="62" rx="150" ry="34" fill="none" stroke="url(#intro-ring-g)" stroke-width="3" transform="rotate(-8 160 62)"/>
+            <defs>
+              <linearGradient id="intro-ring-g" x1="0" x2="1">
+                <stop offset="0" stop-color="#4fe3c1" stop-opacity="0"/>
+                <stop offset=".35" stop-color="#4fe3c1" stop-opacity=".9"/>
+                <stop offset=".7" stop-color="#ffd166" stop-opacity=".9"/>
+                <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <g transform="rotate(-8 160 62)">
+              <circle r="5" fill="#fff4cc">
+                <animateMotion dur="5s" repeatCount="indefinite" path="M10 62a150 34 0 1 0 300 0a150 34 0 1 0-300 0"/>
+              </circle>
+            </g>
+          </svg>
+          <span class="intro-scrap">Scrap</span>
+          <span class="intro-orbit">Orbit</span>
+        </div>
+        <p class="intro-tag">A cozy space salvage station</p>
+      </div>
+      <div class="intro-bottom">
+        <p id="intro-save" class="intro-save" hidden></p>
+        <button id="intro-play" class="primary intro-play" type="button">Start salvaging</button>
+        <small class="intro-hint">Made of scrap, sound and starlight</small>
+      </div>
+    </div>
     <div id="festival" class="modal" hidden>
       <div class="modal-card festival-card" role="dialog" aria-modal="true" aria-labelledby="festival-title">
         <button id="festival-close" class="close-btn" type="button" aria-label="Close">&times;</button>
