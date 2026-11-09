@@ -1749,4 +1749,6 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 @keyframes intro-rise { from { opacity: 0; transform: translateY(24px); } }
 @keyframes intro-glow { 50% { box-shadow: 0 5px 0 var(--scrap-deep), 0 0 40px rgb(255 181 71 / 0.75); } }
 @media (prefers-reduced-motion: reduce) { .intro-top, .intro-bottom, .intro-play { animation: none; } }
-body.intro :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach-spot, #menu-btn, #combo) { opacity: 0; pointer-events: none; }
+body.intro :is(#hud, #panel, #stage > *, #toasts, #coach, #coach-dim, #coach-spot, #menu-btn, #combo) { opacity: 0; pointer-events: none; }
+/* Pop-ups that open at start-up (time-away earnings, daily reward, cloud backup) wait until the title is tapped away. */
+body.intro :is(.modal, .sample-ad, .fanfare, .confetti, .sector-card, .boss-alert) { display: none !important; }
