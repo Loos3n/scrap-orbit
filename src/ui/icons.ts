@@ -338,6 +338,17 @@ const RAW_ICONS = {
       cut(rrect(28, 19.5, 6.5, 3, 1.5), 0.6) +
       cut(rrect(28, 31.5, 6.5, 3, 1.5), 0.6),
   ),
+  /** A little radio with an aerial and signal arcs: the Hollow Fleet transmissions. */
+  radio: glyph(
+    cs('M14 18L33 7', 3) +
+      cf(circ(33, 7, 2.4)) +
+      cf(rrect(6, 18, 36, 24, 6)) +
+      cut(circ(17, 30, 6.5), 0.55) +
+      cut(circ(17, 30, 2.4), 0.35) +
+      cut(rrect(28, 24, 10, 3, 1.5), 0.5) +
+      cut(rrect(28, 30, 10, 3, 1.5), 0.5) +
+      cut(rrect(28, 36, 6, 3, 1.5), 0.5),
+  ),
   /** A medal on a ribbon: the captain's profile. */
   profile: glyph(
     cf('M12 4h9l5 13h-9zM36 4h-9l-5 13h9z', 0.55) +

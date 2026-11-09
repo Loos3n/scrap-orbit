@@ -38,6 +38,8 @@ const CLAW_TIP = { x: 0, y: -104 };
 /** Where a boss wreck arrives: up and to the left, behind the station. From there it roams across the top. */
 const BOSS_POS = { x: -92, y: -132 };
 const BOSS_SCALE = 0.78;
+/** Where the Lantern berths once it has docked: above the station, clear of the buttons and the trader. */
+const LANTERN = { x: 10, y: -255 };
 
 const COLORS = {
   scrap: 0xffb547,
@@ -225,6 +227,8 @@ export class StationScene {
   private nextSteam = 1;
   private nextTraffic = rand(4, 9);
   private traderShip: { s: Sprite; light: Sprite; t: number } | null = null;
+  /** The Lantern, docked for good once the Hollow Fleet story ends. */
+  private lantern: { s: Sprite; lamp: Sprite; t: number } | null = null;
   private traffic: { s: Sprite; light: Sprite; vx: number; vy: number; life: number; blink: number }[] = [];
   private scale = 1;
   private skyKey = '';
@@ -1683,6 +1687,41 @@ export class StationScene {
     }
   }
 
+  /** Docks the Lantern beside the station (gliding in when `arrive`), or takes it away. */
+  setLantern(on: boolean, arrive = false): void {
+    if (!this.ready) return;
+    if (on && !this.lantern) {
+      const s = this.sprite(art.lanternShip(), this.dockLayer, LANTERN.x, LANTERN.y);
+      s.scale.set(0.8);
+      const lamp = this.sprite(this.tex.glow, this.dockLayer, s.x, s.y);
+      lamp.blendMode = 'add';
+      lamp.tint = 0xffc870;
+      this.lantern = { s, lamp, t: arrive ? 0 : 99 };
+    } else if (!on && this.lantern) {
+      this.lantern.s.destroy();
+      this.lantern.lamp.destroy();
+      this.lantern = null;
+    }
+  }
+
+  private updateLantern(dt: number): void {
+    const o = this.lantern;
+    if (!o) return;
+    o.t += dt;
+    // Glides in from off to the left over six seconds, then rides gently at its berth.
+    const k = Math.min(1, o.t / 6);
+    const ease = 1 - Math.pow(1 - k, 3);
+    o.s.x = LANTERN.x - (1 - ease) * 420;
+    // While the station is small and the view zoomed in, it rides lower so the HUD never hides it.
+    const berth = Math.max(LANTERN.y, this.toWorld(0, this.focus.top).y + 30);
+    o.s.y = berth + Math.sin(o.t * 0.6) * 3;
+    o.s.rotation = Math.sin(o.t * 0.45) * 0.015;
+    o.s.alpha = Math.min(1, k * 3);
+    o.lamp.position.set(o.s.x - 91, o.s.y);
+    o.lamp.alpha = 0.75 + Math.sin(o.t * 2.2) * 0.2;
+    o.lamp.scale.set(0.55);
+  }
+
   private updateTrader(dt: number): void {
     const o = this.traderShip;
     if (!o) return;
@@ -2469,6 +2508,7 @@ export class StationScene {
 
     this.updateTraffic(dt);
     this.updateTrader(dt);
+    this.updateLantern(dt);
 
     // Drones dart around in a loose swarm, leaving short trails.
     for (const o of this.drones) {

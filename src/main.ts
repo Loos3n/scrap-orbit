@@ -13,7 +13,9 @@ import '@fontsource/rubik/latin-400.css';
 import '@fontsource/rubik/latin-500.css';
 import '@fontsource/rubik/latin-600.css';
 import './style.css';
-import { Sfx } from './audio';
+import { SECTOR_THEMES, Sfx, type ThemeId } from './audio';
+import { StoryRadio } from './ui/story-ui';
+import { FINALE_ID, storyDone } from './core/story';
 import { CLAW, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES } from './core/config';
 import { modelName } from './core/evolve';
 import { AD_CRYSTALS } from './core/rewards';
@@ -174,6 +176,25 @@ async function boot(): Promise<void> {
   window.addEventListener('pointerdown', unlock, { capture: true });
 
   const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  /**
+   * Music follows the place: each sector has its own theme. A boss wreck brings its own, and the
+   * radio plays a hushed one under the voices (and a big one when the Lantern comes home).
+   */
+  let radioTheme: ThemeId | null = null;
+  const syncMusic = () => {
+    const s = game.state;
+    sfx.setTheme(SECTOR_THEMES[s.stats.relocations % SECTOR_THEMES.length]);
+    sfx.setOverride(radioTheme ?? (s.boss ? 'boss' : null));
+  };
+  const radio = new StoryRadio(game, {
+    crackle: () => sfx.radio(),
+    blip: () => sfx.radioBlip(),
+    playing: (id) => {
+      radioTheme = id ? (id === FINALE_ID ? 'fleet' : 'radio') : null;
+      syncMusic();
+    },
+  });
+  if (import.meta.env.DEV) Object.assign(window, { __radio: radio });
   /**
    * Day and night from the device clock (core/daynight.ts). Checked every 20 seconds; when the
    * light changes while playing, the crew mention it in a toast (not on start-up or in the tutorial).
@@ -429,6 +450,8 @@ async function boot(): Promise<void> {
         scene.setGalaxy(game.state.galaxy.shifts);
         scene.setTrader(meta.traderHere(game.state, Date.now()));
         scene.setOrnaments(game.state.ornaments.on);
+        scene.setLantern(storyDone(game.state));
+        radio.render();
         syncPerks();
         syncDecor();
         break;
@@ -571,6 +594,21 @@ async function boot(): Promise<void> {
         }
         break;
       }
+      case 'story':
+        radio.render();
+        if (e.phase === 'ready') {
+          if (game.state.tutorial >= 0) break;
+          ui.toast(ICONS.radio.replace('currentColor', '#ffcf7a'), '<b>Incoming transmission!</b> Tap Radio to listen');
+          sfx.radio();
+          buzz([15, 40, 15]);
+        } else if (e.id === FINALE_ID) {
+          scene.setLantern(true, true);
+          fanfare.confetti(['#ffcf7a', '#ffffff', '#ff8fa8', '#9fe6ff']);
+          scene.fireworks([0xffcf7a, 0xffffff, 0x9fe6ff]);
+          sfx.fanfare();
+          buzz([40, 60, 40, 60, 200]);
+        } else ui.toast(ICONS.radio.replace('currentColor', '#ffcf7a'), `<b>Transmission logged</b> +${e.crystals} crystals`);
+        break;
       case 'bossEscape':
         scene.setBoss(null);
         ui.toast(ICONS.warp, '<b>The wreck flew away!</b> Break the next one within a minute.');
@@ -938,6 +976,8 @@ async function boot(): Promise<void> {
   if (game.state.boss) scene.setBoss(game.state.boss.name);
   scene.setTrader(meta.traderHere(game.state, Date.now()));
   scene.setOrnaments(game.state.ornaments.on);
+  scene.setLantern(storyDone(game.state));
+  syncMusic();
 
   // Combo heat meter (core/combo.ts), redrawn only when it moves.
   const comboEl = document.getElementById('combo')!;
@@ -976,6 +1016,7 @@ async function boot(): Promise<void> {
     if (now - lastUi > 100) {
       lastUi = now;
       ui.render();
+      syncMusic();
     }
   };
   requestAnimationFrame(loop);

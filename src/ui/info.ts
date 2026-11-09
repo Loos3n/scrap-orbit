@@ -1,4 +1,5 @@
 import { ACHIEVEMENT_BONUS, BOOST, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES, type GeneratorId } from '../core/config';
+import { storyIncome } from '../core/story';
 import { markMult, markOf, modelName, nextMark } from '../core/evolve';
 import { CREW, CREW_PER_LEVEL } from '../core/content';
 import * as eco from '../core/economy';
@@ -147,7 +148,8 @@ export class InfoSheet {
     const b = bonuses(s);
     const loot = LOOT.filter((l) => l.stat === 'income' && s.loot.has(l.id)).reduce((a, l) => a + l.amount!, 0);
     const challenges = CHALLENGES.filter((c) => c.stat === 'income' && s.challengesDone.has(c.id)).reduce((a, c) => a + c.amount, 0);
-    const rooms = b.income - loot - challenges;
+    const lantern = storyIncome(s);
+    const rooms = b.income - loot - challenges - lantern;
     const cores = s.cores * eco.perCoreBonus(s);
     const ach = s.achievements.size * ACHIEVEMENT_BONUS;
     const research = eco.researchProduct(s, 'allMult');
@@ -160,6 +162,7 @@ export class InfoSheet {
       ['Station rooms', pctText(rooms)],
       ['Boss loot', pctText(loot)],
       ['Challenges', pctText(challenges)],
+      ...(lantern ? ([['The Lantern\u2019s crew', pctText(lantern)]] as [string, string][]) : []),
       ['Overdrive', boost ? `${xText(BOOST.mult)} now` : 'Not running'],
       ['Golden rush', golden ? `${xText(GOLDEN.mult)} now` : 'Not running'],
     ];

@@ -6,6 +6,7 @@ import { ORNAMENTS } from './ornaments';
 import { FRIEND_LIMIT, cleanName, normalizeCode, type Friend } from './friends';
 import { STAR_NODES } from './galaxy';
 import { CONTRACTS, type ActiveContract, type ContractOffer } from './contracts';
+import { STORY } from './story';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -103,6 +104,8 @@ export interface GameState {
   ornaments: { got: Set<string>; on: Set<string> };
   /** Whether this sector's rig is built; it stays behind on a relocation. */
   rig: boolean;
+  /** Radio transmissions heard, in the Hollow Fleet story (core/story.ts). */
+  story: { heard: Set<string> };
   /**
    * Friend codes (core/friends.ts): this player's own code and station name once signed in,
    * friends added, who got a gift today, and today's gift counters.
@@ -214,6 +217,7 @@ interface SaveData {
   setsDone?: string[];
   skin?: string | null;
   ornaments?: { got?: string[]; on?: string[] };
+  story?: { heard?: string[] };
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
@@ -285,6 +289,7 @@ export function newState(now: number): GameState {
     setsDone: new Set(),
     skin: null,
     ornaments: { got: new Set(), on: new Set() },
+    story: { heard: new Set() },
     rig: false,
     friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
@@ -360,6 +365,7 @@ export function serialize(state: GameState): string {
     setsDone: [...state.setsDone],
     skin: state.skin,
     ornaments: { got: [...state.ornaments.got], on: [...state.ornaments.on] },
+    story: { heard: [...state.story.heard] },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
@@ -530,6 +536,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
   const ornamentIds = new Set(ORNAMENTS.map((o) => o.id));
   for (const id of strings(data.ornaments?.got)) if (ornamentIds.has(id)) state.ornaments.got.add(id);
   for (const id of strings(data.ornaments?.on)) if (state.ornaments.got.has(id)) state.ornaments.on.add(id);
+  for (const id of strings(data.story?.heard)) if (STORY.some((e) => e.id === id)) state.story.heard.add(id);
   state.rig = data.rig === true;
   const fr = data.friends;
   if (fr && typeof fr === 'object') {
