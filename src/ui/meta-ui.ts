@@ -578,6 +578,8 @@ export class Coach {
   private shownKey = '';
   /** Set once the player scrolls a menu list themselves, so a card stops scrolling it for them. */
   private handScrolled = false;
+  /** Which end of the view the crate card sits at, so it doesn't flick back and forth. */
+  private crateEnd: 'top' | 'foot' = 'foot';
   /** The tip on screen and when it first showed, so it can fade out on its own. */
   private tipShown: { id: string; at: number } | null = null;
   /** Where the tutorial's crate is on screen, if the graphics are running. */
@@ -775,10 +777,26 @@ export class Coach {
     spot.style.width = `${sr.width}px`;
     spot.style.height = `${sr.height}px`;
     if (crate) {
-      // The crate moves, so the card stays put at the foot of the view, clear of the HUD and side buttons.
+      // The crate drifts about the view, and on a phone the view is short enough that the card
+      // would cover it wherever it sat. Nothing in the menu is needed for this step, so with the
+      // menu open the card sits over the menu, out of the crate's way entirely.
       const stage = $('stage').getBoundingClientRect();
+      const h = coach.offsetHeight;
+      let top: number;
+      if (!panelClosed) top = Math.min(window.innerHeight - h - 8, stage.bottom + 8);
+      else {
+        // Menu hidden: the view is tall, so wait at whichever end is clear of the crate
+        // (switching only once the crate is clearly closer, so the card doesn't flick about).
+        const topY = stage.top + 8;
+        const footY = Math.max(topY, stage.bottom - h - 8);
+        const reach = 48; // The crate's size plus a finger's width.
+        const gap = (y: number) => Math.max(y - (crate.y + reach), crate.y - reach - (y + h), 0) || -Math.abs(crate.y - (y + h / 2));
+        const atTop = this.crateEnd === 'top' ? gap(topY) + 12 >= gap(footY) : gap(topY) > gap(footY) + 12;
+        this.crateEnd = atTop ? 'top' : 'foot';
+        top = atTop ? topY : footY;
+      }
       coach.style.left = `${(window.innerWidth - w) / 2}px`;
-      coach.style.top = `${Math.max(stage.top + 8, stage.bottom - coach.offsetHeight - 8)}px`;
+      coach.style.top = `${top}px`;
       delete coach.dataset.place;
       coach.classList.add('centre');
       return;
