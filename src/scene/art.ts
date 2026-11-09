@@ -626,6 +626,9 @@ export const goldenCrate = () => vector(sprites.goldenCrate());
 /** The golden salvage crate. */
 export const crate = () => vector(sprites.crate());
 
+/** The salvage crate, gift-wrapped for the Frost Festival. */
+export const giftCrate = () => vector(sprites.giftCrate());
+
 // ---------- Extra detail ----------
 
 /** Comms mast with a dish, hanging below the hull. Anchored at its top. */
@@ -863,6 +866,118 @@ export const bossWreck = (seed: number) =>
       ctx.fillRect(x - 5, y - 5, 10, 10);
     }
   }, 3, { bevel: 1.6, light: 0.5, grain: 0.45, grime: 0.6, seed: seed + 40 });
+
+/**
+ * The Lantern, the Hollow Fleet's last ship, docked for good once the story ends. Pointing left
+ * like the wrecks, but whole: a long hull with warm rows of windows, the hollow circle painted
+ * fresh, and the lamp on its bow that gave it its name.
+ */
+export const lanternShip = () =>
+  paint(240, 110, (ctx) => {
+    const top = 30;
+    const bottom = 82;
+    const hull = () => {
+      ctx.beginPath();
+      ctx.moveTo(10, 56);
+      ctx.quadraticCurveTo(16, top + 4, 48, top);
+      ctx.lineTo(196, top + 2);
+      ctx.quadraticCurveTo(214, top + 4, 218, 44);
+      ctx.lineTo(232, 46);
+      ctx.lineTo(232, 66);
+      ctx.lineTo(218, 68);
+      ctx.quadraticCurveTo(214, bottom - 4, 196, bottom - 2);
+      ctx.lineTo(48, bottom);
+      ctx.quadraticCurveTo(16, bottom - 4, 10, 56);
+      ctx.closePath();
+    };
+    ctx.save();
+    ctx.translate(3, 5);
+    hull();
+    ctx.fillStyle = 'rgba(0,0,12,0.4)';
+    ctx.fill();
+    ctx.restore();
+    // Bridge tower on top, and fins.
+    ctx.fillStyle = linear(ctx, 0, 14, 0, 32, [
+      [0, '#c9cfef'],
+      [1, '#6a70a0'],
+    ]);
+    ctx.beginPath();
+    ctx.moveTo(60, top + 1);
+    ctx.lineTo(70, 16);
+    ctx.lineTo(104, 16);
+    ctx.lineTo(112, top + 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#4d5280';
+    ctx.beginPath();
+    ctx.moveTo(170, bottom - 2);
+    ctx.lineTo(196, 100);
+    ctx.lineTo(206, 100);
+    ctx.lineTo(196, bottom - 4);
+    ctx.closePath();
+    ctx.fill();
+    hull();
+    ctx.fillStyle = linear(ctx, 0, top, 0, bottom, [
+      [0, '#d6dcf6'],
+      [0.4, '#8890c0'],
+      [1, '#33385e'],
+    ]);
+    ctx.fill();
+    ctx.save();
+    hull();
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(20,22,50,0.4)';
+    ctx.lineWidth = 0.8;
+    for (let x = 44; x < 230; x += 18) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 110);
+      ctx.stroke();
+    }
+    // A warm stripe along the hull, the fleet's amber.
+    ctx.fillStyle = 'rgba(255,181,71,0.85)';
+    ctx.fillRect(0, 62, 240, 4);
+    ctx.fillStyle = linear(ctx, 0, top, 0, top + 10, [
+      [0, 'rgba(255,255,255,0.5)'],
+      [1, 'rgba(255,255,255,0)'],
+    ]);
+    ctx.fillRect(0, top - 2, 240, 12);
+    ctx.restore();
+    // Rows of warm windows: the sleepers' decks, awake again.
+    const r = rng(91);
+    for (const y of [42, 52, 72]) {
+      for (let x = 40; x < 206; x += 6) {
+        if (r() < 0.18) continue;
+        ctx.fillStyle = r() < 0.15 ? 'rgba(255,240,200,1)' : 'rgba(255,200,120,0.95)';
+        ctx.fillRect(x, y, 3.2, 2.6);
+      }
+    }
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = 'rgba(160,230,255,0.95)';
+      ctx.fillRect(74 + i * 5, 21, 3, 3);
+    }
+    // The hollow circle, freshly painted.
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 3.6;
+    ctx.beginPath();
+    ctx.arc(140, 56, 11, 0, TAU);
+    ctx.stroke();
+    // Engine glow at the stern.
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = radial(ctx, 234, 56, 16, [
+      [0, 'rgba(160,230,255,0.9)'],
+      [1, 'rgba(90,180,255,0)'],
+    ]);
+    ctx.fillRect(214, 36, 26, 40);
+    // The lantern on the bow.
+    ctx.fillStyle = radial(ctx, 12, 56, 12, [
+      [0, 'rgba(255,250,220,1)'],
+      [0.35, 'rgba(255,200,110,0.8)'],
+      [1, 'rgba(255,170,70,0)'],
+    ]);
+    ctx.fillRect(0, 44, 24, 24);
+    ctx.globalCompositeOperation = 'source-over';
+  }, 3, { bevel: 1.4, light: 0.6, grain: 0.35, grime: 0.15, seed: 77 });
 
 /** Glowing cracks, faded in over a wreck as it takes damage. Drawn additively. */
 export const bossCracks = (seed: number) =>
@@ -1147,10 +1262,88 @@ export const ORNAMENT_SIZE: Record<string, [number, number]> = {
   disco: [14, 26],
   flag: [6, 8],
   bulb: [6, 6],
+  snowman: [14, 20],
+  startree: [16, 24],
 };
 
 function drawOrnament(ctx: Ctx, id: string): void {
   switch (id) {
+    case 'snowman': {
+      // Two snowballs, a carrot nose, a red scarf and (of course) a bubble helmet.
+      const ball = (x: number, y: number, r: number) => {
+        ctx.fillStyle = radial(ctx, x - r * 0.35, y - r * 0.35, r * 1.3, [
+          [0, '#ffffff'],
+          [0.7, '#dfeeff'],
+          [1, '#a8c4e8'],
+        ]);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+      };
+      ball(7, 15, 4.6);
+      ball(7, 8.2, 3.3);
+      ctx.fillStyle = '#e8324e';
+      ctx.fillRect(3.6, 10.6, 6.8, 1.6);
+      ctx.fillRect(8.2, 11.4, 1.6, 3.2);
+      ctx.fillStyle = '#1c1e3a';
+      ctx.fillRect(5.5, 7.2, 0.9, 0.9);
+      ctx.fillRect(7.8, 7.2, 0.9, 0.9);
+      for (const y of [13.6, 15.6]) ctx.fillRect(6.6, y, 0.9, 0.9);
+      ctx.fillStyle = '#ff9a3c';
+      ctx.beginPath();
+      ctx.moveTo(7, 8.6);
+      ctx.lineTo(10.6, 9.1);
+      ctx.lineTo(7, 9.6);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200,240,255,0.75)';
+      ctx.lineWidth = 0.6;
+      ctx.fillStyle = 'rgba(160,220,255,0.15)';
+      ctx.beginPath();
+      ctx.arc(7, 7.8, 5, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.ellipse(5, 5.4, 1.3, 0.6, -0.6, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'startree': {
+      // A little tree in a pot: three tiers, coloured lights and a gold star on top.
+      ctx.fillStyle = '#8a5a3c';
+      ctx.fillRect(6, 19, 4, 5);
+      ctx.fillStyle = '#5a5f80';
+      ctx.fillRect(4.5, 21, 7, 3);
+      const tier = (top: number, bottom: number, w: number, c: string) => {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.moveTo(8, top);
+        ctx.lineTo(8 + w, bottom);
+        ctx.lineTo(8 - w, bottom);
+        ctx.closePath();
+        ctx.fill();
+      };
+      tier(8, 20, 7.5, '#1f8f5a');
+      tier(5.5, 15, 6, '#27a868');
+      tier(3, 10.5, 4.3, '#34c27a');
+      const lights = ['#ff6b9a', '#ffd166', '#5ce1ff', '#ff9a4c', '#c58cff', '#ffffff'];
+      [[5, 17.5], [10.5, 18], [7.5, 13], [11, 13.5], [5.5, 12.5], [8.5, 9]].forEach(([x, y], i) => {
+        ctx.fillStyle = lights[i];
+        ctx.beginPath();
+        ctx.arc(x, y, 0.9, 0, TAU);
+        ctx.fill();
+      });
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const r = i % 2 ? 1.2 : 2.8;
+        ctx.lineTo(8 + Math.cos(a) * r, 3 + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
     case 'fern': {
       // Three cords to a basket, fronds spilling over the rim.
       ctx.strokeStyle = 'rgba(220,210,190,0.8)';

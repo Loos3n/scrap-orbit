@@ -58,7 +58,7 @@ import {
 } from './expansion';
 import { SAFE, SAFE_TYPES, SETS, setComplete, skinUnlocked, type CollectionSet } from './collection';
 import { GENERATORS } from './config';
-import { GALAXY, STAR_NODES, forgeCost, starsForCores } from './galaxy';
+import { GALAXY, STAR_NODES, forgeCost, starNodeShown, starsForCores } from './galaxy';
 import { D, Decimal } from './num';
 import { sectorBossRules, sectorHappenings, timeStretch } from './sectors';
 import { EVENT_PAINTS, weeklyOn } from './weekly';
@@ -933,7 +933,7 @@ export function buyForge(state: GameState): boolean {
 /** Buys a Star Map node with Galaxy Stars. */
 export function buyStarNode(state: GameState, id: string): boolean {
   const node = STAR_NODES.find((n) => n.id === id);
-  if (!node || state.galaxy.map.has(id) || state.galaxy.stars < node.cost) return false;
+  if (!node || !starNodeShown(state, node) || state.galaxy.map.has(id) || state.galaxy.stars < node.cost) return false;
   state.galaxy.stars -= node.cost;
   state.galaxy.map.add(id);
   // The kit lands straight away, not just from the next run.

@@ -3,14 +3,81 @@
  * player interacts, so the context is created on the first tap.
  */
 
-/** Ambient loop: four slow chords (A minor, F, C, G), as semitones above A2. */
-const CHORDS = [
-  [0, 3, 7, 12],
-  [-4, 0, 3, 8],
-  [3, 7, 10, 15],
-  [-2, 2, 5, 10],
-];
-const CHORD_SEC = 8;
+/**
+ * Music themes. Every theme is a loop of chords (semitones above A2, before `key`), played as a
+ * soft pad with sparse twinkles, plus optional arpeggios and a pulsing bass. Each sector has its
+ * own, and bosses, the radio story and its finale have theirs. All made in code, no files.
+ */
+export interface Theme {
+  chords: number[][];
+  /** Semitones added to every note. */
+  key: number;
+  /** Seconds per chord. */
+  sec: number;
+  pad: OscillatorType;
+  padVol: number;
+  /** Cents between the two voices of each pad note: wider sounds dreamier. */
+  spread: number;
+  /** Chance of a twinkle each half beat, and how many octaves up. */
+  twinkle: number;
+  twinkleOct: number;
+  /** Arpeggio step in seconds (0 = none) and its wave. */
+  arp: number;
+  arpWave?: OscillatorType;
+  /** Bass pulse step in seconds (0 = none). */
+  bass: number;
+  bassWave?: OscillatorType;
+  /** Low-pass cutoff for this theme, in Hz. */
+  cutoff: number;
+}
+
+const T = (t: Partial<Theme> & Pick<Theme, 'chords'>): Theme => ({
+  key: 0,
+  sec: 8,
+  pad: 'triangle',
+  padVol: 0.09,
+  spread: 6,
+  twinkle: 0.28,
+  twinkleOct: 2,
+  arp: 0,
+  bass: 0,
+  cutoff: 1400,
+  ...t,
+});
+
+export const MUSIC = {
+  // Scrapyard Belt: the original cozy loop (A minor, F, C, G).
+  scrapyard: T({ chords: [[0, 3, 7, 12], [-4, 0, 3, 8], [3, 7, 10, 15], [-2, 2, 5, 10]] }),
+  // Ember Reach: warm D dorian with a slow, glowing bass.
+  ember: T({ key: 5, chords: [[0, 3, 7, 10], [5, 9, 12, 15], [0, 3, 7, 10], [-2, 2, 5, 9]], sec: 9, bass: 1.5, bassWave: 'sine', twinkle: 0.18, cutoff: 1200 }),
+  // Verdant Drift: bright and green, with a gentle plucked arpeggio.
+  verdant: T({ key: -4, chords: [[0, 4, 7, 11], [2, 6, 9, 12], [-1, 2, 7, 11], [-3, 0, 4, 7]], sec: 7, arp: 0.35, arpWave: 'sine', twinkle: 0.15, cutoff: 1700 }),
+  // Glass Sea: clear, glassy major sevenths with lots of sparkle.
+  glass: T({ key: 7, chords: [[0, 4, 7, 11], [-3, 0, 4, 7], [-7, -3, 0, 4], [-5, -1, 2, 7]], sec: 8, pad: 'sine', padVol: 0.11, twinkle: 0.45, twinkleOct: 3, cutoff: 2200 }),
+  // Rose Nebula: dreamy, wide and slow.
+  rose: T({ key: 4, chords: [[0, 4, 7, 11], [-3, 0, 3, 7], [-8, -4, -1, 3], [-6, -2, 1, 5]], sec: 10, spread: 14, twinkle: 0.22, cutoff: 1500 }),
+  // Hollow Expanse: almost nothing out here; open fifths, very slow.
+  hollow: T({ chords: [[0, 7, 12, 14], [-5, 2, 7, 12], [-3, 4, 9, 11], [-5, 2, 7, 9]], sec: 12, pad: 'sine', padVol: 0.1, twinkle: 0.08, twinkleOct: 3, cutoff: 1000 }),
+  // Ice Belt: a music-box arpeggio over cold minor chords.
+  ice: T({ key: 2, chords: [[0, 3, 7, 12], [-4, 0, 3, 7], [-7, -3, 0, 5], [-5, -1, 2, 7]], sec: 8, pad: 'sine', arp: 0.25, arpWave: 'triangle', twinkle: 0.12, twinkleOct: 3, cutoff: 2400 }),
+  // Derelict City: a low, steady pulse through empty streets.
+  city: T({ key: 3, chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [3, 7, 10, 14], [-2, 2, 5, 9]], sec: 8, bass: 0.5, bassWave: 'triangle', twinkle: 0.15, cutoff: 1100 }),
+  // Black Hole Edge: eerie and stretched, with a slow wobble.
+  hole: T({ chords: [[0, 2, 7, 10], [-4, 3, 7, 11], [-2, 2, 5, 9], [-7, 0, 3, 6]], sec: 12, spread: 22, pad: 'sine', padVol: 0.11, twinkle: 0.1, twinkleOct: 3, cutoff: 900 }),
+  // A boss wreck: quicker minor chords and a driving bass.
+  boss: T({ key: 7, chords: [[0, 3, 7, 12], [-4, 0, 3, 8], [0, 3, 7, 12], [-2, 2, 5, 10]], sec: 3, padVol: 0.07, bass: 0.25, bassWave: 'square', twinkle: 0.1, cutoff: 1300 }),
+  // The radio story: a hushed, hopeful loop under the voices.
+  radio: T({ key: -2, chords: [[0, 4, 7, 12], [-3, 0, 4, 9], [-7, -3, 0, 5], [-5, -1, 2, 7]], sec: 7, pad: 'sine', padVol: 0.08, arp: 0.5, arpWave: 'sine', twinkle: 0.1, cutoff: 1300 }),
+  // The Lantern comes home: big, warm and bright.
+  fleet: T({ key: 3, chords: [[0, 4, 7, 12], [7, 11, 14, 19], [9, 12, 16, 21], [5, 9, 12, 17]], sec: 5, padVol: 0.1, arp: 0.25, arpWave: 'triangle', bass: 1.25, bassWave: 'sine', twinkle: 0.35, cutoff: 2400 }),
+  // The Frost Festival: sleigh-bell sparkle over cosy major chords.
+  frost: T({ key: 3, chords: [[0, 4, 7, 12], [5, 9, 12, 17], [7, 11, 14, 19], [0, 4, 7, 12]], sec: 6, pad: 'sine', padVol: 0.1, arp: 0.3, arpWave: 'triangle', twinkle: 0.5, twinkleOct: 3, cutoff: 2600 }),
+} satisfies Record<string, Theme>;
+export type ThemeId = keyof typeof MUSIC;
+
+/** The theme for each sector, in the order of SECTORS. */
+export const SECTOR_THEMES: readonly ThemeId[] = ['scrapyard', 'ember', 'verdant', 'glass', 'rose', 'hollow', 'ice', 'city', 'hole'];
+
 const A2 = 110;
 
 /** Options for one synthesized voice. */
@@ -43,6 +110,10 @@ export class Sfx {
   private musicTimer = 0;
   private nextChordAt = 0;
   private chord = 0;
+  /** The background theme (the sector) and one that plays over it for a while (a boss, the radio). */
+  private theme: ThemeId = 'scrapyard';
+  private override: ThemeId | null = null;
+  private playingTheme: ThemeId = 'scrapyard';
   /** Night (0 to 1): the music slows, drops a step and softens; see setNight. */
   private night = 0;
   private musicLp: BiquadFilterNode | null = null;
@@ -83,7 +154,7 @@ export class Sfx {
       // Music runs through its own quiet bus with a soft low-pass, under the effects.
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 1400 - this.night * 650;
+      lp.frequency.value = this.cutoff();
       this.musicLp = lp;
       this.musicBus = ctx.createGain();
       this.musicBus.gain.value = 0;
@@ -384,7 +455,32 @@ export class Sfx {
   /** Night-time music: 0 is the normal loop, 1 a slower, lower, muffled lullaby version. */
   setNight(n: number): void {
     this.night = Math.max(0, Math.min(1, n));
-    if (this.ctx && this.musicLp) this.musicLp.frequency.setTargetAtTime(1400 - this.night * 650, this.ctx.currentTime, 4);
+    this.retune(4);
+  }
+
+  /** The place's own theme; it changes at the next chord. */
+  setTheme(id: ThemeId): void {
+    this.theme = id;
+  }
+
+  /** A theme that plays over the place's own (a boss, the radio), or null to go back. */
+  setOverride(id: ThemeId | null): void {
+    if (id === this.override) return;
+    this.override = id;
+    // Bring the change in quickly instead of waiting out a long chord.
+    if (this.ctx && this.musicTimer && this.nextChordAt > this.ctx.currentTime + 1) this.nextChordAt = this.ctx.currentTime + 0.6;
+  }
+
+  private current(): Theme {
+    return MUSIC[this.override ?? this.theme];
+  }
+
+  private cutoff(): number {
+    return this.current().cutoff * (1 - this.night * 0.45);
+  }
+
+  private retune(sec: number): void {
+    if (this.ctx && this.musicLp) this.musicLp.frequency.setTargetAtTime(this.cutoff(), this.ctx.currentTime, sec);
   }
 
   setMusic(on: boolean): void {
@@ -422,44 +518,81 @@ export class Sfx {
     if (!ctx || !this.musicBus || ctx.state !== 'running') return;
     while (this.nextChordAt < ctx.currentTime + 1.5) {
       const start = this.nextChordAt;
-      // At night each chord lasts longer and sits two semitones lower: a sleepier loop.
-      const chordSec = CHORD_SEC * (1 + this.night * 0.5);
-      const shift = this.night > 0.5 ? -2 : 0;
-      const notes = CHORDS[this.chord % CHORDS.length].map((n) => n + shift);
+      const id = this.override ?? this.theme;
+      if (id !== this.playingTheme) {
+        this.playingTheme = id;
+        this.chord = 0;
+        this.retune(1.5);
+      }
+      const th = MUSIC[id];
+      // At night each chord lasts longer and sits two semitones lower: a sleepier loop
+      // (not for a boss or the story, which keep their own pace).
+      const calm = this.override ? 0 : this.night;
+      const chordSec = th.sec * (1 + calm * 0.5);
+      const shift = th.key + (calm > 0.5 ? -2 : 0);
+      const notes = th.chords[this.chord % th.chords.length].map((n) => n + shift);
+      const hz = (semi: number) => A2 * Math.pow(2, semi / 12);
+      const tone = (type: OscillatorType, freq: number, t: number, vol: number, attack: number, dur: number) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(g).connect(this.musicBus!);
+        osc.start(t);
+        osc.stop(t + dur + 0.05);
+      };
       // Pad: each chord tone as two slightly detuned voices with a slow swell.
       for (const semi of notes) {
-        for (const detune of [-6, 6]) {
+        for (const detune of [-th.spread, th.spread]) {
           const osc = ctx.createOscillator();
           const g = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.value = A2 * Math.pow(2, semi / 12);
+          osc.type = th.pad;
+          osc.frequency.value = hz(semi);
           osc.detune.value = detune;
           g.gain.setValueAtTime(0.0001, start);
-          g.gain.linearRampToValueAtTime(0.09, start + 2.5);
+          g.gain.linearRampToValueAtTime(th.padVol, start + Math.min(2.5, chordSec * 0.4));
           g.gain.linearRampToValueAtTime(0.0001, start + chordSec + 1.5);
           osc.connect(g).connect(this.musicBus);
           osc.start(start);
           osc.stop(start + chordSec + 1.6);
         }
       }
-      // Sparse twinkles from the chord, two octaves up.
+      // Arpeggio: up and down the chord, an octave up, softly.
+      if (th.arp > 0) {
+        const up = [...notes, notes[0] + 12];
+        const run = [...up, ...up.slice(1, -1).reverse()];
+        let i = 0;
+        for (let t = 0; t < chordSec - 0.05; t += th.arp * (1 + calm * 0.4), i++) tone(th.arpWave ?? 'sine', hz(run[i % run.length] + 12), start + t, 0.035, 0.01, th.arp * 2.2);
+      }
+      // Bass: the chord's root, two octaves down, pulsing.
+      if (th.bass > 0) for (let t = 0; t < chordSec - 0.05; t += th.bass) tone(th.bassWave ?? 'sine', hz(notes[0] - 12), start + t, th.bassWave === 'square' ? 0.03 : 0.07, 0.02, Math.min(th.bass * 0.9, 1.4));
+      // Sparse twinkles from the chord, high up.
       for (let beat = 0; beat < chordSec; beat += 0.5) {
-        if (Math.random() > 0.28 - this.night * 0.12) continue;
-        const semi = notes[Math.floor(Math.random() * notes.length)] + 24 + (Math.random() < 0.3 ? 12 : 0);
-        const t = start + beat;
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = A2 * Math.pow(2, semi / 12);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.06, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
-        osc.connect(g).connect(this.musicBus);
-        osc.start(t);
-        osc.stop(t + 1.5);
+        if (Math.random() > th.twinkle - calm * 0.12) continue;
+        const semi = notes[Math.floor(Math.random() * notes.length)] + 12 * th.twinkleOct + (Math.random() < 0.3 ? 12 : 0);
+        tone('sine', hz(semi), start + beat, 0.06, 0.01, 1.4);
       }
       this.nextChordAt += chordSec;
       this.chord++;
     }
+  }
+
+  /** Radio static: a short burst of crackle and a squelch. */
+  radio(): void {
+    if (!this.ready()) return;
+    this.noise(0, 0.5, 0.05, { type: 'bandpass', freq: 1800, q: 0.7 });
+    this.noise(0.1, 0.12, 0.05, { type: 'highpass', freq: 3000 });
+    this.voice({ freq: 1200, slideTo: 600, dur: 0.18, vol: 0.05, type: 'square', start: 0.45, filter: { type: 'lowpass', freq: 2000 } });
+  }
+
+  /** A soft two-tone beep as a new speaker comes on the radio. */
+  radioBlip(): void {
+    if (!this.ready()) return;
+    this.voice({ freq: 880, dur: 0.07, vol: 0.06, type: 'sine' });
+    this.voice({ freq: 1320, dur: 0.08, vol: 0.05, type: 'sine', start: 0.08 });
+    this.noise(0, 0.06, 0.02, { type: 'bandpass', freq: 2500, q: 1 });
   }
 }

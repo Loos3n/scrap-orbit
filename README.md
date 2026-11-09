@@ -14,10 +14,10 @@ It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and
 - Buy x1, x10, x100 or Max
 - Milestones at 10, 25, 50, 100, ... owned that double a machine's output
 - A Salvage Claw levelled with scrap (+1 per tap per level, doubling every 10 levels)
-- 29 upgrades: tap power, per-tier multipliers, global multipliers, and taps that scale with income
-- Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition. Six sectors cycle, each with its own sky, nebula and planet, announced by a title card
+- 116 upgrades: tap power, per-tier multipliers, global multipliers, taps that scale with income, and a long tail of 2x upgrades for every machine
+- Relocation (prestige): jump to a new sector for Star Cores, +10% income each, with a warp-and-flash transition. Nine sectors cycle, each with its own sky, nebula, planet and music, announced by a title card; most bend one rule, and the last three have a rig you can only build there
 - 6 core perks unlocked by how many cores you hold, including an Auto-Builder
-- 27 achievements, each worth +1% income
+- 22 achievements, each worth +1% income
 - Crew: 10 collectible crew members with their own portraits, each one multiplying a machine's output, levelled up with crystals
 - Missions: three daily goals and a weekly challenge that pay out crystals
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals), every 12 to 20 minutes. Events, bosses, golden crates, the trader and cargo pods never overlap, and each is followed by at least 4 minutes of calm
@@ -28,7 +28,8 @@ It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and
 - Golden scrap: every 12 to 20 minutes a glittering golden crate drifts past; tap it for a 30-second golden rush where everything earns 7x
 - Trading post: every 30 to 45 minutes a trader docks for 4 minutes with three one-off deals (crystals for scrap, scrap for crystals, a missing blueprint, an express recall for expeditions, or a missing wreck part)
 - Challenge runs: from 5 Star Cores, start a fresh run under a rule (no taps, no upgrades, no crew, 3x prices); salvage the goal in one run for a permanent bonus, or give up and carry on. Goals grow with the cube of your station's power (cores, research, achievements, rooms and loot), so a challenge stays about an hour of play however strong the station is; the goal is fixed when you start
-- Galaxy Shift (Progress, Galaxy): once a run has built a Dyson Collector, trade every Star Core for Galaxy Stars and start over in a new galaxy. Each star ever earned adds 25% income, and stars buy permanent Star Map upgrades (a starter kit, stronger and more plentiful cores, perks that survive the shift, 5x taps, 2x offline, 2x mission crystals, 3x everything) plus a Star Forge that doubles everything each level. Every galaxy asks for more cores per star, and each one gets its own colour in the sky
+- Galaxy traits and constellations: from the second galaxy on, each galaxy bends one rule your way (cheaper machines, hotter taps, a long night that pays 3x for time away, doubled crew, treasure crates, twin suns), and two new Star Map nodes come into view in each galaxy up to the seventh
+- Galaxy Shift (Prestige, Galaxy): once a run has built a Dyson Collector, trade every Star Core for Galaxy Stars and start over in a new galaxy. Each star ever earned adds 25% income, and stars buy permanent Star Map upgrades (a starter kit, stronger and more plentiful cores, perks that survive the shift, 5x taps, 2x offline, 2x mission crystals, 3x everything) plus a Star Forge that doubles everything each level. Every galaxy asks for more cores per star, and each one gets its own colour in the sky
 - Feel: bought machines fly from their card into the station, big one-off gains lift a gold "+X" off the counter, and the bottom tabs hop when picked
 - Locked cargo: every 25 to 40 minutes a wreck's cargo pod drifts by for 2 minutes. Crack its safe by tapping the dial when the needle sweeps through the green; three locks, each faster, and three misses jams it. Every lock opened pays scrap and crystals
 - Collection book (Station, Book): seven sets to fill (boss wrecks, sectors, machines, safes, pets, wreck parts and crew). Each finished set pays crystals and unlocks a station skin
@@ -38,8 +39,8 @@ It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and
 - Station rooms: build modules on a 3x3 grid with crystals (reactor, hangars, solar arrays and blueprint rooms); layout matters, since the reactor powers its neighbours and rooms like hangars, corners or the centre get extra. Rooms survive relocation and refund in full when taken down
 - Pets: a Nebula Cat that pounces for free taps, an Orbit Pup that finds more and richer crates, a Star Owl for offline earnings and a Goo Blob that chews bosses. One follows the station at a time
 - Daily login streak: a 7-day reward track of crystals, scrap and a free pet on day 7
-- Ambient generative music, three number formats and a full stats screen (collection and adventure records too)
-- Menu square: a small square in the bottom corner opens the menu edge to edge across the bottom half of the screen, with four tabs along its top (Build, Crew, Progress, Station). The square moves to the end of the tab row; tap it again to hide the menu and see the whole station. Build holds Machines and Upgrades, Progress holds the Lab, Star Cores and the Galaxy, and each tab reopens where you left it
+- Generative music made in code: every sector has its own theme (a warm bass in Ember Reach, a music box in the Ice Belt, a slow wobble at the Black Hole Edge), boss wrecks bring a tense one, and it all slows into a lullaby at night. Three number formats and a full stats screen (collection and adventure records too)
+- Menu square: a small square in the bottom corner opens the menu edge to edge across the bottom half of the screen, with five tabs along its top (Build, Crew, Lab, Prestige, Station). The square moves to the end of the tab row; tap it again to hide the menu and see the whole station. Build holds Machines and Upgrades, Prestige holds Star Cores, Challenges and the Galaxy, and each tab reopens where you left it
 - Next goal: a line under the scrap counter always names one thing to work towards (a new machine, a milestone, an upgrade, or the next Star Core) with a progress bar. It holds on to that goal until it is done, and tapping it opens the right tab, scrolls to the machine or upgrade that finishes it and makes it glow
 - Buy best: a button at the top of Machines buys whatever pays for itself soonest, counting both the wait to afford it and how fast its extra income earns back its price. It weighs single machines, buying up to the next milestone, and upgrades. Hold it to keep buying
 - Pan the view: drag the station to look around a little. It stretches past the edge and glides back to the middle when you let go, the scenery moves less than the station for depth. Taps still count the moment you touch, and press-and-hold still opens a machine
@@ -51,13 +52,15 @@ It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and
 - Scene life: smelters vent heat, fabricators weld, and far-off ships cross the sky with blinking nav lights
 - A hands-on first-run tutorial with Mika, the drone wrangler: every step waits for the player to do it, with a spotlight and progress bar, plus one-time tips as the crew, lab and relocation unlock
 - Overdrive: 2x everything for 30 seconds, every 5 minutes, with warp-speed stars
-- Synthesized sound effects: FM bells and mallets, filtered noise for impacts and whooshes, a shared space echo and a compressor (taps climb a musical scale), with a mute button
+- Synthesized sound effects: FM bells and mallets, filtered noise for impacts and whooshes, a shared space echo and a compressor (each tap is one soft, steady note), with volume sliders
 - Asteroids, meteors and moons painted per pixel from a height map: lumpy outlines, crater bowls with raised rims, lit from the same direction as the station
 - Lucky salvage crates drift past every couple of minutes. Each is sealed until you tap it: most hold scrap, the rest hold a Power surge (5x income for 45s), a Claw frenzy (20x taps for 12s), a big haul that grows with your banked scrap, a swarm of little crates to catch, a crystal stash or a spare battery that recharges Overdrive. Buffs stack with Overdrive and golden rushes
 - Autosave every 30 seconds and when the app is hidden
 - Offline earnings for up to 8 hours (up to 24 with perks and research), shown when you come back
 - Combo tapping: quick taps heat the claw up, and heat makes every tap worth up to 3x. A thermometer on the left shows it; at full heat the sparks run hot and a chime plays. Stop tapping and it cools
 - Run contracts: from the second relocation on, pick one of three rule cards for the new run (Haulers 4x, taps 10x, machines 40% cheaper, a 20 minute sprint, and more), or none. Each sets a goal sized from the run before; meeting it pays 15 crystals and +2% income for good. A slim line at the top of Build tracks it
+- The Hollow Fleet: a story told over the station radio. A garbled signal turns into a lost fleet's logs, a little girl's message in the ice and a captain asking for help. Thirteen transmissions in five chapters follow the beacon across sectors and galaxies, until the Lantern docks beside your station for good (+50% income) and the credits roll. Every transmission can be replayed from the Radio button
+- Frost Festival: every year from 1 December to 6 January snow drifts past the station, the music turns cosy and salvage crates come gift-wrapped. Crates, boss wrecks and a daily present give snowflakes for the festival shop: hot cocoa (2x income for 30 minutes), a snowman and a Star Tree for the station, a Hoarfrost hull paint and crystal stockings
 - Cloud save: sign in with Google to back up the station and play it on the web or another phone. Opening the game checks the cloud first, so an older device never overwrites newer progress
 
 ## Running it

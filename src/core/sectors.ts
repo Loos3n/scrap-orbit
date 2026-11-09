@@ -1,5 +1,6 @@
 import { sectorFor, type SectorDef } from './content';
 import type { GameState } from './state';
+import { traitOn } from './galaxy';
 
 /*
  * The deeper sectors each bend one rule (the twist) and offer one machine that can only be built
@@ -29,6 +30,13 @@ export function sectorBonuses(state: GameState): { income: number; tap: number; 
     b.offline += 1;
     if (rig) b.income += 0.75;
   }
+  // The galaxy's trait applies wherever the station is.
+  if (traitOn(state, 'ember')) {
+    b.tap += 2;
+    b.boss += 1;
+  }
+  if (traitOn(state, 'night')) b.offline += 2;
+  if (traitOn(state, 'twin')) b.income += 1;
   return b;
 }
 
@@ -44,13 +52,13 @@ export function sectorGenMult(state: GameState, gen: string): number {
 }
 
 /** Machine price multiplier from the twist. */
-export const sectorCostMult = (state: GameState) => (sectorRule(state) === 'cheap' ? 0.6 : 1);
+export const sectorCostMult = (state: GameState) => (sectorRule(state) === 'cheap' ? 0.6 : 1) * (traitOn(state, 'shallows') ? 0.75 : 1);
 
 /** How much more crew bonuses count here. */
-export const sectorCrewMult = (state: GameState) => (sectorRule(state) === 'crew' ? 2 : 1);
+export const sectorCrewMult = (state: GameState) => (sectorRule(state) === 'crew' ? 2 : 1) * (traitOn(state, 'haven') ? 2 : 1);
 
 /** Crate rate and crate value multipliers. */
-export const sectorCrateMult = (state: GameState) => (sectorRule(state) === 'crates' ? 2 : 1);
+export const sectorCrateMult = (state: GameState) => (sectorRule(state) === 'crates' ? 2 : 1) * (traitOn(state, 'treasure') ? 2 : 1);
 
 /** False where wrecks, storms and traders never come. */
 export const sectorHappenings = (state: GameState) => sectorRule(state) !== 'quiet';
@@ -62,7 +70,7 @@ export function sectorBossRules(state: GameState): { hp: number; reward: number;
 
 /** How much longer Overdrive and golden rushes last here. */
 export function timeStretch(state: GameState): number {
-  return currentSector(state).look === 'hole' ? 2 : 1;
+  return (currentSector(state).look === 'hole' ? 2 : 1) * (traitOn(state, 'night') ? 1.5 : 1);
 }
 
 /** The rig costs this many seconds of income, and never less than the floor. */

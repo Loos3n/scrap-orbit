@@ -1,4 +1,6 @@
 import { AD_CRYSTALS, useAd, type AdReward } from './core/rewards';
+import { buyFestival, dailyPresent, earnFlakes, type FestivalItemId } from './core/festival';
+import { FINALE_CRYSTALS, FINALE_ID, STORY_CRYSTALS, pendingStory } from './core/story';
 import { markOf } from './core/evolve';
 import { comboMult, cooled, heatAfterTap } from './core/combo';
 import { CONTRACT_CRYSTALS, checkContract, contractAutoBuyOff, makeOffers, pickContract, type ContractId } from './core/contracts';
@@ -86,7 +88,11 @@ export type GameEvent =
   | { type: 'contract'; phase: 'start' | 'done' | 'failed'; id?: ContractId }
   | { type: 'star'; prize: StarPrize }
   | { type: 'weekly'; phase: 'start' | 'tier'; id: WeeklyId }
-  | { type: 'weeklyClaim'; crystals: number; paint?: string };
+  | { type: 'weeklyClaim'; crystals: number; paint?: string }
+  /** A radio transmission came in (ready to play), or was just heard. */
+  | { type: 'story'; id: string; phase: 'ready' | 'heard'; crystals?: number }
+  /** Frost Festival: snowflakes earned (from a crate, a wreck or the daily present), or a shop item bought. */
+  | { type: 'festival'; flakes?: number; from?: 'crate' | 'boss' | 'present'; bought?: FestivalItemId };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -127,6 +133,7 @@ export class Game {
   private readyMissions = 0;
   private lastPounce = Date.now();
   private streakShown = '';
+  private storyShown = '';
   private tripsReady = new Set<CrewId>();
   /** What each little crate of the current swarm is worth. */
   private swarmEach: Decimal = D(1);
@@ -142,6 +149,20 @@ export class Game {
 
   private emit(e: GameEvent): void {
     for (const fn of this.listeners) fn(e);
+    // The Frost Festival shakes snowflakes out of crates and wrecks.
+    if (e.type === 'bonus' || e.type === 'bossDefeated') {
+      const from = e.type === 'bonus' ? 'crate' : 'boss';
+      const flakes = earnFlakes(this.state, Date.now(), from);
+      if (flakes) this.emit({ type: 'festival', flakes, from });
+    }
+  }
+
+  /** Buys something from the Frost Festival shop with snowflakes. */
+  buyFestival(id: FestivalItemId): void {
+    if (!buyFestival(this.state, id, Date.now())) return;
+    this.emit({ type: 'festival', bought: id });
+    if (id === 'snowman' || id === 'startree') for (const o of checkOrnaments(this.state)) this.emit({ type: 'ornament', id: o.id, fresh: true });
+    this.save();
   }
 
   /** Call once after listeners are attached, to credit time away since the last save. */
@@ -227,6 +248,16 @@ export class Game {
         this.emit({ type: 'tripReady', crew: t.crew });
       }
     }
+    // A present under the tree, once a festival day (after a new captain has settled in).
+    if (s.stats.playSec >= STREAK_SETTLE_SEC) {
+      const present = dailyPresent(s, now);
+      if (present) this.emit({ type: 'festival', flakes: present, from: 'present' });
+    }
+    const story = pendingStory(s);
+    if (story && story.id !== this.storyShown) {
+      this.storyShown = story.id;
+      this.emit({ type: 'story', id: story.id, phase: 'ready' });
+    }
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
     // A new day's reward waits until the tutorial is over and a brand-new captain has had a few
@@ -250,6 +281,17 @@ export class Game {
     this.emit({ type: 'bossHit', value });
     const won = meta.hitBoss(this.state, value, now);
     if (won) this.emit({ type: 'bossDefeated', ...won });
+  }
+
+  /** Marks a radio transmission heard (only the one that is ready), paying its crystals. */
+  hearStory(id: string): void {
+    const ready = pendingStory(this.state);
+    if (!ready || ready.id !== id) return;
+    this.state.story.heard.add(id);
+    const crystals = id === FINALE_ID ? FINALE_CRYSTALS : STORY_CRYSTALS;
+    meta.addCrystals(this.state, crystals);
+    this.emit({ type: 'story', id, phase: 'heard', crystals });
+    this.save();
   }
 
   claimStreak(): void {

@@ -1,4 +1,5 @@
 import type { CrewId, PetId } from './content';
+import { storyIncome } from './story';
 import { sectorBonuses } from './sectors';
 import type { GameState } from './state';
 
@@ -266,6 +267,7 @@ export function bonuses(state: GameState): Bonuses {
   b.tap += sec.tap;
   b.offline += sec.offline;
   b.boss += sec.boss;
+  b.income += storyIncome(state);
   return b;
 }
 

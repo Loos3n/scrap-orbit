@@ -1656,3 +1656,99 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 .keys-list dt { margin: 0; }
 .keys-list dd { margin: 0; color: var(--ink-dim); }
 .keys-list kbd { display: inline-block; min-width: 18px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: rgb(46 52 107 / 0.6); color: var(--ink); font: 600 12px var(--font-body); text-align: center; }
+
+/* ---------- Radio: the Hollow Fleet story ----------
+   A warm amber card for transmissions. The log lists chapters, with heard ones to replay and
+   the next one's hint. A playing transmission shows one speaker at a time, typed out. */
+.radio-card { padding-top: 44px; background: linear-gradient(#2a2346, #141230); border-color: rgb(255 181 71 / 0.35); max-height: min(86vh, 640px); overflow-y: auto; }
+.radio-card > div { width: 100%; display: grid; justify-items: center; gap: 6px; }
+.radio-list { width: 100%; margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; text-align: left; }
+.radio-chapter { margin: 8px 2px 0; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #ffcf7a; }
+.radio-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 14px; background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.06); }
+.radio-item b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.radio-item small { display: block; color: var(--ink-dim); font-size: 12px; line-height: 1.3; }
+.radio-item .grow { flex: 1; min-width: 0; }
+.radio-item button { flex: none; border: 0; padding: 7px 14px; border-radius: 99px; background: rgb(255 181 71 / 0.16); color: #ffd99a; font-weight: 600; font-size: 13px; }
+.radio-item.ready { background: rgb(255 181 71 / 0.14); border-color: rgb(255 181 71 / 0.5); box-shadow: 0 0 18px rgb(255 181 71 / 0.18); }
+.radio-item.ready button { background: linear-gradient(#ffd27a, var(--scrap)); color: #2b1600; }
+.radio-item.locked { opacity: 0.55; }
+.radio-item.locked b { color: var(--ink-dim); }
+.radio-kicker { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #ffcf7a; }
+.radio-wave { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; }
+.radio-wave i { width: 3px; border-radius: 2px; background: #ffcf7a; animation: radio-wave 0.9s ease-in-out infinite; }
+.radio-wave i:nth-child(1) { height: 5px; }
+.radio-wave i:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+.radio-wave i:nth-child(3) { height: 8px; animation-delay: 0.3s; }
+@keyframes radio-wave { 50% { transform: scaleY(0.35); } }
+.radio-line { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 8px; text-align: left; }
+.radio-face { flex: none; width: 56px; height: 56px; border-radius: 50%; background: #20264f; box-shadow: 0 0 0 3px #ffcf7a, 0 3px 10px rgb(0 0 0 / 0.35); overflow: hidden; }
+.radio-face svg { display: block; width: 100%; height: 100%; }
+.radio-face.static svg { filter: grayscale(1) contrast(0.6) blur(0.6px); animation: radio-static 0.25s steps(2) infinite; }
+@keyframes radio-static { 50% { opacity: 0.7; transform: translateX(1px); } }
+.radio-who { display: flex; flex-direction: column; line-height: 1.2; }
+.radio-who b { font-family: var(--font-display); font-weight: 600; font-size: 17px; }
+.radio-who small { color: var(--ink-dim); font-size: 12px; }
+.radio-text { width: 100%; min-height: 6.2em; margin: 6px 0 4px; padding: 12px 14px; border-radius: 16px; background: rgb(0 0 0 / 0.22); text-align: left; font-size: 15.5px; line-height: 1.45; }
+.radio-text.static { font-style: italic; color: #b8bce0; }
+.radio-foot { display: flex; align-items: center; gap: 12px; width: 100%; }
+.radio-foot .primary { width: auto; flex: 1; padding: 11px; font-size: 17px; }
+.radio-dots { display: flex; gap: 5px; }
+.radio-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgb(255 255 255 / 0.18); }
+.radio-dots i.on { background: #ffcf7a; }
+.radio-end h2 { font-size: 24px; }
+.radio-credits { width: 100%; margin: 0 0 12px; padding: 0; list-style: none; display: grid; gap: 8px; }
+.radio-credits li { display: grid; gap: 1px; }
+.radio-credits small { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #ffcf7a; }
+.radio-credits b { font-weight: 500; }
+#radio-btn.signal .round-btn { box-shadow: 0 0 0 2px #ffcf7a, 0 0 16px rgb(255 181 71 / 0.7); animation: radio-ping 1.6s ease-in-out infinite; }
+@keyframes radio-ping { 50% { box-shadow: 0 0 0 2px #ffcf7a, 0 0 4px rgb(255 181 71 / 0.2); } }
+
+/* ---------- Frost Festival ---------- */
+.festival-chip { --c: #9fe6ff; color: #dff6ff; }
+.festival-chip [data-icon] { display: inline-flex; width: 15px; height: 15px; color: #9fe6ff; }
+.festival-chip [data-icon] svg { width: 100%; height: 100%; }
+.festival-card { border-color: rgb(159 230 255 / 0.4); background: linear-gradient(#1d2f5a, #11173a); max-height: min(88vh, 680px); overflow-y: auto; }
+.festival-art { color: #cfefff; filter: drop-shadow(0 0 22px rgb(159 230 255 / 0.7)); animation: spin 18s linear infinite; }
+.festival-flakes { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; }
+.festival-flakes [data-icon] { width: 26px; height: 26px; align-self: center; color: #9fe6ff; }
+.festival-flakes b { font-family: var(--font-display); font-weight: 700; font-size: 38px; color: #dff6ff; text-shadow: 0 0 18px rgb(159 230 255 / 0.55); font-variant-numeric: tabular-nums; }
+.festival-flakes small { color: var(--ink-dim); }
+.festival-cocoa { margin: 0 0 6px; padding: 6px 12px; border-radius: 99px; background: rgb(255 181 71 / 0.15); color: #ffd99a; font-size: 13px; font-weight: 600; }
+.festival-shop { width: 100%; margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; text-align: left; }
+.festival-shop li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: rgb(255 255 255 / 0.05); border: 1px solid rgb(159 230 255 / 0.12); }
+.festival-shop .fs-pic { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: rgb(159 230 255 / 0.1); }
+.festival-shop .fs-pic img, .festival-shop .fs-pic svg { width: 34px; height: 34px; }
+.festival-shop .grow { flex: 1; min-width: 0; }
+.festival-shop b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.festival-shop small { display: block; color: var(--ink-dim); font-size: 12px; line-height: 1.3; }
+.festival-shop button { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 0; padding: 8px 12px; border-radius: 99px; background: linear-gradient(#bff0ff, #6fcdf0); color: #062033; font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 #3a8fb4; }
+.festival-shop button [data-icon], .festival-shop button svg { width: 13px; height: 13px; }
+.festival-shop button:disabled { background: rgb(255 255 255 / 0.08); color: var(--ink-dim); box-shadow: none; }
+.festival-shop .owned { color: #9dff6b; font-weight: 600; font-size: 13px; }
+.galaxy-trait { margin: 6px 0 2px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); font-size: 13px; line-height: 1.4; text-align: left; }
+.galaxy-trait b { color: var(--c); }
+.star-node.locked { opacity: 0.55; }
+
+/* ---------- Intro: the title screen ----------
+   Plays over the live station when the game opens: the logo above it, a button below it, and
+   the menus out of the way until the captain taps in. */
+.intro { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top, 0px) + 7vh) 24px calc(env(safe-area-inset-bottom, 0px) + 6vh); text-align: center; background: linear-gradient(rgb(6 7 24 / 0.75), rgb(6 7 24 / 0) 30%, rgb(6 7 24 / 0) 62%, rgb(6 7 24 / 0.85)); cursor: pointer; animation: fade 0.6s ease-out; transition: opacity 0.6s ease; }
+.intro.leaving { opacity: 0; pointer-events: none; }
+.intro-top { display: grid; justify-items: center; gap: 10px; animation: intro-drop 1s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+.intro-logo { position: relative; display: grid; justify-items: center; line-height: 0.86; }
+.intro-ring { position: absolute; left: 50%; top: 50%; width: min(118%, 420px); transform: translate(-50%, -46%); overflow: visible; filter: drop-shadow(0 0 6px rgb(79 227 193 / 0.6)); }
+.intro-scrap, .intro-orbit { position: relative; font-family: var(--font-display); font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; background: linear-gradient(#fff4cc, #ffd166 45%, #ff9a3c); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 0 #9a4f0c) drop-shadow(0 0 18px rgb(255 181 71 / 0.45)); }
+.intro-scrap { font-size: clamp(30px, 10vw, 54px); letter-spacing: 0.22em; padding-left: 0.22em; }
+.intro-orbit { font-size: clamp(56px, 19vw, 104px); }
+.intro-tag { margin: 6px 0 0; color: #cfd4ff; font-size: 15px; letter-spacing: 0.04em; text-shadow: 0 1px 6px rgb(0 0 0 / 0.8); }
+.intro-bottom { width: min(340px, 100%); display: grid; justify-items: center; gap: 10px; animation: intro-rise 0.9s 0.35s cubic-bezier(0.2, 1.2, 0.4, 1) both; }
+.intro-save { margin: 0; padding: 6px 14px; border-radius: 99px; background: rgb(10 12 40 / 0.7); border: 1px solid rgb(120 130 220 / 0.3); color: #dfe3ff; font-size: 13px; }
+.intro-play { font-size: 21px; padding: 16px; animation: intro-glow 2.2s ease-in-out 1.3s infinite; }
+.intro-hint { color: var(--ink-dim); font-size: 11.5px; letter-spacing: 0.06em; }
+@keyframes intro-drop { from { opacity: 0; transform: translateY(-24px) scale(0.92); } }
+@keyframes intro-rise { from { opacity: 0; transform: translateY(24px); } }
+@keyframes intro-glow { 50% { box-shadow: 0 5px 0 var(--scrap-deep), 0 0 40px rgb(255 181 71 / 0.75); } }
+@media (prefers-reduced-motion: reduce) { .intro-top, .intro-bottom, .intro-play { animation: none; } }
+body.intro :is(#hud, #panel, #stage > *, #toasts, #coach, #coach-dim, #coach-spot, #menu-btn, #combo) { opacity: 0; pointer-events: none; }
+/* Pop-ups that open at start-up (time-away earnings, daily reward, cloud backup) wait until the title is tapped away. */
+body.intro :is(.modal, .sample-ad, .fanfare, .confetti, .sector-card, .boss-alert) { display: none !important; }

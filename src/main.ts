@@ -2,6 +2,7 @@ import { askPermission, cancelReminders, notificationsAvailable, scheduleReminde
 import { WEEKLIES, allPaints, weeklyOn } from './core/weekly';
 import { GROWTH, growthStage } from './core/growth';
 import { GROUP_NAMES } from './ui/panes';
+import { introShowing, showIntro } from './ui/intro';
 // Swaps PixiJS's generated code for eval-free versions, so the game runs under strict
 // Content-Security-Policy hosts (embedded pages, some app stores' web views).
 import 'pixi.js/unsafe-eval';
@@ -13,7 +14,11 @@ import '@fontsource/rubik/latin-400.css';
 import '@fontsource/rubik/latin-500.css';
 import '@fontsource/rubik/latin-600.css';
 import './style.css';
-import { Sfx } from './audio';
+import { SECTOR_THEMES, Sfx, type ThemeId } from './audio';
+import { StoryRadio } from './ui/story-ui';
+import { FINALE_ID, storyDone } from './core/story';
+import { festivalActive } from './core/festival';
+import { FestivalPanel } from './ui/festival-ui';
 import { CLAW, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES } from './core/config';
 import { modelName } from './core/evolve';
 import { AD_CRYSTALS } from './core/rewards';
@@ -35,6 +40,7 @@ import { GEN_ICONS, ICONS, genIcon } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
+import { galaxyTrait } from './core/galaxy';
 import { tradeText } from './ui/trade-ui';
 import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
@@ -136,7 +142,10 @@ async function boot(): Promise<void> {
   ui.syncSettings();
   const sceneEl = document.getElementById('scene')!;
   const stage = document.getElementById('stage')!;
+  let gliding = false;
   const syncFocus = () => {
+    // The title screen frames the camera itself until it has glided back.
+    if (introShowing() || gliding) return;
     const r = stage.getBoundingClientRect();
     scene.setFocus(r.top, r.bottom, r.left, r.right);
   };
@@ -152,6 +161,14 @@ async function boot(): Promise<void> {
   syncFocus();
   if (scene.ready) ui.coach.crate = () => scene.crateOnScreen();
   new ResizeObserver(syncFocus).observe(stage);
+  showIntro(game, {
+    focus: (top, bottom, left, right) => scene.setFocus(top, bottom, left, right),
+    glide: (on) => {
+      gliding = on;
+      if (!on) syncFocus();
+    },
+    start: () => sfx.achievement(),
+  });
   scene.setOwned(game.state.owned);
   scene.setViewZoom(game.state.settings.viewZoom);
   scene.setBatterySaver(game.state.settings.batterySaver);
@@ -174,6 +191,35 @@ async function boot(): Promise<void> {
   window.addEventListener('pointerdown', unlock, { capture: true });
 
   const fanfare = new Fanfare(() => game.state.settings.reduceFlash);
+  /**
+   * Music follows the place: each sector has its own theme. A boss wreck brings its own, and the
+   * radio plays a hushed one under the voices (and a big one when the Lantern comes home).
+   */
+  let radioTheme: ThemeId | null = null;
+  const syncMusic = () => {
+    const s = game.state;
+    sfx.setTheme(festivalActive(s, Date.now()) ? 'frost' : SECTOR_THEMES[s.stats.relocations % SECTOR_THEMES.length]);
+    sfx.setOverride(radioTheme ?? (s.boss ? 'boss' : null));
+  };
+  const radio = new StoryRadio(game, {
+    crackle: () => sfx.radio(),
+    blip: () => sfx.radioBlip(),
+    playing: (id) => {
+      radioTheme = id ? (id === FINALE_ID ? 'fleet' : 'radio') : null;
+      syncMusic();
+    },
+  });
+  if (import.meta.env.DEV) Object.assign(window, { __radio: radio });
+  /** The Frost Festival: snow over the station, gift-wrapped crates and its own music while it runs. */
+  const syncFestival = () => {
+    const on = festivalActive(game.state, Date.now());
+    scene.setSnow(on);
+    scene.giftCrates = on;
+  };
+  const festival = new FestivalPanel(game, () => {
+    syncFestival();
+    syncMusic();
+  });
   /**
    * Day and night from the device clock (core/daynight.ts). Checked every 20 seconds; when the
    * light changes while playing, the crew mention it in a toast (not on start-up or in the tutorial).
@@ -365,6 +411,7 @@ async function boot(): Promise<void> {
         scene.galaxyJump();
         cinematic(JUMP_SWAP_MS.galaxy);
         const galaxyNo = game.state.galaxy.shifts + 1;
+        const trait = galaxyTrait(game.state);
         sfx.warp();
         window.setTimeout(() => sfx.warp(), 1600);
         setTimeout(() => {
@@ -378,7 +425,7 @@ async function boot(): Promise<void> {
               icon: ICONS.star.replace('currentColor', '#ffe9a8'),
               kicker: 'Galaxy Shift',
               title: `Welcome to Galaxy ${galaxyNo}`,
-              sub: `+${e.stars.toLocaleString('en-US')} Galaxy Stars. Every star ever earned powers the station, and the Star Map has new upgrades to buy.`,
+              sub: `+${e.stars.toLocaleString('en-US')} Galaxy Stars.${trait ? ` <b>${trait.name}:</b> ${trait.text}` : ''} New stars have come into view on the Star Map.`,
               color: '#ffe9a8',
             });
             fanfare.confetti(['#ffe9a8', '#8f7bff', '#ffd166', '#ffffff']);
@@ -429,6 +476,8 @@ async function boot(): Promise<void> {
         scene.setGalaxy(game.state.galaxy.shifts);
         scene.setTrader(meta.traderHere(game.state, Date.now()));
         scene.setOrnaments(game.state.ornaments.on);
+        scene.setLantern(storyDone(game.state));
+        radio.render();
         syncPerks();
         syncDecor();
         break;
@@ -569,6 +618,41 @@ async function boot(): Promise<void> {
             sfx.achievement();
           }, 900);
         }
+        break;
+      }
+      case 'story':
+        radio.render();
+        if (e.phase === 'ready') {
+          if (game.state.tutorial >= 0) break;
+          ui.toast(ICONS.radio.replace('currentColor', '#ffcf7a'), '<b>Incoming transmission!</b> Tap Radio to listen');
+          sfx.radio();
+          buzz([15, 40, 15]);
+        } else if (e.id === FINALE_ID) {
+          scene.setLantern(true, true);
+          fanfare.confetti(['#ffcf7a', '#ffffff', '#ff8fa8', '#9fe6ff']);
+          scene.fireworks([0xffcf7a, 0xffffff, 0x9fe6ff]);
+          sfx.fanfare();
+          buzz([40, 60, 40, 60, 200]);
+        } else ui.toast(ICONS.radio.replace('currentColor', '#ffcf7a'), `<b>Transmission logged</b> +${e.crystals} crystals`);
+        break;
+      case 'festival': {
+        const flake = ICONS.snowflake.replace('currentColor', '#9fe6ff');
+        if (e.from === 'present') {
+          ui.toast(flake, `<b>A present under the tree!</b> +${e.flakes} snowflakes for the Frost Festival shop`);
+          sfx.achievement();
+        } else if (e.from === 'boss') ui.toast(flake, `<b>+${e.flakes} snowflakes</b> shaken loose from the wreck`);
+        else if (e.bought === 'cocoa') {
+          ui.toast(flake, `<b>Hot cocoa!</b> The crew warm up: 2x income for 30 minutes`);
+          scene.celebrate(0xff8fa8);
+          sfx.boost();
+        } else if (e.bought === 'stocking') {
+          ui.toast(ICONS.crystal, '<b>Crystal stocking!</b> +15 crystals');
+          sfx.coins();
+        } else if (e.bought === 'hoarfrost') {
+          fanfare.cheer({ icon: ICONS.station, kicker: 'Frost Festival', title: 'Hoarfrost paint', sub: 'Only the festival gives it. Put it on in Station, Decor.', color: '#e6f6ff' });
+          sfx.fanfare();
+        } else if (e.bought) sfx.upgrade();
+        festival.render();
         break;
       }
       case 'bossEscape':
@@ -938,6 +1022,8 @@ async function boot(): Promise<void> {
   if (game.state.boss) scene.setBoss(game.state.boss.name);
   scene.setTrader(meta.traderHere(game.state, Date.now()));
   scene.setOrnaments(game.state.ornaments.on);
+  scene.setLantern(storyDone(game.state));
+  syncMusic();
 
   // Combo heat meter (core/combo.ts), redrawn only when it moves.
   const comboEl = document.getElementById('combo')!;
@@ -976,6 +1062,9 @@ async function boot(): Promise<void> {
     if (now - lastUi > 100) {
       lastUi = now;
       ui.render();
+      festival.render();
+      syncFestival();
+      syncMusic();
     }
   };
   requestAnimationFrame(loop);

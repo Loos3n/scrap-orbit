@@ -18,6 +18,8 @@ const CLOSERS: Record<string, string> = {
   missions: 'missions-close',
   streak: 'streak-claim',
   'cloud-ask': 'cloud-ask-close',
+  radio: 'radio-close',
+  festival: 'festival-close',
 };
 
 /** What back does right now: closes the top window or the menu. Returns false when nothing was open. */

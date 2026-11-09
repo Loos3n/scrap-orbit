@@ -51,6 +51,7 @@
         </div>
         <div class="goal-row">
           <button id="goal" class="goal-line" type="button" aria-label="Next goal" hidden><span class="goal-tag"><span data-icon="trophy"></span><span class="goal-tag-word">Next</span></span><span id="goal-text" class="goal-text"></span><span id="goal-ready" class="goal-ready" hidden>Ready</span><i class="goal-bar"><i id="goal-bar"></i></i></button>
+          <button id="festival-chip" class="weekly-chip festival-chip" type="button" hidden><span data-icon="snowflake"></span><span id="festival-chip-text">0</span></button>
           <button id="weekly-chip" class="weekly-chip" type="button" hidden><i id="weekly-chip-dot"></i><span id="weekly-chip-text">Event</span></button>
         </div>
       </div>
@@ -59,6 +60,7 @@
         <nav class="side-rail" aria-label="Missions, profile and settings">
           <button id="missions-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></span><small>Missions</small></button>
           <button id="profile-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="profile"></span><span id="profile-dot" class="dot" hidden></span></span><small>Profile</small></button>
+          <button id="radio-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="radio"></span><span id="radio-dot" class="dot" hidden></span></span><small>Radio</small></button>
           <button id="settings-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="gear"></span></span><small>Settings</small></button>
         </nav>
         <div id="boss-banner" class="boss-banner" hidden>
@@ -248,6 +250,7 @@
             <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration</span></label>
             <label id="opt-notify-row" class="toggle" hidden><input id="opt-notify" type="checkbox" /><span>Reminders<small>When storage fills up, research finishes or crew come home</small></span></label>
             <label class="toggle"><input id="opt-daynight" type="checkbox" /><span>Day and night<small>The station follows your clock: sleepy lights and slower music late at night</small></span></label>
+            <label class="toggle" id="opt-festival-row" hidden><input id="opt-festival" type="checkbox" /><span>Try the Frost Festival now<small>For testing: the winter festival normally runs 1 December to 6 January</small></span></label>
             <label class="toggle"><input id="opt-battery" type="checkbox" /><span>Battery saver<small>Smoother on older phones and easier on the battery</small></span></label>
             <h3 class="section-title">Game</h3>
             <label class="toggle"><input id="opt-ads" type="checkbox" /><span>Ad offers<small>Optional bonuses for watching an ad. An ad only plays when you tap one.</small></span></label>
@@ -402,6 +405,84 @@
         <div id="graphs" class="graphs"></div>
         <h3 class="section-title">Stats</h3>
         <dl id="stats" class="stats"></dl>
+        </div>
+      </div>
+    </div>
+    <div id="intro" class="intro" hidden>
+      <div class="intro-top">
+        <div class="intro-logo" role="img" aria-label="Scrap Orbit">
+          <svg class="intro-ring" viewBox="0 0 320 120" aria-hidden="true">
+            <ellipse cx="160" cy="62" rx="150" ry="34" fill="none" stroke="url(#intro-ring-g)" stroke-width="3" transform="rotate(-8 160 62)"/>
+            <defs>
+              <linearGradient id="intro-ring-g" x1="0" x2="1">
+                <stop offset="0" stop-color="#4fe3c1" stop-opacity="0"/>
+                <stop offset=".35" stop-color="#4fe3c1" stop-opacity=".9"/>
+                <stop offset=".7" stop-color="#ffd166" stop-opacity=".9"/>
+                <stop offset="1" stop-color="#ffd166" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <g transform="rotate(-8 160 62)">
+              <circle r="5" fill="#fff4cc">
+                <animateMotion dur="5s" repeatCount="indefinite" path="M10 62a150 34 0 1 0 300 0a150 34 0 1 0-300 0"/>
+              </circle>
+            </g>
+          </svg>
+          <span class="intro-scrap">Scrap</span>
+          <span class="intro-orbit">Orbit</span>
+        </div>
+        <p class="intro-tag">A cozy space salvage station</p>
+      </div>
+      <div class="intro-bottom">
+        <p id="intro-save" class="intro-save" hidden></p>
+        <button id="intro-play" class="primary intro-play" type="button">Start salvaging</button>
+        <small class="intro-hint">Made of scrap, sound and starlight</small>
+      </div>
+    </div>
+    <div id="festival" class="modal" hidden>
+      <div class="modal-card festival-card" role="dialog" aria-modal="true" aria-labelledby="festival-title">
+        <button id="festival-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="modal-art festival-art" data-icon="snowflake"></div>
+        <div id="festival-ends" class="eyebrow"></div>
+        <h2 id="festival-title">Frost Festival</h2>
+        <div class="festival-flakes"><span data-icon="snowflake"></span><b id="festival-flakes">0</b><small>snowflakes</small></div>
+        <p class="modal-time">Gift-wrapped crates hold <b>1 snowflake</b>, boss wrecks <b>5</b>, and there's a present with <b>5</b> under the tree every day.</p>
+        <p id="festival-cocoa" class="festival-cocoa" hidden></p>
+        <ul id="festival-shop" class="festival-shop"></ul>
+      </div>
+    </div>
+    <div id="radio" class="modal" hidden>
+      <div class="modal-card radio-card" role="dialog" aria-modal="true" aria-labelledby="radio-title">
+        <button id="radio-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div id="radio-log">
+          <div class="eyebrow">Emergency band</div>
+          <h2 id="radio-title">The Hollow Fleet</h2>
+          <p id="radio-intro" class="modal-time"></p>
+          <ol id="radio-list" class="radio-list"></ol>
+        </div>
+        <div id="radio-play" class="radio-play" hidden>
+          <div class="radio-kicker"><span class="radio-wave"><i></i><i></i><i></i></span><span id="radio-chapter"></span></div>
+          <h2 id="radio-entry"></h2>
+          <div class="radio-line">
+            <span id="radio-face" class="radio-face"></span>
+            <div class="radio-who"><b id="radio-name"></b><small id="radio-role"></small></div>
+          </div>
+          <p id="radio-text" class="radio-text" aria-live="polite"></p>
+          <div class="radio-foot">
+            <span id="radio-dots" class="radio-dots"></span>
+            <button id="radio-next" class="primary" type="button">Next</button>
+          </div>
+        </div>
+        <div id="radio-end" class="radio-end" hidden>
+          <div class="eyebrow">The end</div>
+          <h2>The Hollow Fleet is home</h2>
+          <p class="modal-time">The Lantern is docked beside your station for good, and her crew lend a hand: <b>+50% income</b> and <b>50 crystals</b>. The station keeps growing, and so can you.</p>
+          <ul class="radio-credits">
+            <li><small>Captain</small><b>You</b></li>
+            <li><small>Crew</small><b>Mika, Bolt, Ash, Juno, Hex, Ray, Nova, Pip, Orin and Sol</b></li>
+            <li><small>From the Lantern</small><b>Captain Ilsa Vey, Tamsin, and Biscuit the cat</b></li>
+            <li><small>Thanks for playing</small><b>Scrap Orbit</b></li>
+          </ul>
+          <button id="radio-end-ok" class="primary" type="button">Back to the station</button>
         </div>
       </div>
     </div>

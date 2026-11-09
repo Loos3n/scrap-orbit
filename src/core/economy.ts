@@ -20,6 +20,7 @@ import {
 import { BOSS, CREW, CREW_PER_LEVEL, FLARE_TAP_MULT, RESEARCH, type ResearchEffect } from './content';
 import { GOLDEN, bonuses, challengeOn, goldenActive, onTrip } from './expansion';
 import { weeklyOn } from './weekly';
+import { cocoaMult } from './festival';
 import { crateIncomeMult, crateTapMult } from './crate-buffs';
 import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
@@ -175,7 +176,7 @@ export function baseIncome(state: GameState): Decimal {
 
 export function income(state: GameState, now: number): Decimal {
   const base = baseIncome(state);
-  const boosted = (boostActive(state, now) ? base.mul(BOOST.mult) : base).mul(crateIncomeMult(state, now));
+  const boosted = (boostActive(state, now) ? base.mul(BOOST.mult) : base).mul(crateIncomeMult(state, now) * cocoaMult(state, now));
   return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 
