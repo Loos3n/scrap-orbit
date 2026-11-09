@@ -626,6 +626,9 @@ export const goldenCrate = () => vector(sprites.goldenCrate());
 /** The golden salvage crate. */
 export const crate = () => vector(sprites.crate());
 
+/** The salvage crate, gift-wrapped for the Frost Festival. */
+export const giftCrate = () => vector(sprites.giftCrate());
+
 // ---------- Extra detail ----------
 
 /** Comms mast with a dish, hanging below the hull. Anchored at its top. */
@@ -1259,10 +1262,88 @@ export const ORNAMENT_SIZE: Record<string, [number, number]> = {
   disco: [14, 26],
   flag: [6, 8],
   bulb: [6, 6],
+  snowman: [14, 20],
+  startree: [16, 24],
 };
 
 function drawOrnament(ctx: Ctx, id: string): void {
   switch (id) {
+    case 'snowman': {
+      // Two snowballs, a carrot nose, a red scarf and (of course) a bubble helmet.
+      const ball = (x: number, y: number, r: number) => {
+        ctx.fillStyle = radial(ctx, x - r * 0.35, y - r * 0.35, r * 1.3, [
+          [0, '#ffffff'],
+          [0.7, '#dfeeff'],
+          [1, '#a8c4e8'],
+        ]);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+      };
+      ball(7, 15, 4.6);
+      ball(7, 8.2, 3.3);
+      ctx.fillStyle = '#e8324e';
+      ctx.fillRect(3.6, 10.6, 6.8, 1.6);
+      ctx.fillRect(8.2, 11.4, 1.6, 3.2);
+      ctx.fillStyle = '#1c1e3a';
+      ctx.fillRect(5.5, 7.2, 0.9, 0.9);
+      ctx.fillRect(7.8, 7.2, 0.9, 0.9);
+      for (const y of [13.6, 15.6]) ctx.fillRect(6.6, y, 0.9, 0.9);
+      ctx.fillStyle = '#ff9a3c';
+      ctx.beginPath();
+      ctx.moveTo(7, 8.6);
+      ctx.lineTo(10.6, 9.1);
+      ctx.lineTo(7, 9.6);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200,240,255,0.75)';
+      ctx.lineWidth = 0.6;
+      ctx.fillStyle = 'rgba(160,220,255,0.15)';
+      ctx.beginPath();
+      ctx.arc(7, 7.8, 5, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.ellipse(5, 5.4, 1.3, 0.6, -0.6, 0, TAU);
+      ctx.fill();
+      break;
+    }
+    case 'startree': {
+      // A little tree in a pot: three tiers, coloured lights and a gold star on top.
+      ctx.fillStyle = '#8a5a3c';
+      ctx.fillRect(6, 19, 4, 5);
+      ctx.fillStyle = '#5a5f80';
+      ctx.fillRect(4.5, 21, 7, 3);
+      const tier = (top: number, bottom: number, w: number, c: string) => {
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.moveTo(8, top);
+        ctx.lineTo(8 + w, bottom);
+        ctx.lineTo(8 - w, bottom);
+        ctx.closePath();
+        ctx.fill();
+      };
+      tier(8, 20, 7.5, '#1f8f5a');
+      tier(5.5, 15, 6, '#27a868');
+      tier(3, 10.5, 4.3, '#34c27a');
+      const lights = ['#ff6b9a', '#ffd166', '#5ce1ff', '#ff9a4c', '#c58cff', '#ffffff'];
+      [[5, 17.5], [10.5, 18], [7.5, 13], [11, 13.5], [5.5, 12.5], [8.5, 9]].forEach(([x, y], i) => {
+        ctx.fillStyle = lights[i];
+        ctx.beginPath();
+        ctx.arc(x, y, 0.9, 0, TAU);
+        ctx.fill();
+      });
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const r = i % 2 ? 1.2 : 2.8;
+        ctx.lineTo(8 + Math.cos(a) * r, 3 + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
     case 'fern': {
       // Three cords to a basket, fronds spilling over the rim.
       ctx.strokeStyle = 'rgba(220,210,190,0.8)';

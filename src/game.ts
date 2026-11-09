@@ -1,4 +1,5 @@
 import { AD_CRYSTALS, useAd, type AdReward } from './core/rewards';
+import { buyFestival, dailyPresent, earnFlakes, type FestivalItemId } from './core/festival';
 import { FINALE_CRYSTALS, FINALE_ID, STORY_CRYSTALS, pendingStory } from './core/story';
 import { markOf } from './core/evolve';
 import { comboMult, cooled, heatAfterTap } from './core/combo';
@@ -89,7 +90,9 @@ export type GameEvent =
   | { type: 'weekly'; phase: 'start' | 'tier'; id: WeeklyId }
   | { type: 'weeklyClaim'; crystals: number; paint?: string }
   /** A radio transmission came in (ready to play), or was just heard. */
-  | { type: 'story'; id: string; phase: 'ready' | 'heard'; crystals?: number };
+  | { type: 'story'; id: string; phase: 'ready' | 'heard'; crystals?: number }
+  /** Frost Festival: snowflakes earned (from a crate, a wreck or the daily present), or a shop item bought. */
+  | { type: 'festival'; flakes?: number; from?: 'crate' | 'boss' | 'present'; bought?: FestivalItemId };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -146,6 +149,20 @@ export class Game {
 
   private emit(e: GameEvent): void {
     for (const fn of this.listeners) fn(e);
+    // The Frost Festival shakes snowflakes out of crates and wrecks.
+    if (e.type === 'bonus' || e.type === 'bossDefeated') {
+      const from = e.type === 'bonus' ? 'crate' : 'boss';
+      const flakes = earnFlakes(this.state, Date.now(), from);
+      if (flakes) this.emit({ type: 'festival', flakes, from });
+    }
+  }
+
+  /** Buys something from the Frost Festival shop with snowflakes. */
+  buyFestival(id: FestivalItemId): void {
+    if (!buyFestival(this.state, id, Date.now())) return;
+    this.emit({ type: 'festival', bought: id });
+    if (id === 'snowman' || id === 'startree') for (const o of checkOrnaments(this.state)) this.emit({ type: 'ornament', id: o.id, fresh: true });
+    this.save();
   }
 
   /** Call once after listeners are attached, to credit time away since the last save. */
@@ -230,6 +247,11 @@ export class Game {
         this.tripsReady.add(t.crew);
         this.emit({ type: 'tripReady', crew: t.crew });
       }
+    }
+    // A present under the tree, once a festival day (after a new captain has settled in).
+    if (s.stats.playSec >= STREAK_SETTLE_SEC) {
+      const present = dailyPresent(s, now);
+      if (present) this.emit({ type: 'festival', flakes: present, from: 'present' });
     }
     const story = pendingStory(s);
     if (story && story.id !== this.storyShown) {

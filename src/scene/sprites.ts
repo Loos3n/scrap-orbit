@@ -354,6 +354,22 @@ export function crate(): SpriteArt {
   return { w: 28, h: 28, scale: 2, markup: m };
 }
 
+/** A Frost Festival crate: the salvage crate, gift-wrapped in red with a gold ribbon and bow. */
+export function giftCrate(): SpriteArt {
+  const box = rrect(6, 10, 44, 40, 8);
+  const m =
+    cel(box, P.red, [28, 30, 22], {
+      hl: 0.4,
+      hlOp: 0.45,
+      detail: fill(rrect(24, 10, 8, 40, 1), P.gold.base) + fill(rrect(6, 26, 44, 8, 1), P.gold.base) + fill(rrect(24, 10, 3, 40, 1), P.gold.hi, ' opacity=".6"') + glint(15, 18, 3),
+      ink: 2.4,
+    }) +
+    cel('M28 12C20 0 10 2 13 9c2 4 10 4 15 3z', P.gold, [20, 8, 8], { hl: 0, ink: 1.8 }) +
+    cel('M28 12C36 0 46 2 43 9c-2 4-10 4-15 3z', P.gold, [36, 8, 8], { hl: 0, ink: 1.8 }) +
+    fill(circ(28, 11, 3.6), P.gold.lo);
+  return { w: 28, h: 28, scale: 2, markup: m };
+}
+
 /** The golden crate: a bright box with a faceted star. */
 export function goldenCrate(): SpriteArt {
   const m =

@@ -7,6 +7,7 @@ import { FRIEND_LIMIT, cleanName, normalizeCode, type Friend } from './friends';
 import { STAR_NODES } from './galaxy';
 import { CONTRACTS, type ActiveContract, type ContractOffer } from './contracts';
 import { STORY } from './story';
+import { FESTIVAL_SHOP } from './festival';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -106,6 +107,11 @@ export interface GameState {
   rig: boolean;
   /** Radio transmissions heard, in the Hollow Fleet story (core/story.ts). */
   story: { heard: Set<string> };
+  /**
+   * The Frost Festival (core/festival.ts): snowflakes to spend, shop items bought once, when hot
+   * cocoa wears off, the last day a present was opened, and a switch to try it out early.
+   */
+  festival: { flakes: number; bought: Set<string>; cocoaUntil: number; day: string; test: boolean };
   /**
    * Friend codes (core/friends.ts): this player's own code and station name once signed in,
    * friends added, who got a gift today, and today's gift counters.
@@ -218,6 +224,7 @@ interface SaveData {
   skin?: string | null;
   ornaments?: { got?: string[]; on?: string[] };
   story?: { heard?: string[] };
+  festival?: { flakes?: number; bought?: string[]; cocoaUntil?: number; day?: string; test?: boolean };
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
@@ -290,6 +297,7 @@ export function newState(now: number): GameState {
     skin: null,
     ornaments: { got: new Set(), on: new Set() },
     story: { heard: new Set() },
+    festival: { flakes: 0, bought: new Set(), cocoaUntil: 0, day: '', test: false },
     rig: false,
     friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
@@ -366,6 +374,7 @@ export function serialize(state: GameState): string {
     skin: state.skin,
     ornaments: { got: [...state.ornaments.got], on: [...state.ornaments.on] },
     story: { heard: [...state.story.heard] },
+    festival: { ...state.festival, bought: [...state.festival.bought] },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
@@ -537,6 +546,14 @@ export function deserialize(json: string | null, now: number): GameState | null 
   for (const id of strings(data.ornaments?.got)) if (ornamentIds.has(id)) state.ornaments.got.add(id);
   for (const id of strings(data.ornaments?.on)) if (state.ornaments.got.has(id)) state.ornaments.on.add(id);
   for (const id of strings(data.story?.heard)) if (STORY.some((e) => e.id === id)) state.story.heard.add(id);
+  const fest = data.festival;
+  if (fest) {
+    state.festival.flakes = int(fest.flakes);
+    for (const id of strings(fest.bought)) if (FESTIVAL_SHOP.some((i) => i.id === id && !i.repeat)) state.festival.bought.add(id);
+    state.festival.cocoaUntil = typeof fest.cocoaUntil === 'number' && Number.isFinite(fest.cocoaUntil) ? fest.cocoaUntil : 0;
+    state.festival.day = typeof fest.day === 'string' ? fest.day.slice(0, 12) : '';
+    state.festival.test = fest.test === true;
+  }
   state.rig = data.rig === true;
   const fr = data.friends;
   if (fr && typeof fr === 'object') {

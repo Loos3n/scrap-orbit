@@ -32,6 +32,8 @@ export const ORNAMENTS: readonly OrnamentDef[] = [
   { id: 'neon', name: 'Neon Sign', kind: 'posters', hint: 'Relocate the station', progress: (s) => [s.stats.relocations, 1] },
   { id: 'disco', name: 'Disco Ball', kind: 'lights', hint: 'Break a boss wreck', progress: (s) => [s.stats.bosses, 1] },
   { id: 'bunting', name: 'Party Bunting', kind: 'fun', hint: 'Earn 10 achievements', progress: (s) => [s.achievements.size, 10] },
+  { id: 'snowman', name: 'Snowman', kind: 'fun', hint: 'Frost Festival shop (December)', progress: (s) => [s.festival.bought.has('snowman') ? 1 : 0, 1] },
+  { id: 'startree', name: 'Star Tree', kind: 'lights', hint: 'Frost Festival shop (December)', progress: (s) => [s.festival.bought.has('startree') ? 1 : 0, 1] },
 ];
 
 export const ORNAMENT_KINDS: Record<OrnamentKind, string> = { lights: 'Lights', plants: 'Plants', posters: 'Posters', fun: 'Fun' };

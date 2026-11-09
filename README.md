@@ -59,6 +59,7 @@ It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and
 - Combo tapping: quick taps heat the claw up, and heat makes every tap worth up to 3x. A thermometer on the left shows it; at full heat the sparks run hot and a chime plays. Stop tapping and it cools
 - Run contracts: from the second relocation on, pick one of three rule cards for the new run (Haulers 4x, taps 10x, machines 40% cheaper, a 20 minute sprint, and more), or none. Each sets a goal sized from the run before; meeting it pays 15 crystals and +2% income for good. A slim line at the top of Build tracks it
 - The Hollow Fleet: a story told over the station radio. A garbled signal turns into a lost fleet's logs, a little girl's message in the ice and a captain asking for help. Thirteen transmissions in five chapters follow the beacon across sectors and galaxies, until the Lantern docks beside your station for good (+50% income) and the credits roll. Every transmission can be replayed from the Radio button
+- Frost Festival: every year from 1 December to 6 January snow drifts past the station, the music turns cosy and salvage crates come gift-wrapped. Crates, boss wrecks and a daily present give snowflakes for the festival shop: hot cocoa (2x income for 30 minutes), a snowman and a Star Tree for the station, a Hoarfrost hull paint and crystal stockings
 - Cloud save: sign in with Google to back up the station and play it on the web or another phone. Opening the game checks the cloud first, so an older device never overwrites newer progress
 
 ## Running it

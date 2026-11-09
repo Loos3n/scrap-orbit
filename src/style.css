@@ -1702,3 +1702,26 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 .radio-credits b { font-weight: 500; }
 #radio-btn.signal .round-btn { box-shadow: 0 0 0 2px #ffcf7a, 0 0 16px rgb(255 181 71 / 0.7); animation: radio-ping 1.6s ease-in-out infinite; }
 @keyframes radio-ping { 50% { box-shadow: 0 0 0 2px #ffcf7a, 0 0 4px rgb(255 181 71 / 0.2); } }
+
+/* ---------- Frost Festival ---------- */
+.festival-chip { --c: #9fe6ff; color: #dff6ff; }
+.festival-chip [data-icon] { display: inline-flex; width: 15px; height: 15px; color: #9fe6ff; }
+.festival-chip [data-icon] svg { width: 100%; height: 100%; }
+.festival-card { border-color: rgb(159 230 255 / 0.4); background: linear-gradient(#1d2f5a, #11173a); max-height: min(88vh, 680px); overflow-y: auto; }
+.festival-art { color: #cfefff; filter: drop-shadow(0 0 22px rgb(159 230 255 / 0.7)); animation: spin 18s linear infinite; }
+.festival-flakes { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; }
+.festival-flakes [data-icon] { width: 26px; height: 26px; align-self: center; color: #9fe6ff; }
+.festival-flakes b { font-family: var(--font-display); font-weight: 700; font-size: 38px; color: #dff6ff; text-shadow: 0 0 18px rgb(159 230 255 / 0.55); font-variant-numeric: tabular-nums; }
+.festival-flakes small { color: var(--ink-dim); }
+.festival-cocoa { margin: 0 0 6px; padding: 6px 12px; border-radius: 99px; background: rgb(255 181 71 / 0.15); color: #ffd99a; font-size: 13px; font-weight: 600; }
+.festival-shop { width: 100%; margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; text-align: left; }
+.festival-shop li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 14px; background: rgb(255 255 255 / 0.05); border: 1px solid rgb(159 230 255 / 0.12); }
+.festival-shop .fs-pic { flex: none; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: rgb(159 230 255 / 0.1); }
+.festival-shop .fs-pic img, .festival-shop .fs-pic svg { width: 34px; height: 34px; }
+.festival-shop .grow { flex: 1; min-width: 0; }
+.festival-shop b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.festival-shop small { display: block; color: var(--ink-dim); font-size: 12px; line-height: 1.3; }
+.festival-shop button { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 0; padding: 8px 12px; border-radius: 99px; background: linear-gradient(#bff0ff, #6fcdf0); color: #062033; font-weight: 700; font-size: 13px; box-shadow: 0 3px 0 #3a8fb4; }
+.festival-shop button [data-icon], .festival-shop button svg { width: 13px; height: 13px; }
+.festival-shop button:disabled { background: rgb(255 255 255 / 0.08); color: var(--ink-dim); box-shadow: none; }
+.festival-shop .owned { color: #9dff6b; font-weight: 600; font-size: 13px; }

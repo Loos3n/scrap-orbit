@@ -161,6 +161,12 @@ export class StationScene {
   private vignette = new Sprite();
   private keyLight = new Sprite();
   private dustLayer = new Container();
+  /** Frost Festival snow, drifting down across the whole view. */
+  private snowLayer = new Container();
+  private snow: { s: Sprite; depth: number; phase: number }[] = [];
+  /** Crates come gift-wrapped while the festival is on. */
+  giftCrates = false;
+  private giftTex: Texture | null = null;
   private dust: { s: Sprite; depth: number; phase: number; vx: number; vy: number }[] = [];
   private bossLayer = new Container();
   private boss: { c: Container; hull: Sprite; cracks: Sprite; glow: Sprite; bar: Graphics; shown: number; state: 'in' | 'here' | 'out' | 'dead'; t: number; hit: number; health: number; roam: number; lean: number } | null = null;
@@ -389,7 +395,7 @@ export class StationScene {
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -470,7 +476,7 @@ export class StationScene {
     }
     this.orns = [];
     // Draw order: things around the rim first, then what hangs and sits on top.
-    const order = ['bunting', 'bulbs', 'poster', 'gnome', 'garden', 'cactus', 'fern', 'lanterns', 'pennant', 'neon', 'disco', 'duck'];
+    const order = ['bunting', 'bulbs', 'poster', 'gnome', 'snowman', 'garden', 'startree', 'cactus', 'fern', 'lanterns', 'pennant', 'neon', 'disco', 'duck'];
     for (const id of order) if (ids.includes(id)) this.orns.push(this.buildOrnament(id));
   }
 
@@ -563,6 +569,16 @@ export class StationScene {
       }
       case 'gnome':
         return { id, parts: [place('gnome', 36, 46, 0.5, 1)] };
+      case 'snowman':
+        return { id, parts: [place('snowman', -58, 46, 0.5, 1)] };
+      case 'startree': {
+        const glow = this.sprite(this.tex.glow, L, 88, -20);
+        glow.blendMode = 'add';
+        glow.tint = 0xffd166;
+        glow.scale.set(0.35);
+        glow.alpha = 0.45;
+        return { id, parts: [glow, place('startree', 88, -9, 0.5, 1)] };
+      }
       case 'pennant':
         return { id, parts: [place('pennant', 2, 60, 0, 0.5)] };
       case 'neon': {
@@ -2237,12 +2253,50 @@ export class StationScene {
     this.updateFx(dt);
     this.updateMarkFx(dt);
     this.updateDaylight(dt);
+    this.updateSnow(dt);
     if (this.calmShake) this.shake = 0;
     if (!this.reducedMotion && this.shake > 0.05) {
       this.world.pivot.set(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);
       this.shake *= Math.pow(0.002, dt);
     } else {
       this.world.pivot.set(0, 0);
+    }
+  }
+
+  /** Lets it snow (the Frost Festival), or stops it. */
+  setSnow(on: boolean): void {
+    if (!this.ready || on === this.snow.length > 0) return;
+    for (const f of this.snow) f.s.destroy();
+    this.snow = [];
+    if (!on) return;
+    const { width: w, height: h } = this.app.screen;
+    const count = Math.round((w * h) / (this.reducedMotion ? 26000 : 7000));
+    for (let i = 0; i < count; i++) {
+      const sp = new Sprite(this.tex.glow);
+      sp.anchor.set(0.5);
+      sp.position.set(Math.random() * w, Math.random() * h);
+      const depth = rand(0.35, 1);
+      sp.scale.set(0.08 + depth * 0.14);
+      sp.tint = 0xf2f8ff;
+      sp.alpha = 0.55 + depth * 0.45;
+      this.snowLayer.addChild(sp);
+      this.snow.push({ s: sp, depth, phase: rand(0, TAU) });
+    }
+  }
+
+  private updateSnow(dt: number): void {
+    if (!this.snow.length) return;
+    const { width: w, height: h } = this.app.screen;
+    const slow = this.reducedMotion ? 0.4 : 1;
+    for (const f of this.snow) {
+      const s = f.s;
+      s.y += (12 + 30 * f.depth) * dt * slow;
+      s.x += (Math.sin(this.time * 0.8 + f.phase) * 10 + 4) * f.depth * dt * slow;
+      if (s.y > h + 8) {
+        s.y = -8;
+        s.x = Math.random() * w;
+      }
+      if (s.x > w + 8) s.x -= w + 16;
     }
   }
 
@@ -2302,7 +2356,7 @@ export class StationScene {
   private spawnDrift(kind: DriftKind): void {
     const half = WORLD * 0.8;
     const fromLeft = Math.random() < 0.5;
-    const tex = kind === 'star' ? this.tex.flare : kind === 'golden' ? this.tex.golden : kind === 'crate' || kind === 'mini' ? this.tex.crate : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
+    const tex = kind === 'star' ? this.tex.flare : kind === 'golden' ? this.tex.golden : kind === 'crate' || kind === 'mini' ? (this.giftCrates ? (this.giftTex ??= art.giftCrate()) : this.tex.crate) : kind === 'meteor' ? this.tex.meteor : kind === 'convoy' ? this.tex.hauler : this.tex.debris[Math.floor(Math.random() * this.tex.debris.length)];
     const s = new Sprite(tex);
     s.anchor.set(0.5);
     let vx = (fromLeft ? 1 : -1) * rand(12, 28);

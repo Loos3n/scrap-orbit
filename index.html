@@ -51,6 +51,7 @@
         </div>
         <div class="goal-row">
           <button id="goal" class="goal-line" type="button" aria-label="Next goal" hidden><span class="goal-tag"><span data-icon="trophy"></span><span class="goal-tag-word">Next</span></span><span id="goal-text" class="goal-text"></span><span id="goal-ready" class="goal-ready" hidden>Ready</span><i class="goal-bar"><i id="goal-bar"></i></i></button>
+          <button id="festival-chip" class="weekly-chip festival-chip" type="button" hidden><span data-icon="snowflake"></span><span id="festival-chip-text">0</span></button>
           <button id="weekly-chip" class="weekly-chip" type="button" hidden><i id="weekly-chip-dot"></i><span id="weekly-chip-text">Event</span></button>
         </div>
       </div>
@@ -249,6 +250,7 @@
             <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration</span></label>
             <label id="opt-notify-row" class="toggle" hidden><input id="opt-notify" type="checkbox" /><span>Reminders<small>When storage fills up, research finishes or crew come home</small></span></label>
             <label class="toggle"><input id="opt-daynight" type="checkbox" /><span>Day and night<small>The station follows your clock: sleepy lights and slower music late at night</small></span></label>
+            <label class="toggle" id="opt-festival-row" hidden><input id="opt-festival" type="checkbox" /><span>Try the Frost Festival now<small>For testing: the winter festival normally runs 1 December to 6 January</small></span></label>
             <label class="toggle"><input id="opt-battery" type="checkbox" /><span>Battery saver<small>Smoother on older phones and easier on the battery</small></span></label>
             <h3 class="section-title">Game</h3>
             <label class="toggle"><input id="opt-ads" type="checkbox" /><span>Ad offers<small>Optional bonuses for watching an ad. An ad only plays when you tap one.</small></span></label>
@@ -404,6 +406,18 @@
         <h3 class="section-title">Stats</h3>
         <dl id="stats" class="stats"></dl>
         </div>
+      </div>
+    </div>
+    <div id="festival" class="modal" hidden>
+      <div class="modal-card festival-card" role="dialog" aria-modal="true" aria-labelledby="festival-title">
+        <button id="festival-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="modal-art festival-art" data-icon="snowflake"></div>
+        <div id="festival-ends" class="eyebrow"></div>
+        <h2 id="festival-title">Frost Festival</h2>
+        <div class="festival-flakes"><span data-icon="snowflake"></span><b id="festival-flakes">0</b><small>snowflakes</small></div>
+        <p class="modal-time">Gift-wrapped crates hold <b>1 snowflake</b>, boss wrecks <b>5</b>, and there's a present with <b>5</b> under the tree every day.</p>
+        <p id="festival-cocoa" class="festival-cocoa" hidden></p>
+        <ul id="festival-shop" class="festival-shop"></ul>
       </div>
     </div>
     <div id="radio" class="modal" hidden>

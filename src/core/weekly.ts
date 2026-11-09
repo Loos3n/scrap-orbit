@@ -1,4 +1,5 @@
 import { PAINTS } from './content';
+import { FESTIVAL_PAINT } from './festival';
 import type { GameState } from './state';
 
 /*
@@ -32,8 +33,8 @@ export const WEEKLIES: readonly WeeklyDef[] = [
 
 export const WEEKLY_CRYSTALS = [10, 25, 40] as const;
 
-/** Paints only weekly events give, kept out of the shop. */
-export const EVENT_PAINTS = WEEKLIES.map((w) => ({ ...w.paint, cost: 0 }));
+/** Paints only weekly events (and the Frost Festival) give, kept out of the shop. */
+export const EVENT_PAINTS = [...WEEKLIES.map((w) => ({ ...w.paint, cost: 0 })), FESTIVAL_PAINT];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 

@@ -16,6 +16,8 @@ import './style.css';
 import { SECTOR_THEMES, Sfx, type ThemeId } from './audio';
 import { StoryRadio } from './ui/story-ui';
 import { FINALE_ID, storyDone } from './core/story';
+import { festivalActive } from './core/festival';
+import { FestivalPanel } from './ui/festival-ui';
 import { CLAW, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES } from './core/config';
 import { modelName } from './core/evolve';
 import { AD_CRYSTALS } from './core/rewards';
@@ -183,7 +185,7 @@ async function boot(): Promise<void> {
   let radioTheme: ThemeId | null = null;
   const syncMusic = () => {
     const s = game.state;
-    sfx.setTheme(SECTOR_THEMES[s.stats.relocations % SECTOR_THEMES.length]);
+    sfx.setTheme(festivalActive(s, Date.now()) ? 'frost' : SECTOR_THEMES[s.stats.relocations % SECTOR_THEMES.length]);
     sfx.setOverride(radioTheme ?? (s.boss ? 'boss' : null));
   };
   const radio = new StoryRadio(game, {
@@ -195,6 +197,16 @@ async function boot(): Promise<void> {
     },
   });
   if (import.meta.env.DEV) Object.assign(window, { __radio: radio });
+  /** The Frost Festival: snow over the station, gift-wrapped crates and its own music while it runs. */
+  const syncFestival = () => {
+    const on = festivalActive(game.state, Date.now());
+    scene.setSnow(on);
+    scene.giftCrates = on;
+  };
+  const festival = new FestivalPanel(game, () => {
+    syncFestival();
+    syncMusic();
+  });
   /**
    * Day and night from the device clock (core/daynight.ts). Checked every 20 seconds; when the
    * light changes while playing, the crew mention it in a toast (not on start-up or in the tutorial).
@@ -609,6 +621,26 @@ async function boot(): Promise<void> {
           buzz([40, 60, 40, 60, 200]);
         } else ui.toast(ICONS.radio.replace('currentColor', '#ffcf7a'), `<b>Transmission logged</b> +${e.crystals} crystals`);
         break;
+      case 'festival': {
+        const flake = ICONS.snowflake.replace('currentColor', '#9fe6ff');
+        if (e.from === 'present') {
+          ui.toast(flake, `<b>A present under the tree!</b> +${e.flakes} snowflakes for the Frost Festival shop`);
+          sfx.achievement();
+        } else if (e.from === 'boss') ui.toast(flake, `<b>+${e.flakes} snowflakes</b> shaken loose from the wreck`);
+        else if (e.bought === 'cocoa') {
+          ui.toast(flake, `<b>Hot cocoa!</b> The crew warm up: 2x income for 30 minutes`);
+          scene.celebrate(0xff8fa8);
+          sfx.boost();
+        } else if (e.bought === 'stocking') {
+          ui.toast(ICONS.crystal, '<b>Crystal stocking!</b> +15 crystals');
+          sfx.coins();
+        } else if (e.bought === 'hoarfrost') {
+          fanfare.cheer({ icon: ICONS.station, kicker: 'Frost Festival', title: 'Hoarfrost paint', sub: 'Only the festival gives it. Put it on in Station, Decor.', color: '#e6f6ff' });
+          sfx.fanfare();
+        } else if (e.bought) sfx.upgrade();
+        festival.render();
+        break;
+      }
       case 'bossEscape':
         scene.setBoss(null);
         ui.toast(ICONS.warp, '<b>The wreck flew away!</b> Break the next one within a minute.');
@@ -1016,6 +1048,8 @@ async function boot(): Promise<void> {
     if (now - lastUi > 100) {
       lastUi = now;
       ui.render();
+      festival.render();
+      syncFestival();
       syncMusic();
     }
   };

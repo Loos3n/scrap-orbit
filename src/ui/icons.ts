@@ -338,6 +338,12 @@ const RAW_ICONS = {
       cut(rrect(28, 19.5, 6.5, 3, 1.5), 0.6) +
       cut(rrect(28, 31.5, 6.5, 3, 1.5), 0.6),
   ),
+  /** A six-armed snowflake: the Frost Festival. */
+  snowflake: glyph(
+    cs('M24 4v40M6.7 14l34.6 20M6.7 34l34.6-20', 3.6) +
+      cs('M19 7.5l5 4.5 5-4.5M19 40.5l5-4.5 5 4.5M7.5 21.5l6.5-1.5-2-6.5M40.5 26.5l-6.5 1.5 2 6.5M7.5 26.5l6.5 1.5-2 6.5M40.5 21.5l-6.5-1.5 2-6.5', 2.6) +
+      cf(circ(24, 24, 3.4)),
+  ),
   /** A little radio with an aerial and signal arcs: the Hollow Fleet transmissions. */
   radio: glyph(
     cs('M14 18L33 7', 3) +
