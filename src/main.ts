@@ -39,6 +39,7 @@ import { GEN_ICONS, ICONS, genIcon } from './ui/icons';
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
+import { galaxyTrait } from './core/galaxy';
 import { tradeText } from './ui/trade-ui';
 import { UI, fmtSpeed } from './ui/ui';
 import { Fanfare } from './ui/fanfare';
@@ -398,6 +399,7 @@ async function boot(): Promise<void> {
         scene.galaxyJump();
         cinematic(JUMP_SWAP_MS.galaxy);
         const galaxyNo = game.state.galaxy.shifts + 1;
+        const trait = galaxyTrait(game.state);
         sfx.warp();
         window.setTimeout(() => sfx.warp(), 1600);
         setTimeout(() => {
@@ -411,7 +413,7 @@ async function boot(): Promise<void> {
               icon: ICONS.star.replace('currentColor', '#ffe9a8'),
               kicker: 'Galaxy Shift',
               title: `Welcome to Galaxy ${galaxyNo}`,
-              sub: `+${e.stars.toLocaleString('en-US')} Galaxy Stars. Every star ever earned powers the station, and the Star Map has new upgrades to buy.`,
+              sub: `+${e.stars.toLocaleString('en-US')} Galaxy Stars.${trait ? ` <b>${trait.name}:</b> ${trait.text}` : ''} New stars have come into view on the Star Map.`,
               color: '#ffe9a8',
             });
             fanfare.confetti(['#ffe9a8', '#8f7bff', '#ffd166', '#ffffff']);

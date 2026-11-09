@@ -1725,3 +1725,6 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
 .festival-shop button [data-icon], .festival-shop button svg { width: 13px; height: 13px; }
 .festival-shop button:disabled { background: rgb(255 255 255 / 0.08); color: var(--ink-dim); box-shadow: none; }
 .festival-shop .owned { color: #9dff6b; font-weight: 600; font-size: 13px; }
+.galaxy-trait { margin: 6px 0 2px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); font-size: 13px; line-height: 1.4; text-align: left; }
+.galaxy-trait b { color: var(--c); }
+.star-node.locked { opacity: 0.55; }

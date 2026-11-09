@@ -1,5 +1,5 @@
 import { claimableCores } from '../core/economy';
-import { GALAXY, STAR_NODES, forgeCost, starIncomeMult } from '../core/galaxy';
+import { GALAXY, GALAXY_TRAITS, STAR_NODES, forgeCost, galaxyTrait, starIncomeMult, starNodeShown } from '../core/galaxy';
 import * as meta from '../core/meta';
 import type { Game } from '../game';
 import { ICONS } from './icons';
@@ -49,7 +49,12 @@ export class GalaxyPanel {
     this.key = key;
     if (!open && stars === 0) this.arming = false;
 
+    const trait = galaxyTrait(s);
+    const upcoming = GALAXY_TRAITS[g.shifts % GALAXY_TRAITS.length];
     const now = g.shifts ? `<div class="galaxy-now">Galaxy ${g.shifts + 1} · ${g.earned} stars earned · x${fmtMult(starIncomeMult(s))} income</div>` : '';
+    const traitLine = trait
+      ? `<div class="galaxy-trait" style="--c:${trait.color}"><b>${esc(trait.name)}</b> ${esc(trait.text)}</div>`
+      : `<div class="galaxy-trait" style="--c:${upcoming.color}"><b>Every new galaxy has a trait.</b> The next one: ${esc(upcoming.name)}. ${esc(upcoming.text)}</div>`;
     let action: string;
     if (!open) action = `<div class="galaxy-lock">${ICONS.lock}Build a Dyson Collector in a run to open the shift.</div>`;
     else if (stars === 0) action = `<div class="galaxy-lock">Hold more Star Cores first. You need ${(GALAXY.coresPerStar * GALAXY.starGrowth ** g.shifts).toLocaleString('en-US')} for your first star here.</div>`;
@@ -61,11 +66,15 @@ export class GalaxyPanel {
     $('galaxy-card').innerHTML = `
       <div class="galaxy-head"><div class="galaxy-art">${ICONS.star}</div><div><div class="eyebrow">Galaxy Shift</div>
       <div class="galaxy-count"><b>${g.stars}</b> ${g.stars === 1 ? 'star' : 'stars'} to spend</div></div></div>
-      ${now}
+      ${now}${traitLine}
       <p class="galaxy-desc">Trade all your Star Cores for Galaxy Stars and start over in a new galaxy. Every star ever earned adds +${GALAXY.incomePerStar * 100}% income, and you spend them on the Star Map below. More cores make more stars.</p>
       ${action}${warn}`;
 
-    const nodes = STAR_NODES.map((n) => {
+    // The map shows every node reached so far, and the next galaxy's constellation as a teaser.
+    const nextGalaxy = g.shifts + 2;
+    const nodes = STAR_NODES.filter((n) => starNodeShown(s, n) || n.galaxy === nextGalaxy).map((n) => {
+      if (!starNodeShown(s, n))
+        return `<li class="star-node locked" style="--c:${hex(n.color)}"><div class="challenge-icon">${ICONS.lock}</div><div><b>${esc(n.name)}</b><div class="challenge-rule">${esc(n.desc)} Appears in Galaxy ${n.galaxy}.</div></div></li>`;
       const have = g.map.has(n.id);
       const btn = have
         ? `<span class="offer-sold">${ICONS.check}Owned</span>`
