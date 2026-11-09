@@ -1,5 +1,6 @@
 import { AD_CRYSTALS, useAd, type AdReward } from './core/rewards';
 import { buyFestival, dailyPresent, earnFlakes, type FestivalItemId } from './core/festival';
+import { hook, landCatch, pickCritter, refillBait, type CatchReward, type Critter } from './core/fishing';
 import { FINALE_CRYSTALS, FINALE_ID, STORY_CRYSTALS, pendingStory } from './core/story';
 import { markOf } from './core/evolve';
 import { comboMult, cooled, heatAfterTap } from './core/combo';
@@ -92,7 +93,9 @@ export type GameEvent =
   /** A radio transmission came in (ready to play), or was just heard. */
   | { type: 'story'; id: string; phase: 'ready' | 'heard'; crystals?: number }
   /** Frost Festival: snowflakes earned (from a crate, a wreck or the daily present), or a shop item bought. */
-  | { type: 'festival'; flakes?: number; from?: 'crate' | 'boss' | 'present'; bought?: FestivalItemId };
+  | { type: 'festival'; flakes?: number; from?: 'crate' | 'boss' | 'present'; bought?: FestivalItemId }
+  /** Space fishing: something landed. */
+  | { type: 'fish'; id: string; reward: CatchReward };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -292,6 +295,27 @@ export class Game {
     meta.addCrystals(this.state, crystals);
     this.emit({ type: 'story', id, phase: 'heard', crystals });
     this.save();
+  }
+
+  /** A bite was hooked: spends a bait and says what's on the line, or null with no bait left. */
+  hookFish(roll = Math.random()): Critter | null {
+    const now = Date.now();
+    if (!hook(this.state, now)) return null;
+    return pickCritter(this.state, roll);
+  }
+
+  /** Reeled in: pays out and adds it to the catch book. */
+  landFish(id: string): CatchReward | null {
+    const reward = landCatch(this.state, id, Date.now());
+    if (!reward) return null;
+    this.emit({ type: 'fish', id, reward });
+    this.save();
+    return reward;
+  }
+
+  /** Tops up bait for time passed (the fishing screen calls this as it ticks). */
+  refillBait(): void {
+    refillBait(this.state, Date.now());
   }
 
   claimStreak(): void {

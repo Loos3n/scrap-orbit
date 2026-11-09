@@ -2155,3 +2155,79 @@ export function machineMark(id: GeneratorId, mark: number, dockRadius: number): 
   // The dock is one slice of a whole ring, so it has no outline to dress up.
   return vector(id === 'dock' ? plated : sprites.evolveParts(plated, mark));
 }
+
+/** The fish tank that drifts beside the station once something is caught: a glass bubble of nebula water. */
+export const fishTank = () =>
+  paint(96, 104, (ctx) => {
+    const cx = 48;
+    const cy = 56;
+    const r = 38;
+    // Water.
+    const water = ctx.createRadialGradient(cx - 10, cy - 12, 4, cx, cy, r);
+    water.addColorStop(0, '#3d7fc4');
+    water.addColorStop(0.6, '#1c4486');
+    water.addColorStop(1, '#0d1f52');
+    ctx.fillStyle = water;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Weed and pebbles at the bottom.
+    ctx.fillStyle = '#2a8a6a';
+    for (const [x, h] of [[30, 16], [36, 22], [62, 18], [68, 12]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(x - 3, cy + r - 6);
+      ctx.quadraticCurveTo(x + 4, cy + r - 6 - h / 2, x, cy + r - 6 - h);
+      ctx.quadraticCurveTo(x - 1, cy + r - 6 - h / 2, x + 3, cy + r - 6);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#7a6aa8';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r - 4, 26, 6, 0, Math.PI, 0, true);
+    ctx.fill();
+    // Bubbles.
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    for (const [x, y, br] of [[58, 36, 2.2], [62, 28, 1.6], [56, 22, 1.2], [34, 44, 1.4]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, br, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Glass rim and shine.
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(190,230,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r - 7, Math.PI * 1.08, Math.PI * 1.42);
+    ctx.stroke();
+    // Metal cap with a light on top.
+    ctx.fillStyle = '#5a6090';
+    ctx.strokeStyle = '#20264f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(cx - 16, cy - r - 6, 32, 11, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#9aa2d8';
+    for (const x of [cx - 10, cx, cx + 10]) {
+      ctx.beginPath();
+      ctx.arc(x, cy - r - 0.5, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#5a6090';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r - 6);
+    ctx.lineTo(cx, cy - r - 13);
+    ctx.stroke();
+    ctx.fillStyle = '#5cd6ff';
+    ctx.beginPath();
+    ctx.arc(cx, cy - r - 14, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+/** One critter, for the tank. */
+export const critterTex = (draw: (ctx: CanvasRenderingContext2D) => void) => paint(40, 40, draw);

@@ -344,6 +344,14 @@ const RAW_ICONS = {
       cs('M19 7.5l5 4.5 5-4.5M19 40.5l5-4.5 5 4.5M7.5 21.5l6.5-1.5-2-6.5M40.5 26.5l-6.5 1.5 2 6.5M7.5 26.5l6.5 1.5-2 6.5M40.5 21.5l-6.5-1.5 2-6.5', 2.6) +
       cf(circ(24, 24, 3.4)),
   ),
+  /** A little fish on a line: space fishing. */
+  fish: glyph(
+    cs('M9 3v20', 2.4, 0.6) +
+      cf('M6 30c5-10 19-12 27 0c-8 12-22 10-27 0z') +
+      cf('M31 30l11-8-2 8 2 8z') +
+      cut(circ(14, 28, 2.6), 0.6) +
+      cs('M9 23c0 3 3 4 5 2', 2.4, 0.6),
+  ),
   /** A little radio with an aerial and signal arcs: the Hollow Fleet transmissions. */
   radio: glyph(
     cs('M14 18L33 7', 3) +

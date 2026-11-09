@@ -581,6 +581,41 @@ export class Sfx {
   }
 
   /** Radio static: a short burst of crackle and a squelch. */
+  /** The line flicks out and the bobber plops into the nebula. */
+  cast(): void {
+    if (!this.ready()) return;
+    this.noise(0, 0.25, 0.05, { type: 'bandpass', freq: 2500, to: 600, q: 1.2 });
+    this.voice({ freq: 520, slideTo: 180, dur: 0.18, vol: 0.08, type: 'sine', start: 0.3 });
+    this.noise(0.3, 0.2, 0.06, { type: 'lowpass', freq: 1200, to: 300 });
+  }
+
+  /** Something bites: two quick bubbly plinks. */
+  bite(): void {
+    if (!this.ready()) return;
+    this.voice({ freq: 600, slideTo: 1100, dur: 0.09, vol: 0.1, type: 'sine' });
+    this.voice({ freq: 700, slideTo: 1400, dur: 0.1, vol: 0.1, type: 'sine', start: 0.11 });
+  }
+
+  /** A good tug on the reel: a click that climbs with each hit. */
+  reelHit(step: number): void {
+    if (!this.ready()) return;
+    const f = 660 * Math.pow(2, (step * 3) / 12);
+    this.voice({ freq: f, dur: 0.12, vol: 0.09, type: 'triangle' });
+    this.noise(0, 0.04, 0.05, { type: 'highpass', freq: 3000 });
+  }
+
+  /** A missed tug: the line goes slack with a low twang. */
+  reelMiss(): void {
+    if (!this.ready()) return;
+    this.voice({ freq: 180, slideTo: 90, dur: 0.25, vol: 0.12, type: 'sawtooth', filter: { type: 'lowpass', freq: 900 } });
+  }
+
+  /** It got away: a sad little slide down. */
+  escape(): void {
+    if (!this.ready()) return;
+    this.voice({ freq: 520, slideTo: 200, dur: 0.45, vol: 0.08, type: 'triangle' });
+  }
+
   radio(): void {
     if (!this.ready()) return;
     this.noise(0, 0.5, 0.05, { type: 'bandpass', freq: 1800, q: 0.7 });
