@@ -744,13 +744,16 @@ export class Coach {
 
     const w = Math.min(320, window.innerWidth - 32);
     coach.style.width = `${w}px`;
+    // Cards with nothing to point at sit in the middle of the view (left of the menu on wide screens).
+    const stageBox = $('stage').getBoundingClientRect();
+    const midLeft = Math.max(16, Math.min(window.innerWidth - w - 16, stageBox.left + (stageBox.width - w) / 2));
     const centred = !target || !def.target;
     coach.classList.toggle('centre', centred);
     // The welcome and goodbye cards dim the screen and wait for their button.
     dim.hidden = !(centred && def.next && !tip);
     if (centred) {
       spot.hidden = true;
-      coach.style.left = `${(window.innerWidth - w) / 2}px`;
+      coach.style.left = `${midLeft}px`;
       const stage = $('stage').getBoundingClientRect();
       // A card with nothing to press waits at the top of the view, clear of the station.
       const top = def.next ? stage.top + stage.height / 2 - coach.offsetHeight / 2 : stage.top + 8;
@@ -795,7 +798,7 @@ export class Coach {
         this.crateEnd = atTop ? 'top' : 'foot';
         top = atTop ? topY : footY;
       }
-      coach.style.left = `${(window.innerWidth - w) / 2}px`;
+      coach.style.left = `${midLeft}px`;
       coach.style.top = `${top}px`;
       delete coach.dataset.place;
       coach.classList.add('centre');

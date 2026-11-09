@@ -864,8 +864,9 @@ export class StationScene {
     const right = this.focus.right > this.focus.left + 100 ? Math.min(w, this.focus.right) : w;
     const fw = right - left;
     const cx = left + fw / 2;
-    // Capped so a big monitor shows the station with sky around it, not a giant close-up.
-    this.baseScale = Math.min(fw, fh * 1.08, 600) / WORLD;
+    // Capped so a big monitor shows the station with sky around it, not a giant close-up; the cap
+    // grows with tall views so a desktop window doesn't leave the station small in the middle.
+    this.baseScale = Math.min(fw, fh * 1.08, Math.max(600, fh * 0.92)) / WORLD;
     this.scale = (this.baseScale * this.viewZoom) / this.zoom;
     this.home.world = { x: cx, y: top + fh / 2 };
     this.world.scale.set(this.scale);

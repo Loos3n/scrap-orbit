@@ -1644,6 +1644,9 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
   .fanfare, .sector-card, .boss-alert { right: calc(var(--menu-w) + 16px); }
   .boss-alert { left: 0; }
   .crash { right: calc(var(--menu-w) + 12px); }
+  /* Banners over the station keep to a readable width instead of spanning the whole view. */
+  .event-banner, .boss-banner { left: 0; right: 0; margin-inline: auto; width: min(620px, calc(100% - 24px)); box-sizing: border-box; }
+  .boss-banner { bottom: 16px; }
 }
 /* Mouse and trackpad: buttons light up under the pointer. */
 @media (hover: hover) and (pointer: fine) {
@@ -1651,6 +1654,8 @@ body.cinematic :is(#hud, #panel, .side-rail, #toasts, #coach, #coach-dim, #coach
   .hud-btn:hover .round-btn { color: #fff; border-color: rgb(255 255 255 / 0.3); }
   .buy:not(:disabled):hover, .best-buy:not(:disabled):hover, .primary:hover { filter: brightness(1.08); }
   .boost:not(:disabled):hover { filter: brightness(1.12); }
+  /* Slim, themed scrollbars instead of the system's grey ones. */
+  * { scrollbar-width: thin; scrollbar-color: rgb(140 150 240 / 0.35) transparent; }
 }
 .keys-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 12px; align-items: center; font-size: 13px; }
 .keys-list dt { margin: 0; }
