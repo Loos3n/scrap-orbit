@@ -60,6 +60,7 @@
         <nav class="side-rail" aria-label="Missions, profile and settings">
           <button id="missions-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></span><small>Missions</small></button>
           <button id="profile-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="profile"></span><span id="profile-dot" class="dot" hidden></span></span><small>Profile</small></button>
+          <button id="fish-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="fish"></span><span id="fish-dot" class="dot" hidden></span></span><small>Fishing</small></button>
           <button id="radio-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="radio"></span><span id="radio-dot" class="dot" hidden></span></span><small>Radio</small></button>
           <button id="settings-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="gear"></span></span><small>Settings</small></button>
         </nav>
@@ -448,6 +449,45 @@
         <p class="modal-time">Gift-wrapped crates hold <b>1 snowflake</b>, boss wrecks <b>5</b>, and there's a present with <b>5</b> under the tree every day.</p>
         <p id="festival-cocoa" class="festival-cocoa" hidden></p>
         <ul id="festival-shop" class="festival-shop"></ul>
+      </div>
+    </div>
+    <div id="fishing" class="modal" hidden>
+      <div class="modal-card fishing-card" role="dialog" aria-modal="true" aria-labelledby="fishing-title">
+        <button id="fishing-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">Off the station’s side</div>
+        <h2 id="fishing-title">Space Fishing</h2>
+        <div class="fish-tabs" role="tablist">
+          <button id="fish-tab-fish" class="on" type="button" role="tab" aria-selected="true">Fish</button>
+          <button id="fish-tab-book" type="button" role="tab" aria-selected="false">Catch book <span id="fish-book-count"></span></button>
+        </div>
+        <div id="fish-play" class="fish-play">
+          <div class="fish-bait"><span id="fish-bait-pips" class="fish-pips"></span><small id="fish-bait-text"></small></div>
+          <div id="fish-pond" class="fish-pond">
+            <div class="fish-stars"></div>
+            <div id="fish-shadows" class="fish-shadows"></div>
+            <svg class="fish-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path id="fish-line-path" d="M50 0L50 0" vector-effect="non-scaling-stroke"/></svg>
+            <div id="fish-bobber" class="fish-bobber" hidden><i></i></div>
+            <div id="fish-alert" class="fish-alert" hidden>!</div>
+            <div id="fish-result" class="fish-result" hidden>
+              <div id="fish-result-pic" class="fish-result-pic"></div>
+              <span id="fish-result-rarity" class="fish-rarity"></span>
+              <b id="fish-result-name"></b>
+              <small id="fish-result-desc"></small>
+              <div id="fish-result-pay" class="fish-pay"></div>
+            </div>
+            <p id="fish-msg" class="fish-msg" aria-live="polite"></p>
+          </div>
+          <div id="fish-reel" class="fish-reel" hidden>
+            <div class="fish-reel-top"><span id="fish-hits" class="fish-hits"></span><span id="fish-reel-label"></span><span id="fish-slack" class="fish-slack"></span></div>
+            <div id="fish-bar" class="fish-bar"><i id="fish-zone" class="fish-zone"></i><i id="fish-marker" class="fish-marker"></i></div>
+          </div>
+          <button id="fish-act" class="primary fish-act" type="button">Cast</button>
+        </div>
+        <div id="fish-book" class="fish-book" hidden>
+          <p id="fish-book-intro" class="modal-time"></p>
+          <div id="fish-detail" class="fish-detail"></div>
+          <ul id="fish-grid" class="fish-grid"></ul>
+        </div>
       </div>
     </div>
     <div id="radio" class="modal" hidden>

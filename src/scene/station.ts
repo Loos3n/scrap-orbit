@@ -4,6 +4,8 @@ import type { GeneratorId } from '../core/config';
 import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } from '../core/content';
 import type { SkinDef } from '../core/collection';
 import * as art from './art';
+import { drawCritter } from './critter-art';
+import type { Critter } from '../core/fishing';
 import { markOf } from '../core/evolve';
 
 /** Glow colours for Mk II to Mk V: chrome, cyan core, gold, prism violet. */
@@ -40,6 +42,8 @@ const BOSS_POS = { x: -92, y: -132 };
 const BOSS_SCALE = 0.78;
 /** Where the Lantern berths once it has docked: above the station, clear of the buttons and the trader. */
 const LANTERN = { x: 10, y: -255 };
+/** Where the fish tank drifts, below and right of the station. */
+const TANK = { x: 132, y: 112 };
 
 const COLORS = {
   scrap: 0xffb547,
@@ -235,6 +239,7 @@ export class StationScene {
   private traderShip: { s: Sprite; light: Sprite; t: number } | null = null;
   /** The Lantern, docked for good once the Hollow Fleet story ends. */
   private lantern: { s: Sprite; lamp: Sprite; t: number } | null = null;
+  private tank: { box: Container; glass: Sprite; light: Sprite; fish: { s: Sprite; ph: number; sp: number; size: number }[]; key: string; t: number } | null = null;
   private traffic: { s: Sprite; light: Sprite; vx: number; vy: number; life: number; blink: number }[] = [];
   private scale = 1;
   private skyKey = '';
@@ -1721,6 +1726,51 @@ export class StationScene {
     }
   }
 
+  /** The fish tank beside the station, with up to five of the critters caught swimming in it. */
+  setTank(critters: readonly Critter[]): void {
+    if (!this.ready) return;
+    const key = critters.map((c) => c.id).join();
+    if (this.tank && this.tank.key === key) return;
+    if (this.tank) {
+      this.tank.box.destroy({ children: true });
+      this.tank = null;
+    }
+    if (!critters.length) return;
+    const box = new Container();
+    box.position.set(TANK.x, TANK.y);
+    box.scale.set(0.72);
+    this.dockLayer.addChild(box);
+    const light = this.sprite(this.tex.glow, box, 0, 0);
+    light.blendMode = 'add';
+    light.tint = 0x5cd6ff;
+    light.scale.set(0.9);
+    light.alpha = 0.35;
+    const glass = this.sprite(art.fishTank(), box, 0, 0);
+    const fish = critters.slice(0, 5).map((c, i) => {
+      const s = this.sprite(art.critterTex((ctx) => drawCritter(ctx, c, 20, 20, 36)), box, 0, 6);
+      const size = c.shape === 'whale' ? 0.62 : 0.5;
+      s.scale.set(size);
+      return { s, ph: i * 1.7 + Math.random(), sp: 0.35 + Math.random() * 0.3, size };
+    });
+    this.tank = { box, glass, light, fish, key, t: 0 };
+  }
+
+  private updateTank(dt: number): void {
+    const o = this.tank;
+    if (!o) return;
+    o.t += dt;
+    o.box.y = TANK.y + Math.sin(o.t * 0.5) * 5;
+    o.box.rotation = Math.sin(o.t * 0.35) * 0.05;
+    for (const f of o.fish) {
+      const a = o.t * f.sp + f.ph;
+      f.s.x = Math.sin(a) * 18;
+      f.s.y = 8 + Math.sin(a * 0.7 + f.ph) * 12;
+      // Critters face left; turn them round as they swim to the right.
+      f.s.scale.x = Math.cos(a) > 0 ? -f.size : f.size;
+    }
+    o.light.alpha = 0.3 + Math.sin(o.t * 1.3) * 0.08;
+  }
+
   private updateLantern(dt: number): void {
     const o = this.lantern;
     if (!o) return;
@@ -2564,6 +2614,7 @@ export class StationScene {
     this.updateTraffic(dt);
     this.updateTrader(dt);
     this.updateLantern(dt);
+    this.updateTank(dt);
 
     // Drones dart around in a loose swarm, leaving short trails.
     for (const o of this.drones) {

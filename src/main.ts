@@ -16,6 +16,10 @@ import '@fontsource/rubik/latin-600.css';
 import './style.css';
 import { SECTOR_THEMES, Sfx, type ThemeId } from './audio';
 import { StoryRadio } from './ui/story-ui';
+import { FishingPanel } from './ui/fishing-ui';
+import { adsAvailable } from './ads';
+import { setAdsSupported } from './core/rewards';
+import { RARITY, tankCritters } from './core/fishing';
 import { FINALE_ID, storyDone } from './core/story';
 import { festivalActive } from './core/festival';
 import { FestivalPanel } from './ui/festival-ui';
@@ -123,6 +127,9 @@ async function boot(): Promise<void> {
     const pet = game.state.pets.active;
     return LOOT.find((l) => l.id === (pet && game.state.skins[pet]))?.tint ?? 0xffffff;
   };
+  // No ad network on the web, so ad offers only show in the phone app.
+  setAdsSupported(adsAvailable());
+  document.getElementById('opt-ads')?.closest('label')?.toggleAttribute('hidden', !adsAvailable());
   const sfx = new Sfx();
   const ui = new UI(game);
   ui.safeGame = new SafeGame(game, (kind) => {
@@ -216,6 +223,15 @@ async function boot(): Promise<void> {
     scene.setSnow(on);
     scene.giftCrates = on;
   };
+  const fishing = new FishingPanel(game, {
+    cast: () => sfx.cast(),
+    bite: () => sfx.bite(),
+    hit: (n) => sfx.reelHit(n),
+    miss: () => sfx.reelMiss(),
+    escape: () => sfx.escape(),
+    landed: (c) => (c.rarity === 'common' || c.rarity === 'uncommon' ? sfx.coins() : sfx.achievement()),
+    buzz: (ms) => buzz(ms),
+  });
   const festival = new FestivalPanel(game, () => {
     syncFestival();
     syncMusic();
@@ -477,6 +493,7 @@ async function boot(): Promise<void> {
         scene.setTrader(meta.traderHere(game.state, Date.now()));
         scene.setOrnaments(game.state.ornaments.on);
         scene.setLantern(storyDone(game.state));
+        scene.setTank(tankCritters(game.state));
         radio.render();
         syncPerks();
         syncDecor();
@@ -635,6 +652,14 @@ async function boot(): Promise<void> {
           buzz([40, 60, 40, 60, 200]);
         } else ui.toast(ICONS.radio.replace('currentColor', '#ffcf7a'), `<b>Transmission logged</b> +${e.crystals} crystals`);
         break;
+      case 'fish': {
+        scene.setTank(tankCritters(game.state));
+        if (e.reward.surge) {
+          ui.toast(ICONS.fish.replace('currentColor', RARITY.legendary.color), '<b>A legendary catch!</b> The station hums along: power surge, 5x income');
+          scene.celebrate(0xffd166);
+        }
+        break;
+      }
       case 'festival': {
         const flake = ICONS.snowflake.replace('currentColor', '#9fe6ff');
         if (e.from === 'present') {
@@ -1023,6 +1048,7 @@ async function boot(): Promise<void> {
   scene.setTrader(meta.traderHere(game.state, Date.now()));
   scene.setOrnaments(game.state.ornaments.on);
   scene.setLantern(storyDone(game.state));
+  scene.setTank(tankCritters(game.state));
   syncMusic();
 
   // Combo heat meter (core/combo.ts), redrawn only when it moves.
@@ -1063,6 +1089,7 @@ async function boot(): Promise<void> {
       lastUi = now;
       ui.render();
       festival.render();
+      fishing.render();
       syncFestival();
       syncMusic();
     }

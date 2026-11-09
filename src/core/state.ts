@@ -8,6 +8,7 @@ import { STAR_NODES } from './galaxy';
 import { CONTRACTS, type ActiveContract, type ContractOffer } from './contracts';
 import { STORY } from './story';
 import { FESTIVAL_SHOP } from './festival';
+import { CRITTERS, FISHING } from './fishing';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -112,6 +113,8 @@ export interface GameState {
    * cocoa wears off, the last day a present was opened, and a switch to try it out early.
    */
   festival: { flakes: number; bought: Set<string>; cocoaUntil: number; day: string; test: boolean };
+  /** Space fishing (core/fishing.ts): bait held and when it last refilled, catches by kind, and lines cast. */
+  fishing: { bait: number; baitAt: number; caught: Record<string, number>; casts: number };
   /**
    * Friend codes (core/friends.ts): this player's own code and station name once signed in,
    * friends added, who got a gift today, and today's gift counters.
@@ -225,6 +228,7 @@ interface SaveData {
   ornaments?: { got?: string[]; on?: string[] };
   story?: { heard?: string[] };
   festival?: { flakes?: number; bought?: string[]; cocoaUntil?: number; day?: string; test?: boolean };
+  fishing?: { bait?: number; baitAt?: number; caught?: Record<string, number>; casts?: number };
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
@@ -298,6 +302,7 @@ export function newState(now: number): GameState {
     ornaments: { got: new Set(), on: new Set() },
     story: { heard: new Set() },
     festival: { flakes: 0, bought: new Set(), cocoaUntil: 0, day: '', test: false },
+    fishing: { bait: FISHING.baitMax, baitAt: now, caught: {}, casts: 0 },
     rig: false,
     friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
@@ -375,6 +380,7 @@ export function serialize(state: GameState): string {
     ornaments: { got: [...state.ornaments.got], on: [...state.ornaments.on] },
     story: { heard: [...state.story.heard] },
     festival: { ...state.festival, bought: [...state.festival.bought] },
+    fishing: { ...state.fishing, caught: { ...state.fishing.caught } },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
@@ -553,6 +559,18 @@ export function deserialize(json: string | null, now: number): GameState | null 
     state.festival.cocoaUntil = typeof fest.cocoaUntil === 'number' && Number.isFinite(fest.cocoaUntil) ? fest.cocoaUntil : 0;
     state.festival.day = typeof fest.day === 'string' ? fest.day.slice(0, 12) : '';
     state.festival.test = fest.test === true;
+  }
+  const fish = data.fishing;
+  if (fish && typeof fish === 'object') {
+    const f = state.fishing;
+    f.bait = Math.min(FISHING.baitMax, int(fish.bait));
+    f.baitAt = typeof fish.baitAt === 'number' && Number.isFinite(fish.baitAt) ? Math.min(fish.baitAt, now) : now;
+    f.casts = int(fish.casts);
+    if (fish.caught && typeof fish.caught === 'object')
+      for (const c of CRITTERS) {
+        const n = int((fish.caught as Record<string, unknown>)[c.id]);
+        if (n > 0) f.caught[c.id] = n;
+      }
   }
   state.rig = data.rig === true;
   const fr = data.friends;

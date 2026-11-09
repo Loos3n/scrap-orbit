@@ -6,8 +6,8 @@ import { AdMob } from '@capacitor-community/admob';
  * - Android app: Google AdMob. Until the game has its own AdMob account these are Google's
  *   official test ads, which pay nothing and are safe to tap. To go live, put the real ids in
  *   ADMOB below and in android/app/src/main/AndroidManifest.xml, and set TESTING to false.
- * - Web (the browser build and the playable preview): no ad network, so a short sample card
- *   stands in for the ad, to show how the reward flow feels.
+ * - Web (the browser build and the playable preview): no ad network, so every ad offer is hidden
+ *   (adsAvailable() is false). The sample card below only stands in when testing locally.
  */
 
 export const ADMOB = {
@@ -17,6 +17,9 @@ export const ADMOB = {
 };
 
 const native = () => Capacitor.isNativePlatform();
+
+/** Ads can only really play in the phone app; the dev server keeps the sample card for testing. */
+export const adsAvailable = () => native() || import.meta.env.DEV;
 let ready: Promise<boolean> | null = null;
 
 function init(): Promise<boolean> {

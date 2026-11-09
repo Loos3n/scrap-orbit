@@ -25,9 +25,15 @@ export function dayKey(now: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** Ads of this kind the player can still watch today; 0 while offers are switched off. */
+let adsSupported = true;
+/** Whether this platform can show real ads (only the phone app can). Off hides every offer. */
+export function setAdsSupported(on: boolean): void {
+  adsSupported = on;
+}
+
+/** Ads of this kind the player can still watch today; 0 while offers are switched off or ads can't play here. */
 export function adsLeft(state: GameState, kind: AdReward, now: number): number {
-  if (!state.settings.adOffers) return 0;
+  if (!adsSupported || !state.settings.adOffers) return 0;
   const used = state.ads.day === dayKey(now) ? (state.ads.used[kind] ?? 0) : 0;
   return Math.max(0, AD_REWARDS[kind].perDay - used);
 }

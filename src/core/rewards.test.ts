@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AD_REWARDS, adsLeft, useAd } from './rewards';
+import { AD_REWARDS, adsLeft, setAdsSupported, useAd } from './rewards';
 import { affordableUpgrades } from './economy';
 import { D } from './num';
 import { deserialize, newState, serialize } from './state';
@@ -41,5 +41,16 @@ describe('install all', () => {
     s.scrap = D(75 + 600 + 900);
     const ids = affordableUpgrades(s).map((u) => u.id);
     expect(ids).toEqual(['claw1', 'grip1', 'drone1']);
+  });
+});
+
+describe('ad support', () => {
+  it('hides every offer where ads cannot play', () => {
+    const s = newState(0);
+    expect(adsLeft(s, 'crystals', 0)).toBeGreaterThan(0);
+    setAdsSupported(false);
+    expect(adsLeft(s, 'crystals', 0)).toBe(0);
+    expect(adsLeft(s, 'offline', 0)).toBe(0);
+    setAdsSupported(true);
   });
 });
