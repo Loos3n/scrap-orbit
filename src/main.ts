@@ -17,6 +17,8 @@ import './style.css';
 import { SECTOR_THEMES, Sfx, type ThemeId } from './audio';
 import { StoryRadio } from './ui/story-ui';
 import { FishingPanel } from './ui/fishing-ui';
+import { adsAvailable } from './ads';
+import { setAdsSupported } from './core/rewards';
 import { RARITY, tankCritters } from './core/fishing';
 import { FINALE_ID, storyDone } from './core/story';
 import { festivalActive } from './core/festival';
@@ -125,6 +127,9 @@ async function boot(): Promise<void> {
     const pet = game.state.pets.active;
     return LOOT.find((l) => l.id === (pet && game.state.skins[pet]))?.tint ?? 0xffffff;
   };
+  // No ad network on the web, so ad offers only show in the phone app.
+  setAdsSupported(adsAvailable());
+  document.getElementById('opt-ads')?.closest('label')?.toggleAttribute('hidden', !adsAvailable());
   const sfx = new Sfx();
   const ui = new UI(game);
   ui.safeGame = new SafeGame(game, (kind) => {
