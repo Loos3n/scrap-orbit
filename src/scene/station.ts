@@ -7,6 +7,8 @@ import * as art from './art';
 import { drawCritter } from './critter-art';
 import type { Critter } from '../core/fishing';
 import { markOf } from '../core/evolve';
+import type { CrewId } from '../core/content';
+import { CrewDeck } from './crew-deck';
 
 /** Glow colours for Mk II to Mk V: chrome, cyan core, gold, prism violet. */
 const MARK_TINTS = [0xeaf2ff, 0x5ce1ff, 0xffd166, 0xc58cff];
@@ -366,6 +368,17 @@ export class StationScene {
     };
 
     this.buildHub();
+    this.deck = new CrewDeck({
+      spark: (x, y, color) => this.burst(x, y + this.hub.y, color, 2, 0.12),
+      puff: (x, y, color, size, life) => this.puff(x, y + this.hub.y, color, size * 0.25, life),
+      toScreen: (x, y) => this.hub.toGlobal({ x, y }),
+      talk: (id, why) => this.crewTalk(id, why),
+      width: () => this.app.screen.width,
+      glow: this.tex.glow,
+    });
+    this.hub.addChildAt(this.deck.layer, this.hub.getChildIndex(this.claw));
+    this.deck.screen.zIndex = 22;
+    this.app.stage.addChild(this.deck.screen);
     this.sparkPool = new Pool(this.tex.streak, this.fxLayer, 'add');
     this.puffPool = new Pool(this.tex.glow, this.fxLayer, 'add');
     this.chunkPool = new Pool(this.tex.debris[0], this.fxLayer);
@@ -1659,6 +1672,35 @@ export class StationScene {
   /** Off during the tutorial, so a new player isn't distracted. */
   starsAllowed = false;
 
+  /** The crew out on deck (crew-deck.ts). */
+  private deck: CrewDeck | null = null;
+  /** Supplies what the crew say; set by the game. */
+  crewTalk: (id: CrewId, why: 'poke' | 'idle' | 'arrive') => string = () => '';
+  /** Whether the crew may pipe up on their own (not during the tutorial or title screen). */
+  crewChatter = false;
+
+  /** Which crew are on the station: they walk out of the hatch, or in and away. */
+  setCrew(ids: readonly CrewId[]): void {
+    if (this.deck) this.deck.setCrew(ids);
+  }
+
+  /** A tap on a crew member: they hop, wave and say something. Returns who, if anyone. */
+  pokeCrew(sx: number, sy: number): CrewId | null {
+    if (!this.deck) return null;
+    const p = this.toWorld(sx, sy);
+    return this.deck.poke(p.x, p.y - this.hub.y, Math.max(11, 22 / this.scale));
+  }
+
+  /** Someone on deck says something. */
+  crewSay(id: CrewId, text: string): void {
+    this.deck?.say(id, text);
+  }
+
+  /** The crew react: a level up (just them), or a party for everyone. */
+  crewReact(kind: 'win' | 'lose' | 'party', who?: CrewId): void {
+    this.deck?.react(kind, who);
+  }
+
   /** The station's middle on screen, where bought machines fly in. */
   hubOnScreen(): { x: number; y: number } | null {
     if (!this.ready) return null;
@@ -1977,6 +2019,7 @@ export class StationScene {
     if (kind === null) {
       // Already on its way out: let it finish.
       if (!this.boss || this.boss.state === 'out' || this.boss.state === 'dead') return;
+      this.deck?.react(defeated ? 'win' : 'lose');
       if (defeated) this.explodeBoss();
       else this.boss.state = 'out';
       this.boss.t = 0;
@@ -2243,6 +2286,13 @@ export class StationScene {
     p.s.rotation = Math.sin(this.time * 1.7) * 0.12;
   }
 
+  private updateDeck(dt: number): void {
+    if (!this.deck) return;
+    const b = this.boss;
+    const boss = b && (b.state === 'in' || b.state === 'here') ? { x: b.c.x, y: b.c.y - this.hub.y } : null;
+    this.deck.update(dt, { night: this.daylight.night, boss, tank: !!this.tank, chatter: this.crewChatter && !this.cine });
+  }
+
   /** A few bursts of colour popping around the station, for a big moment. */
   fireworks(colors: number[]): void {
     if (!this.ready) return;
@@ -2301,6 +2351,7 @@ export class StationScene {
     this.updateDecor(dt);
     this.updateRig(dt);
     this.updatePet(dt);
+    this.updateDeck(dt);
     this.updateFx(dt);
     this.updateMarkFx(dt);
     this.updateDaylight(dt);
