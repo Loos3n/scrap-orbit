@@ -22,6 +22,8 @@ import { setAdsSupported } from './core/rewards';
 import { RARITY, tankCritters } from './core/fishing';
 import { FINALE_ID, storyDone } from './core/story';
 import { festivalActive } from './core/festival';
+import { crewLine } from './core/crew-talk';
+import type { CrewId } from './core/content';
 import { FestivalPanel } from './ui/festival-ui';
 import { CLAW, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES } from './core/config';
 import { modelName } from './core/evolve';
@@ -251,9 +253,45 @@ async function boot(): Promise<void> {
     lastPhase = light.phase;
   };
   syncDaylight(true);
+
+  /**
+   * The crew out on the station deck (scene/crew-deck.ts): whoever is recruited and not away on
+   * a trip, plus Mika from the start, since she shows new players the ropes.
+   */
+  const justHired = new Set<CrewId>();
+  scene.crewTalk = (id, why) => {
+    const s = game.state;
+    const now = Date.now();
+    const reason = why === 'arrive' ? (justHired.has(id) ? 'hello' : 'home') : why;
+    justHired.delete(id);
+    return crewLine(id, reason, {
+      night: s.settings.dayNight && daylight(now).night > 0.6,
+      boss: !!s.boss,
+      festival: festivalActive(s, now),
+      sector: sectorFor(s.stats.relocations).name,
+      level: s.crew[id],
+      caught: Object.values(s.fishing.caught).filter((n) => n > 0).length,
+      aboard: crewAboard().length,
+    });
+  };
+  const crewAboard = (): CrewId[] => {
+    const s = game.state;
+    return CREW.filter((c) => (s.crew[c.id] > 0 || c.id === 'mika') && !s.trips.some((t) => t.crew === c.id)).map((c) => c.id);
+  };
+  let crewKey = '';
+  const syncCrew = () => {
+    const ids = crewAboard();
+    const key = ids.join();
+    if (key === crewKey) return;
+    crewKey = key;
+    scene.setCrew(ids);
+  };
+  syncCrew();
   const friends = new FriendsPanel(game, (d) => fmt(d), () => scene.snapshot(), (icon, html) => ui.toast(icon, html));
   ui.friendsDot = () => friends.hasGifts;
   if (import.meta.env.DEV) Object.assign(window, { __friends: friends });
+  // Test builds (VITE_PROBE=1) expose the game and scene to scripted checks.
+  if (import.meta.env.VITE_PROBE) Object.assign(window, { __game: game, __scene: scene });
   window.setInterval(() => syncDaylight(), 20_000);
   ui.onDayNightChange = () => {
     lastPhase = null;
@@ -501,6 +539,12 @@ async function boot(): Promise<void> {
       case 'crew': {
         const c = CREW.find((x) => x.id === e.id)!;
         ui.toast(ICONS.crew.replace('currentColor', '#4fe3c1'), e.level === 1 ? `<b>${c.name}</b> joined the crew!` : `<b>${c.name}</b> reached level ${e.level}`);
+        if (e.level === 1 && e.id !== 'mika') justHired.add(e.id);
+        else {
+          scene.crewReact('party', e.id);
+          scene.crewSay(e.id, crewLine(e.id, e.level === 1 ? 'hello' : 'levelup', { night: false, boss: false, festival: false, sector: '', level: e.level, caught: 0, aboard: 0 }));
+        }
+        syncCrew();
         scene.celebrate(GENERATORS.find((g) => g.id === c.gen)!.color);
         sfx.upgrade();
         buzz(20);
@@ -1015,6 +1059,7 @@ async function boot(): Promise<void> {
       buzz(25);
       return;
     }
+    if (scene.pokeCrew(x, y)) buzz(6);
     const value = game.tap();
     if (game.state.taps >= TUTORIAL_TAPS) game.advanceTutorial('tap');
     scene.tapAt(x, y, `+${fmt(value)}`, game.heatNow());
@@ -1090,6 +1135,8 @@ async function boot(): Promise<void> {
       ui.render();
       festival.render();
       fishing.render();
+      syncCrew();
+      scene.crewChatter = game.state.tutorial < 0 && !introShowing();
       syncFestival();
       syncMusic();
     }

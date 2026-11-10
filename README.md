@@ -19,6 +19,7 @@ It runs in the browser at [scrap-orbit.web.app](https://scrap-orbit.web.app) and
 - 6 core perks unlocked by how many cores you hold, including an Auto-Builder
 - 22 achievements, each worth +1% income
 - Crew: 10 collectible crew members with their own portraits, each one multiplying a machine's output, levelled up with crystals
+- Living crew: everyone you recruit (and Mika from day one) walks the station deck as a little character. They stroll round the reactor, fix things with a wrench, stop for a chat, spacewalk out on a tether, fish off the edge once the fish tank is out, and cheer when a boss wreck shows up. At night they head inside through the hatch to sleep while one stays up on watch with a lantern. Tap one and they hop, wave and say something in their own voice; now and then they pipe up on their own. Crew away on expeditions leave through the hatch and come back the same way
 - Missions: three daily goals and a weekly challenge that pay out crystals
 - Timed events: meteor showers (tap the meteors), solar flares (supercharged taps) and trade convoys (tap the ship for crystals), every 12 to 20 minutes. Events, bosses, golden crates, the trader and cargo pods never overlap, and each is followed by at least 4 minutes of calm
 - Research lab: a 16-project tree in four branches that runs on real time, even while the game is closed
