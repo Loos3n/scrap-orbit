@@ -73,6 +73,7 @@
           <div class="boss-hp"><i id="boss-hp"></i></div>
         </div>
         <button id="safe-banner" class="trader-banner safe-banner" type="button" hidden><span data-icon="lock"></span>Locked cargo! <b id="safe-time"></b></button>
+        <button id="visitor-banner" class="trader-banner visitor-banner" type="button" hidden><span data-icon="heart"></span><span id="visitor-who">Visitor</span> docked <b id="visitor-time"></b></button>
         <button id="trader-banner" class="trader-banner" type="button" hidden><span data-icon="crystal"></span>Trader docked <b id="trader-time"></b></button>
         <div id="buff-row" class="buff-row" aria-live="polite">
           <div id="buff-surge" class="buff-chip" data-buff="surge" hidden><span data-icon="bolt"></span><span class="buff-text"><small>Surge</small><b></b></span><b id="buff-surge-time" class="buff-time"></b><i class="buff-bar"><i id="buff-surge-bar"></i></i></div>
@@ -104,10 +105,11 @@
           <button type="button" data-pane="trips" aria-selected="false">Trips<span id="trips-dot" class="dot" hidden></span></button>
           <button type="button" data-pane="pets" aria-selected="false">Pets<span id="pets-dot" class="dot" hidden></span></button>
         </div>
-        <div class="segments pane-seg three" data-group="prestige" role="tablist" aria-label="Prestige sections" hidden>
+        <div class="segments pane-seg four" data-group="prestige" role="tablist" aria-label="Prestige sections" hidden>
           <button type="button" data-pane="cores" aria-selected="true">Cores<span id="cores-dot" class="dot" hidden></span></button>
           <button type="button" data-pane="challenges" aria-selected="false">Challenges</button>
           <button type="button" data-pane="galaxy" aria-selected="false">Galaxy<span id="galaxy-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="fleet" aria-selected="false">Fleet<span id="fleet-dot" class="dot" hidden></span></button>
         </div>
         <div class="segments pane-seg two" data-group="station" role="tablist" aria-label="Station sections" hidden>
           <button type="button" data-pane="station" aria-selected="true">Rooms</button>
@@ -203,6 +205,11 @@
           <div id="galaxy-card" class="galaxy-card"></div>
           <h3 id="star-map-title" class="section-title" hidden>Star Map</h3>
           <ul id="star-map" class="list challenge-list" hidden></ul>
+        </div>
+        <div id="tab-fleet" class="tab-body" hidden>
+          <div id="fleet-card" class="galaxy-card fleet-card"></div>
+          <h3 class="section-title">The Hollow Fleet</h3>
+          <ul id="fleet-list" class="list fleet-list"></ul>
         </div>
         <div id="tab-station" class="tab-body" hidden>
           <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
@@ -346,6 +353,13 @@
         <p id="trader-left" class="mission-reset"></p>
       </div>
     </div>
+    <div id="visitor" class="modal" hidden>
+      <div class="modal-card visitor-card" role="dialog" aria-modal="true" aria-label="Visitor">
+        <button id="visitor-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">A visitor at the dock</div>
+        <div id="visitor-body"></div>
+      </div>
+    </div>
     <div id="profile" class="modal" hidden>
       <div class="modal-card profile-card" role="dialog" aria-modal="true" aria-labelledby="profile-title">
         <button id="profile-close" class="close-btn" type="button" aria-label="Close">&times;</button>
@@ -369,6 +383,9 @@
         <h3 class="section-title">Collections <span id="book-sum" class="section-sub"></span></h3>
         <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
         <ul id="book-list" class="book-list"></ul>
+        <h3 class="section-title">Guestbook <span id="guest-sum" class="section-sub"></span></h3>
+        <p class="tab-intro">Visitors dock now and then with a favour to ask. Give the answer they hope for to win a heart; at three hearts they leave a keepsake that lasts forever.</p>
+        <ul id="guest-list" class="guest-list"></ul>
         </div>
         <div id="prof-friends" class="prof-body" hidden>
           <div id="fr-off" class="fr-off" hidden>

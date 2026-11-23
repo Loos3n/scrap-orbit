@@ -26,6 +26,7 @@ export function offlineReportHtml(r: OfflineReport): string {
     const names = r.trips.map((id) => CREW.find((c) => c.id === id)?.name ?? id);
     lines.push([ICONS.crew, `<b>${esc(names.join(' and '))}</b> came back from ${r.trips.length > 1 ? 'their trips' : 'a trip'}. Open Crew, Trips for the haul`]);
   }
+  if (r.ship) lines.push([ICONS.fleet, `The <b>${esc(r.ship)}</b> is out of the drydock. See it in Prestige, Fleet`]);
   if (r.trader) lines.push([ICONS.crystal, 'A trader is on the way with deals']);
   if (r.golden) lines.push([ICONS.star, 'Golden scrap is drifting nearby. Keep an eye out']);
   if (r.bossEscaped) lines.push([ICONS.warp, 'A boss wreck drifted off while you were gone']);

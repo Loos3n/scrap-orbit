@@ -1,7 +1,7 @@
 /*
  * The menu has five tabs along its top. A tab that holds more than one pane shows a segment bar
  * at the top of the sheet, all in the same style: Build has Machines and Upgrades, Crew has Crew,
- * Trips and Pets, Prestige has Star Cores, Challenges and the Galaxy, Station has Rooms and Decor.
+ * Trips and Pets, Prestige has Star Cores, Challenges, the Galaxy and the Fleet, Station has Rooms and Decor.
  * Each pane keeps its own `tab-<pane>` element.
  */
 
@@ -9,7 +9,7 @@ export const GROUPS: Record<string, readonly string[]> = {
   build: ['build', 'upgrades'],
   crew: ['crew', 'trips', 'pets'],
   lab: ['lab'],
-  prestige: ['cores', 'challenges', 'galaxy'],
+  prestige: ['cores', 'challenges', 'galaxy', 'fleet'],
   station: ['station', 'decor'],
 };
 
@@ -24,6 +24,7 @@ export const PANE_NAMES: Record<string, string> = {
   cores: 'Cores',
   challenges: 'Challenges',
   galaxy: 'Galaxy',
+  fleet: 'Fleet',
   station: 'Rooms',
   decor: 'Decor',
 };

@@ -9,6 +9,8 @@ import { CONTRACTS, type ActiveContract, type ContractOffer } from './contracts'
 import { STORY } from './story';
 import { FESTIVAL_SHOP } from './festival';
 import { CRITTERS, FISHING } from './fishing';
+import { SHIPS, FLEET, type ShipId } from './fleet';
+import { VISITORS, type VisitorId } from './visitors';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -115,6 +117,16 @@ export interface GameState {
   festival: { flakes: number; bought: Set<string>; cocoaUntil: number; day: string; test: boolean };
   /** Space fishing (core/fishing.ts): bait held and when it last refilled, catches by kind, and lines cast. */
   fishing: { bait: number; baitAt: number; caught: Record<string, number>; casts: number };
+  /**
+   * The Hollow Fleet (core/fleet.ts): hull plates held and ever earned, each ship's rank, the
+   * drydock job, when the patrol haul was last collected, and whether Vey's welcome was paid.
+   */
+  fleet: { plates: number; earned: number; ranks: Partial<Record<ShipId, number>>; job: { ship: ShipId; endsAt: number } | null; patrolAt: number; welcomed: boolean };
+  /**
+   * Dock visitors (core/visitors.ts): who is docked and which request they brought, when the next
+   * is due, hearts won and visits made by each, and who came last.
+   */
+  visitors: { here: { id: VisitorId; req: number; until: number } | null; nextAt: number; hearts: Partial<Record<VisitorId, number>>; met: Partial<Record<VisitorId, number>>; last: VisitorId | null; answered: number };
   /**
    * Friend codes (core/friends.ts): this player's own code and station name once signed in,
    * friends added, who got a gift today, and today's gift counters.
@@ -229,6 +241,8 @@ interface SaveData {
   story?: { heard?: string[] };
   festival?: { flakes?: number; bought?: string[]; cocoaUntil?: number; day?: string; test?: boolean };
   fishing?: { bait?: number; baitAt?: number; caught?: Record<string, number>; casts?: number };
+  fleet?: Partial<GameState['fleet']>;
+  visitors?: Partial<GameState['visitors']>;
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
@@ -303,6 +317,8 @@ export function newState(now: number): GameState {
     story: { heard: new Set() },
     festival: { flakes: 0, bought: new Set(), cocoaUntil: 0, day: '', test: false },
     fishing: { bait: FISHING.baitMax, baitAt: now, caught: {}, casts: 0 },
+    fleet: { plates: 0, earned: 0, ranks: {}, job: null, patrolAt: now, welcomed: false },
+    visitors: { here: null, nextAt: 0, hearts: {}, met: {}, last: null, answered: 0 },
     rig: false,
     friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
@@ -381,6 +397,8 @@ export function serialize(state: GameState): string {
     story: { heard: [...state.story.heard] },
     festival: { ...state.festival, bought: [...state.festival.bought] },
     fishing: { ...state.fishing, caught: { ...state.fishing.caught } },
+    fleet: { ...state.fleet, ranks: { ...state.fleet.ranks }, job: state.fleet.job ? { ...state.fleet.job } : null },
+    visitors: { ...state.visitors, here: state.visitors.here ? { ...state.visitors.here } : null, hearts: { ...state.visitors.hearts }, met: { ...state.visitors.met } },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
@@ -571,6 +589,38 @@ export function deserialize(json: string | null, now: number): GameState | null 
         const n = int((fish.caught as Record<string, unknown>)[c.id]);
         if (n > 0) f.caught[c.id] = n;
       }
+  }
+  const fl = data.fleet;
+  if (fl && typeof fl === 'object') {
+    const f = state.fleet;
+    const time = (t: unknown, fallback: number) => (typeof t === 'number' && Number.isFinite(t) ? t : fallback);
+    f.plates = int(fl.plates);
+    f.earned = int(fl.earned);
+    f.welcomed = fl.welcomed === true;
+    f.patrolAt = Math.min(time(fl.patrolAt, now), now);
+    if (fl.ranks && typeof fl.ranks === 'object')
+      for (const sh of SHIPS) {
+        const r = Math.min(FLEET.maxRank, int((fl.ranks as Record<string, unknown>)[sh.id]));
+        if (r > 0) f.ranks[sh.id] = r;
+      }
+    const job = fl.job;
+    if (job && typeof job === 'object' && SHIPS.some((sh) => sh.id === job.ship) && (f.ranks[job.ship] ?? 0) < FLEET.maxRank) f.job = { ship: job.ship, endsAt: time(job.endsAt, now) };
+  }
+  const vi = data.visitors;
+  if (vi && typeof vi === 'object') {
+    const v = state.visitors;
+    const known = (id: unknown): id is VisitorId => VISITORS.some((x) => x.id === id);
+    v.nextAt = typeof vi.nextAt === 'number' && Number.isFinite(vi.nextAt) ? vi.nextAt : 0;
+    v.answered = int(vi.answered);
+    v.last = known(vi.last) ? vi.last : null;
+    const h = vi.here;
+    if (h && typeof h === 'object' && known(h.id) && typeof h.until === 'number') v.here = { id: h.id, req: int(h.req), until: h.until };
+    for (const x of VISITORS) {
+      const hearts = int((vi.hearts as Record<string, unknown> | undefined)?.[x.id]);
+      const met = int((vi.met as Record<string, unknown> | undefined)?.[x.id]);
+      if (hearts > 0) v.hearts[x.id] = hearts;
+      if (met > 0) v.met[x.id] = met;
+    }
   }
   state.rig = data.rig === true;
   const fr = data.friends;

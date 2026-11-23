@@ -1,6 +1,8 @@
 import type { CrewId, PetId } from './content';
 import { storyIncome } from './story';
 import { sectorBonuses } from './sectors';
+import { fleetPower } from './fleet';
+import { keepsakeBonuses } from './visitors';
 import type { GameState } from './state';
 
 /*
@@ -268,6 +270,9 @@ export function bonuses(state: GameState): Bonuses {
   b.offline += sec.offline;
   b.boss += sec.boss;
   b.income += storyIncome(state);
+  // The escort Corvid, and keepsakes left by visitors who became friends.
+  b.boss += fleetPower(state, 'boss');
+  for (const [stat, a] of keepsakeBonuses(state)) b[stat] += a;
   return b;
 }
 

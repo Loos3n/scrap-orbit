@@ -979,6 +979,175 @@ export const lanternShip = () =>
     ctx.globalCompositeOperation = 'source-over';
   }, 3, { bevel: 1.4, light: 0.6, grain: 0.35, grime: 0.15, seed: 77 });
 
+/** The shape of a Hollow Fleet ship, from core/fleet.ts (kept as a plain type so art doesn't need the game rules). */
+export interface HullShape {
+  len: number;
+  tall: number;
+  nose: 'round' | 'sharp' | 'blunt';
+  fins: number;
+  decks: number;
+  dome?: boolean;
+  mast?: boolean;
+}
+
+/**
+ * A rebuilt Hollow Fleet ship, in the Lantern's style: pale hull, the fleet's amber stripe in the
+ * ship's own colour, warm windows and the hollow circle. Points left; the scene flips it to fly right.
+ * A dark, unlit silhouette with `ghost` for ships not yet rebuilt.
+ */
+function drawFleetShip(ctx: Ctx, hull: HullShape, color: string, seed: number, ghost: boolean): void {
+  const L = hull.len;
+  const H = hull.tall;
+  const x0 = 8;
+  const cy = 34;
+  const top = cy - H / 2;
+  const bot = cy + H / 2;
+  const nose = hull.nose === 'sharp' ? L * 0.28 : hull.nose === 'round' ? L * 0.18 : L * 0.08;
+  const shape = () => {
+    ctx.beginPath();
+    if (hull.nose === 'sharp') {
+      ctx.moveTo(x0, cy + 2);
+      ctx.lineTo(x0 + nose, top);
+    } else if (hull.nose === 'round') {
+      ctx.moveTo(x0, cy);
+      ctx.quadraticCurveTo(x0 + 1, top, x0 + nose, top);
+    } else {
+      ctx.moveTo(x0 + 2, cy + H * 0.15);
+      ctx.lineTo(x0 + 2, top + H * 0.15);
+      ctx.lineTo(x0 + nose + 2, top);
+    }
+    ctx.lineTo(x0 + L - 6, top + 1);
+    ctx.quadraticCurveTo(x0 + L, top + 2, x0 + L, cy - H * 0.2);
+    ctx.lineTo(x0 + L + 6, cy - H * 0.22);
+    ctx.lineTo(x0 + L + 6, cy + H * 0.22);
+    ctx.lineTo(x0 + L, cy + H * 0.2);
+    ctx.quadraticCurveTo(x0 + L, bot - 2, x0 + L - 6, bot - 1);
+    if (hull.nose === 'sharp') ctx.lineTo(x0 + nose * 0.8, bot);
+    else if (hull.nose === 'round') {
+      ctx.lineTo(x0 + nose, bot);
+      ctx.quadraticCurveTo(x0 + 1, bot, x0, cy);
+    } else {
+      ctx.lineTo(x0 + nose + 2, bot);
+      ctx.lineTo(x0 + 2, bot - H * 0.15);
+    }
+    ctx.closePath();
+  };
+  const metalHi = ghost ? '#3a3f6a' : '#d6dcf6';
+  const metalMid = ghost ? '#262a4e' : '#8890c0';
+  const metalLo = ghost ? '#141734' : '#33385e';
+  // Fins along the bottom and back.
+  ctx.fillStyle = ghost ? '#1c1f40' : '#4d5280';
+  for (let i = 0; i < hull.fins; i++) {
+    const fx = x0 + L * (0.55 + i * (0.35 / Math.max(1, hull.fins)));
+    ctx.beginPath();
+    ctx.moveTo(fx, bot - 2);
+    ctx.lineTo(fx + 8, bot + 9);
+    ctx.lineTo(fx + 13, bot + 9);
+    ctx.lineTo(fx + 9, bot - 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (hull.mast) {
+    ctx.fillRect(x0 + L * 0.42, top - 12, 2.4, 13);
+    ctx.fillStyle = ghost ? '#262a4e' : color;
+    ctx.beginPath();
+    ctx.arc(x0 + L * 0.42 + 1.2, top - 13, 2.4, 0, TAU);
+    ctx.fill();
+  }
+  if (hull.dome) {
+    ctx.fillStyle = ghost ? '#20244a' : 'rgba(170,240,220,0.85)';
+    ctx.beginPath();
+    ctx.ellipse(x0 + L * 0.5, top + 1, L * 0.16, H * 0.42, 0, Math.PI, TAU);
+    ctx.fill();
+    if (!ghost) {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(x0 + L * 0.46, top - H * 0.18, L * 0.05, H * 0.1, -0.4, 0, TAU);
+      ctx.fill();
+    }
+  }
+  // The bridge.
+  ctx.fillStyle = linear(ctx, 0, top - 8, 0, top + 1, [
+    [0, metalHi],
+    [1, metalMid],
+  ]);
+  const bx = x0 + L * (hull.dome ? 0.72 : 0.3);
+  ctx.beginPath();
+  ctx.moveTo(bx, top + 1);
+  ctx.lineTo(bx + 4, top - 7);
+  ctx.lineTo(bx + L * 0.16, top - 7);
+  ctx.lineTo(bx + L * 0.16 + 4, top + 1);
+  ctx.closePath();
+  ctx.fill();
+  shape();
+  ctx.fillStyle = linear(ctx, 0, top, 0, bot, [
+    [0, metalHi],
+    [0.45, metalMid],
+    [1, metalLo],
+  ]);
+  ctx.fill();
+  ctx.save();
+  shape();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(20,22,50,0.4)';
+  ctx.lineWidth = 0.7;
+  for (let x = x0 + 10; x < x0 + L + 6; x += 12) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 80);
+    ctx.stroke();
+  }
+  ctx.fillStyle = ghost ? 'rgba(90,96,150,0.35)' : color;
+  ctx.fillRect(0, cy + H * 0.16, x0 + L + 10, Math.max(2, H * 0.1));
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  if (!ghost) ctx.fillRect(0, top - 1, x0 + L + 10, 4);
+  ctx.restore();
+  const r = rng(seed);
+  if (!ghost) {
+    // Warm windows on each deck.
+    for (let d = 0; d < hull.decks; d++) {
+      const y = top + 4 + d * ((H * 0.55) / Math.max(1, hull.decks));
+      for (let x = x0 + nose + 2; x < x0 + L - 8; x += 5) {
+        if (r() < 0.22) continue;
+        ctx.fillStyle = r() < 0.15 ? 'rgba(255,240,200,1)' : 'rgba(255,200,120,0.95)';
+        ctx.fillRect(x, y, 2.6, 2.2);
+      }
+    }
+  }
+  // The hollow circle.
+  ctx.strokeStyle = ghost ? 'rgba(120,126,180,0.35)' : 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(x0 + L * 0.62, cy, Math.min(6, H * 0.26), 0, TAU);
+  ctx.stroke();
+  if (!ghost) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = radial(ctx, x0 + L + 8, cy, 11, [
+      [0, 'rgba(160,230,255,0.9)'],
+      [1, 'rgba(90,180,255,0)'],
+    ]);
+    ctx.fillRect(x0 + L - 4, cy - 12, 24, 24);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+/** Canvas size that fits every fleet hull. */
+const FLEET_W = 124;
+const FLEET_H = 60;
+
+export const fleetShip = (hull: HullShape, color: string, seed: number) =>
+  paint(FLEET_W, FLEET_H, (ctx) => {
+    ctx.translate(0, -4);
+    drawFleetShip(ctx, hull, color, seed, false);
+  }, 3, { bevel: 1.2, light: 0.6, grain: 0.3, grime: 0.1, seed });
+
+/** A fleet ship as an image for the menus; `ghost` draws the unrebuilt silhouette. */
+export const fleetShipUrl = (hull: HullShape, color: string, seed: number, ghost = false) =>
+  paintUrl(FLEET_W, FLEET_H, (ctx) => {
+    ctx.translate((FLEET_W - hull.len - 26) / 2, -4);
+    drawFleetShip(ctx, hull, color, seed, ghost);
+  }, 2);
+
 /** Glowing cracks, faded in over a wreck as it takes damage. Drawn additively. */
 export const bossCracks = (seed: number) =>
   paint(230, 120, (ctx) => {

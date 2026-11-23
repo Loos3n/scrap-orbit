@@ -24,6 +24,7 @@ import { cocoaMult } from './festival';
 import { crateIncomeMult, crateTapMult } from './crate-buffs';
 import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
+import { fleetEffects } from './fleet';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
 
@@ -82,10 +83,10 @@ function upgradeDefs(state: GameState): UpgradeDef[] {
   return UPGRADES.filter((u) => state.upgrades.has(u.id));
 }
 
-/** Finished research, plus the Star Map nodes that work the same way. */
+/** Finished research, plus the Star Map nodes and Hollow Fleet ships that work the same way. */
 function researchEffects(state: GameState): ResearchEffect[] {
   const fromStars = starEffects(state).filter((e): e is ResearchEffect => e.kind !== 'startKit' && e.kind !== 'coreGain' && e.kind !== 'keepPerks');
-  return [...RESEARCH.filter((r) => state.research.done.has(r.id)).map((r) => r.effect), ...fromStars];
+  return [...RESEARCH.filter((r) => state.research.done.has(r.id)).map((r) => r.effect), ...fromStars, ...fleetEffects(state)];
 }
 
 type MultKind = 'tapMult' | 'allMult' | 'costMult' | 'crateRate' | 'offlineMult' | 'eventRate' | 'flareMult' | 'crewMult' | 'missionMult';

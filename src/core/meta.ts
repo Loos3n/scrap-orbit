@@ -28,6 +28,9 @@ import {
   type PetId,
   type StreakReward,
 } from './content';
+import { addPlates, fleetOpen, fleetPower } from './fleet';
+import { VISITS, hearts, pickVisitor, visitorHere, type VisitReward, type VisitorId } from './visitors';
+import { FISHING } from './fishing';
 import { baseIncome, claimableCores, earn, giveStarterKit, globalMult, income, researchProduct, resetRun, tapValue } from './economy';
 import {
   CHALLENGES,
@@ -292,6 +295,7 @@ export function calm(state: GameState, now: number): boolean {
     now >= state.golden.until &&
     now >= state.safe.until &&
     !state.safe.open &&
+    !visitorHere(state, now) &&
     now - state.lastHappening >= CALM_SEC * 1000
   );
 }
@@ -898,7 +902,9 @@ export function galaxyOpen(state: GameState): boolean {
 
 /** Galaxy Stars a shift would give now, counting cores still waiting to be banked. */
 export function starsOnShift(state: GameState): number {
-  return starsForCores(state.cores + claimableCores(state), state.galaxy.shifts);
+  const stars = starsForCores(state.cores + claimableCores(state), state.galaxy.shifts);
+  // The sleeper liner Lullaby wakes more stars on every shift.
+  return stars > 0 ? Math.floor(stars * fleetPower(state, 'starGain') + 1e-9) : 0;
 }
 
 /**
@@ -939,4 +945,102 @@ export function buyStarNode(state: GameState, id: string): boolean {
   // The kit lands straight away, not just from the next run.
   if (id === 'kit') giveStarterKit(state);
   return true;
+}
+
+// ---------- Dock visitors ----------
+
+/**
+ * Brings a visitor's shuttle in now and then, when things are calm, and sees it off if nobody
+ * answered in time. Waits for the tutorial and the first few minutes of play.
+ */
+export function updateVisitors(state: GameState, now: number, rand = Math.random): 'arrived' | 'left' | null {
+  const v = state.visitors;
+  if (state.tutorial >= 0) return null;
+  if (v.here && now >= v.here.until) {
+    v.last = v.here.id;
+    v.here = null;
+    return 'left';
+  }
+  if (v.nextAt === 0) {
+    v.nextAt = now + Math.max(60, VISITS.firstMin * 60 - state.stats.playSec) * 1000;
+    return null;
+  }
+  if (v.here || now < v.nextAt || !calm(state, now)) return null;
+  const pick = pickVisitor(state, rand);
+  state.lastHappening = now;
+  v.here = { id: pick.id, req: pick.req, until: now + VISITS.stayMin * 60_000 };
+  const [lo, hi] = VISITS.gap;
+  v.nextAt = v.here.until + (lo + rand() * (hi - lo)) * 60_000;
+  return 'arrived';
+}
+
+export interface VisitResult {
+  id: VisitorId;
+  liked: boolean;
+  /** Hearts now, and whether this answer made them a friend. */
+  hearts: number;
+  friend: boolean;
+  reply: string;
+  scrap?: Decimal;
+  crystals?: number;
+  bait?: number;
+  surge?: number;
+  overdrive?: boolean;
+  plates?: number;
+}
+
+/** Answers the docked visitor's request with 'a' or 'b', paying out its reward. */
+export function answerVisitor(state: GameState, pick: 'a' | 'b', now: number): VisitResult | null {
+  const here = visitorHere(state, now);
+  if (!here) return null;
+  const choice = here.req[pick];
+  if (choice.pay && !spend(state, choice.pay)) return null;
+  const v = state.visitors;
+  const id = here.def.id;
+  const liked = here.req.likes === pick;
+  const before = hearts(state, id);
+  if (liked && before < VISITS.hearts) v.hearts[id] = before + 1;
+  v.met[id] = (v.met[id] ?? 0) + 1;
+  v.answered++;
+  v.last = id;
+  v.here = null;
+  const result: VisitResult = { id, liked, hearts: hearts(state, id), friend: before < VISITS.hearts && hearts(state, id) >= VISITS.hearts, reply: choice.reply };
+  giveVisitReward(state, choice.give, now, result);
+  return result;
+}
+
+function giveVisitReward(state: GameState, g: VisitReward, now: number, out: VisitResult): void {
+  if (g.scrapMin) {
+    out.scrap = Decimal.max(baseIncome(state), 1).mul(g.scrapMin * 60).floor();
+    earn(state, out.scrap);
+  }
+  let crystals = g.crystals ?? 0;
+  if (g.plates) {
+    // Plates go to the drydock once it's open; until then they're traded for crystals.
+    if (fleetOpen(state) && state.fleet.welcomed) out.plates = addPlates(state, g.plates);
+    else crystals += g.plates;
+  }
+  if (crystals) {
+    addCrystals(state, crystals);
+    out.crystals = crystals;
+  }
+  if (g.bait) {
+    const f = state.fishing;
+    const add = Math.max(0, Math.min(g.bait, FISHING.baitMax - f.bait));
+    f.bait += add;
+    out.bait = g.bait;
+    // Bait that wouldn't fit becomes a crystal each, so the reward is never wasted.
+    if (add < g.bait) {
+      addCrystals(state, g.bait - add);
+      out.crystals = (out.crystals ?? 0) + g.bait - add;
+    }
+  }
+  if (g.surge) {
+    state.crateBuffs.surge = Math.max(now, state.crateBuffs.surge) + g.surge * 1000;
+    out.surge = g.surge;
+  }
+  if (g.overdrive) {
+    state.boostReadyAt = Math.min(state.boostReadyAt, now);
+    out.overdrive = true;
+  }
 }

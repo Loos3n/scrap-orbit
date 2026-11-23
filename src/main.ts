@@ -22,6 +22,8 @@ import { setAdsSupported } from './core/rewards';
 import { RARITY, tankCritters } from './core/fishing';
 import { FINALE_ID, storyDone } from './core/story';
 import { festivalActive } from './core/festival';
+import { FLEET, SHIPS, powerText, shipsBuilt } from './core/fleet';
+import { visitorHere } from './core/visitors';
 import { crewLine } from './core/crew-talk';
 import type { CrewId } from './core/content';
 import { FestivalPanel } from './ui/festival-ui';
@@ -287,6 +289,14 @@ async function boot(): Promise<void> {
     scene.setCrew(ids);
   };
   syncCrew();
+  /** The Hollow Fleet circling the station (core/fleet.ts). */
+  const syncFleet = (launched?: string) =>
+    scene.setFleet(
+      shipsBuilt(game.state).map((d) => ({ id: d.id, hull: d.hull, color: d.color, seed: SHIPS.indexOf(d) * 17 + 5 })),
+      launched,
+    );
+  /** A visitor's shuttle at the dock (core/visitors.ts). */
+  const syncVisitor = () => scene.setVisitor(visitorHere(game.state, Date.now())?.def.color ?? null);
   const friends = new FriendsPanel(game, (d) => fmt(d), () => scene.snapshot(), (icon, html) => ui.toast(icon, html));
   ui.friendsDot = () => friends.hasGifts;
   if (import.meta.env.DEV) Object.assign(window, { __friends: friends });
@@ -532,6 +542,8 @@ async function boot(): Promise<void> {
         scene.setOrnaments(game.state.ornaments.on);
         scene.setLantern(storyDone(game.state));
         scene.setTank(tankCritters(game.state));
+        syncFleet();
+        syncVisitor();
         radio.render();
         syncPerks();
         syncDecor();
@@ -722,6 +734,61 @@ async function boot(): Promise<void> {
           sfx.fanfare();
         } else if (e.bought) sfx.upgrade();
         festival.render();
+        break;
+      }
+      case 'fleet': {
+        const d = e.id ? SHIPS.find((x) => x.id === e.id) : undefined;
+        if (e.phase === 'open') {
+          fanfare.whenIdle(() =>
+            fanfare.cheer({ icon: ICONS.fleet, kicker: 'Captain Vey', title: 'The drydock is open', sub: `“Eight of our ships can still fly. Help us rebuild them.” Vey left you ${FLEET.welcomePlates} hull plates. Open Prestige, Fleet.`, color: '#ffcf7a' }),
+          );
+          sfx.radio();
+        } else if (e.phase === 'start' && d) {
+          ui.toast(ICONS.fleet.replace('currentColor', hexColor(d.color)), `<b>${d.name}</b> is in the drydock`);
+          sfx.upgrade();
+        } else if (e.phase === 'launch' && d) {
+          syncFleet(d.id);
+          if (e.rank === 1) {
+            fanfare.whenIdle(() => fanfare.cheer({ icon: ICONS.fleet, kicker: `The Hollow Fleet · ${shipsBuilt(game.state).length} of 8`, title: `The ${d.name} flies again`, sub: `${d.lore} ${powerText(d.power, 1)}`, color: hexColor(d.color) }));
+            fanfare.confetti(['#ffcf7a', '#ffffff', hexColor(d.color)]);
+            sfx.fanfare();
+            buzz([30, 50, 30]);
+          } else {
+            ui.toast(ICONS.fleet.replace('currentColor', hexColor(d.color)), `<b>${d.name} reached rank ${e.rank}!</b> ${powerText(d.power, e.rank!)}`);
+            sfx.achievement();
+          }
+          scene.celebrate(d.color);
+        }
+        break;
+      }
+      case 'plates':
+        if (e.from === 'patrol') {
+          ui.toast(ICONS.plate.replace('currentColor', '#ffcf7a'), `<b>Patrol's back!</b> +${e.n} hull plates`);
+          sfx.coins();
+        } else if (e.from !== 'boss') ui.toast(ICONS.plate.replace('currentColor', '#ffcf7a'), `<b>+${e.n} hull plates</b> for the drydock`);
+        break;
+      case 'visitor':
+        syncVisitor();
+        if (e.phase === 'arrived') {
+          const v = visitorHere(game.state, Date.now());
+          if (v) ui.toast(ICONS.heart.replace('currentColor', '#ff8fa8'), `<b>${v.def.name}</b> has docked with a favour to ask. Tap the banner`);
+          sfx.event();
+          buzz(20);
+        } else ui.toast(ICONS.warp, 'The visitor flew on. Another will come by');
+        break;
+      case 'visit': {
+        syncVisitor();
+        ui.visitors.answered(e.result);
+        if (e.result.scrap) ui.bigGain(e.result.scrap);
+        if (e.result.friend) {
+          fanfare.confetti(['#ff8fa8', '#ffffff', '#ffd166']);
+          sfx.fanfare();
+          buzz([30, 50, 30]);
+        } else if (e.result.liked) {
+          sfx.achievement();
+          buzz(25);
+        } else sfx.coins();
+        if (e.result.surge) scene.celebrate(0x7cf0ff);
         break;
       }
       case 'bossEscape':
@@ -1094,6 +1161,8 @@ async function boot(): Promise<void> {
   scene.setOrnaments(game.state.ornaments.on);
   scene.setLantern(storyDone(game.state));
   scene.setTank(tankCritters(game.state));
+  syncFleet();
+  syncVisitor();
   syncMusic();
 
   // Combo heat meter (core/combo.ts), redrawn only when it moves.
