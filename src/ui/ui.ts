@@ -4,6 +4,8 @@ import { CloudPanel } from './cloud-ui';
 import { playRewardedAd } from '../ads';
 import { adsLeft, type AdReward } from '../core/rewards';
 import { askPermission, notificationsAvailable } from '../notify';
+import { currentRank, rankReady } from '../core/journey';
+import { rankBadge } from './journey-ui';
 import { TAB_UNLOCKS, openReadyTabs, tabOpen, type TabUnlock } from '../core/unlocks';
 import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
@@ -313,7 +315,8 @@ export class UI {
   /** Locks and unlocks the tabs; the first check after loading opens tabs quietly. */
   private syncTabs(): void {
     const s = this.game.state;
-    const opened = openReadyTabs(s);
+    // New tabs wait for the tutorial to finish, so its cards aren't talked over.
+    const opened = s.tutorial >= 0 && this.unlocksChecked ? [] : openReadyTabs(s);
     if (this.unlocksChecked) for (const u of opened) this.onUnlock?.(u);
     if (opened.length || !this.unlocksChecked) {
       document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => {
@@ -1212,8 +1215,18 @@ export class UI {
     $('opt-auto-row').hidden = !eco.hasPerk(s, 'autobuy');
   }
 
+  /** A line for the welcome-back card: how close the next captain rank is. */
+  private rankLine(): string {
+    const s = this.game.state;
+    const rank = currentRank(s);
+    if (!rank || s.tutorial >= 0) return '';
+    const done = rank.tasks.filter((t) => s.journey.met.has(t.id)).length;
+    const text = rankReady(s) ? `Your promotion to <b>${rank.title}</b> is ready to claim!` : `Next rank: <b>${rank.title}</b>, ${done} of 3 tasks done`;
+    return `<li><span class="report-icon">${rankBadge(s.journey.rank, rankReady(s))}</span><span>${text}</span></li>`;
+  }
+
   showOffline(seconds: number, earned: Decimal, report: OfflineReport, onCollect: () => void): void {
-    $('modal-report').innerHTML = awayFlavour(seconds, this.game.state) + offlineReportHtml(report);
+    $('modal-report').innerHTML = awayFlavour(seconds, this.game.state) + offlineReportHtml(report) + this.rankLine();
     const modal = $('modal');
     const amount = $('modal-amount');
     const cap = eco.offlineCapSec(this.game.state);

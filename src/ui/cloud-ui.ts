@@ -10,6 +10,8 @@ const BACKUP_MS = 60 * 60 * 1000;
 const ASK_KEY = 'scrap-orbit.cloudAsked';
 /** How long a session runs before the invite can appear, so it never greets a player on launch. */
 const ASK_AFTER_MS = 20_000;
+/** A new captain is asked only once they have played this long (so the game hooks them before a sign-in does). */
+const ASK_AFTER_PLAY_SEC = 15 * 60;
 
 /** Leaving the game backs up too, unless the last backup is this recent (keeps app switching cheap). */
 const LEAVE_MS = 15 * 60 * 1000;
@@ -121,7 +123,7 @@ export class CloudPanel {
 
   private inviteReady(): boolean {
     if (!this.authKnown || this.signedIn || this.busy) return false;
-    if (this.game.state.tutorial >= 0 || Date.now() - this.openedAt < ASK_AFTER_MS) return false;
+    if (this.game.state.tutorial >= 0 || Date.now() - this.openedAt < ASK_AFTER_MS || this.game.state.stats.playSec < ASK_AFTER_PLAY_SEC) return false;
     if (document.body.classList.contains('cinematic') || document.visibilityState !== 'visible') return false;
     // Wait until no other window or tutorial tip is up.
     const busy = document.querySelector('.modal:not([hidden]), #coach:not([hidden])');

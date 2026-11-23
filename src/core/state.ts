@@ -13,6 +13,7 @@ import { SHIPS, FLEET, type ShipId } from './fleet';
 import { VISITORS, type VisitorId } from './visitors';
 import { CROPS, type SnackKind } from './garden';
 import { DIVE } from './dive';
+import { RANKS } from './journey';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -138,6 +139,11 @@ export interface GameState {
    * friends added, who got a gift today, and today's gift counters.
    */
   friends: { mine: string; name: string; list: Friend[]; sent: Record<string, string>; day: string; opened: number; sentRewards: number };
+  /**
+   * Captain ranks (core/journey.ts): ranks claimed, task ids met on the way, days played, the
+   * last day counted, and whether this save is older than ranks (it then has every system open).
+   */
+  journey: { rank: number; met: Set<string>; days: number; lastDay: string; legacy: boolean };
   stats: {
     crates: number;
     boosts: number;
@@ -251,6 +257,7 @@ interface SaveData {
   visitors?: Partial<GameState['visitors']>;
   garden?: Partial<GameState['garden']>;
   dive?: Partial<GameState['dive']>;
+  journey?: { rank?: number; met?: string[]; days?: number; lastDay?: string; legacy?: boolean };
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
@@ -329,6 +336,7 @@ export function newState(now: number): GameState {
     visitors: { here: null, nextAt: 0, hearts: {}, met: {}, last: null, answered: 0 },
     garden: { plots: [], snacks: {}, harvested: 0 },
     dive: { charges: DIVE.chargesMax, chargeAt: now, best: 0, dives: 0 },
+    journey: { rank: 0, met: new Set(), days: 0, lastDay: '', legacy: false },
     rig: false,
     friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
@@ -411,6 +419,7 @@ export function serialize(state: GameState): string {
     visitors: { ...state.visitors, here: state.visitors.here ? { ...state.visitors.here } : null, hearts: { ...state.visitors.hearts }, met: { ...state.visitors.met } },
     garden: { plots: state.garden.plots.map((x) => (x ? { ...x } : null)), snacks: { ...state.garden.snacks }, harvested: state.garden.harvested },
     dive: { ...state.dive },
+    journey: { ...state.journey, met: [...state.journey.met] },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
@@ -653,6 +662,22 @@ export function deserialize(json: string | null, now: number): GameState | null 
     d.chargeAt = typeof dv.chargeAt === 'number' && Number.isFinite(dv.chargeAt) ? Math.min(dv.chargeAt, now) : now;
     d.best = int(dv.best);
     d.dives = int(dv.dives);
+  }
+  const jr = data.journey;
+  const j = state.journey;
+  if (jr && typeof jr === 'object') {
+    j.rank = Math.min(RANKS.length, int(jr.rank));
+    j.met = new Set(strings(jr.met));
+    j.days = int(jr.days);
+    j.lastDay = typeof jr.lastDay === 'string' ? jr.lastDay : '';
+    j.legacy = jr.legacy === true;
+  } else if (state.stats.relocations > 0 || state.galaxy.shifts > 0) {
+    // Captains from before ranks who have already relocated know the ropes: they start at the top.
+    j.rank = RANKS.length;
+    j.legacy = true;
+  } else if (state.allTime.gt(0)) {
+    // Part-way through a first run: the ranks are there to work through, but nothing is held back.
+    j.legacy = true;
   }
   state.rig = data.rig === true;
   const fr = data.friends;

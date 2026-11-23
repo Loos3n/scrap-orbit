@@ -16,6 +16,7 @@ const CLOSERS: Record<string, string> = {
   trader: 'trader-close',
   profile: 'profile-close',
   missions: 'missions-close',
+  rank: 'rank-close',
   streak: 'streak-claim',
   'cloud-ask': 'cloud-ask-close',
   radio: 'radio-close',

@@ -416,6 +416,13 @@ function adoptPet(state: GameState, id: PetId): void {
   state.pets.active = id;
 }
 
+/** A pet given as a reward: false if it is already aboard. */
+export function givePet(state: GameState, id: PetId): boolean {
+  if (state.pets.owned.has(id)) return false;
+  adoptPet(state, id);
+  return true;
+}
+
 export function buyPet(state: GameState, id: PetId): boolean {
   const def = PETS.find((p) => p.id === id)!;
   if (state.pets.owned.has(id) || !spend(state, def.cost)) return false;

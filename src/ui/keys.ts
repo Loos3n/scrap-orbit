@@ -36,6 +36,7 @@ const TITLES: Record<string, string> = {
   'best-buy': 'Buy best (B, hold to keep buying)',
   'install-all': 'Install all (I)',
   'missions-btn': 'Missions (M)',
+  'rank-chip': 'Captain rank (R)',
   'profile-btn': 'Profile (P)',
   'settings-btn': 'Settings (S)',
 };
@@ -83,7 +84,7 @@ export function setupKeys(opts: { tap: () => void; inTutorial: () => boolean }):
       document.querySelectorAll<HTMLButtonElement>('.tab')[Number(key) - 1]?.click();
       return;
     }
-    const ids: Record<string, string> = { b: 'best-buy', i: 'install-all', o: 'boost', m: 'missions-btn', p: 'profile-btn', s: 'settings-btn' };
+    const ids: Record<string, string> = { b: 'best-buy', i: 'install-all', o: 'boost', m: 'missions-btn', r: 'rank-chip', p: 'profile-btn', s: 'settings-btn' };
     if (ids[key]) {
       e.preventDefault();
       press(ids[key]);

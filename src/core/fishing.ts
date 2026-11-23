@@ -1,3 +1,4 @@
+import { FISHING_RANK, rankOpen } from './journey';
 import { CRATE_BUFFS } from './crate-buffs';
 import { earn, income, tapValue } from './economy';
 import { addCrystals } from './meta';
@@ -82,8 +83,8 @@ export const FISHING = {
   ramp: 1.14,
 };
 
-/** Fishing opens once the tutorial is done. */
-export const fishingOpen = (s: GameState) => s.tutorial < 0;
+/** Fishing opens with the second captain rank (so a new captain's first minutes stay simple). */
+export const fishingOpen = (s: GameState) => s.tutorial < 0 && rankOpen(s, FISHING_RANK);
 
 /** Critters that can bite where the station is now. */
 export function critterPool(s: GameState): Critter[] {
