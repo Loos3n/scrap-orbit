@@ -1,6 +1,5 @@
 import { nightStarRate } from '../core/daynight';
-import { Application, BlurFilter, Container, Graphics, RendererType, Sprite, Text, Texture } from 'pixi.js';
-import { AdvancedBloomFilter } from 'pixi-filters';
+import { Application, BlurFilter, Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import type { GeneratorId } from '../core/config';
 import { SECTORS, type EventKind, type PetId, type SectorDef, type ThemeDef } from '../core/content';
 import type { SkinDef } from '../core/collection';
@@ -155,8 +154,6 @@ export class StationScene {
   private nextRock = rand(4, 10);
   private flash = new Sprite(Texture.WHITE);
   private world = new Container();
-  /** An unmoved frame around the world, so bloom covers exactly the screen. */
-  private lit = new Container();
   private farLayer = new Container();
   private debrisLayer = new Container();
   private lines = new Graphics();
@@ -178,8 +175,6 @@ export class StationScene {
   private hubLit!: Sprite;
   /** One bay per early machine, growing with the count (see bays.ts). */
   private bays!: Bays;
-  /** Soft bloom on the station's lights (off in battery saver). */
-  private bloom: AdvancedBloomFilter | null = null;
   private dustLayer = new Container();
   /** Frost Festival snow, drifting down across the whole view. */
   private snowLayer = new Container();
@@ -435,9 +430,8 @@ export class StationScene {
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.bays.back, this.dockLayer, this.bays.layer, this.machineLayer, this.coreSpill, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
-    this.lit.addChild(this.world);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.lit, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -449,12 +443,6 @@ export class StationScene {
       clearTimeout(this.resizeTimer);
       this.resizeTimer = window.setTimeout(() => this.layout(), 120);
     });
-    // Bloom needs WebGL; the canvas fallback goes without.
-    if (this.app.renderer.type === RendererType.WEBGL) {
-      this.bloom = new AdvancedBloomFilter({ threshold: 0.62, bloomScale: 0.6, brightness: 1, blur: 6, quality: 4 });
-      this.bloom.resolution = 1;
-      this.bloom.padding = 0;
-    }
     this.app.ticker.add((t) => this.frame(Math.min(t.deltaMS / 1000, 0.1)));
     window.addEventListener('pointerdown', () => this.wake(), { capture: true, passive: true });
     window.addEventListener('wheel', () => this.wake(), { capture: true, passive: true });
@@ -483,7 +471,6 @@ export class StationScene {
     if (!this.ready) return;
     this.app.ticker.maxFPS = on ? IDLE_FPS : 0;
     this.fgLayer.filters = on || !this.fgBlur ? [] : [this.fgBlur];
-    this.lit.filters = on || !this.bloom ? [] : [this.bloom];
     const res = Math.min(window.devicePixelRatio || 1, on ? SAVER_RES : MAX_RES);
     if (this.app.renderer.resolution !== res) {
       this.app.renderer.resolution = res;
@@ -962,8 +949,6 @@ export class StationScene {
     this.vignette.height = h * 1.15;
     this.vignette.position.set(-w * 0.075, -h * 0.075);
     this.keyLight.position.set(w * 0.1, top + fh * 0.1);
-    // Bloom only what is on screen, however far the station's outer machines reach.
-    this.lit.filterArea = this.app.screen;
     this.keyLight.scale.set(Math.max(w, h) / 34);
     this.decorBox = { w: fw, left, top, fh };
     this.placePan();
