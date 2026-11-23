@@ -44,6 +44,8 @@ const BOSS_POS = { x: -92, y: -132 };
 const BOSS_SCALE = 0.78;
 /** Where the Lantern berths once it has docked: above the station, clear of the buttons and the trader. */
 const LANTERN = { x: 10, y: -255 };
+/** Where a visitor's shuttle docks: left of the station, above the trader's berth. */
+const VISITOR_BERTH = { x: -150, y: -30 };
 /** Where the fish tank drifts, below and right of the station. */
 const TANK = { x: 132, y: 112 };
 
@@ -239,6 +241,13 @@ export class StationScene {
   private nextSteam = 1;
   private nextTraffic = rand(4, 9);
   private traderShip: { s: Sprite; light: Sprite; t: number } | null = null;
+  /** The Hollow Fleet circling the station: ships behind it in fleetBack, in front in fleetFront. */
+  private fleetBack = new Container();
+  private fleetFront = new Container();
+  private fleet: { id: string; s: Sprite; lamp: Sprite; a: number; t: number; tint: number }[] = [];
+  private fleetT = 0;
+  /** A visitor's shuttle at the dock. */
+  private visitorShip: { s: Sprite; lamp: Sprite; t: number; leaving: boolean } | null = null;
   /** The Lantern, docked for good once the Hollow Fleet story ends. */
   private lantern: { s: Sprite; lamp: Sprite; t: number } | null = null;
   private tank: { box: Container; glass: Sprite; light: Sprite; fish: { s: Sprite; ph: number; sp: number; size: number }[]; key: string; t: number } | null = null;
@@ -411,7 +420,7 @@ export class StationScene {
     this.flareGlow.blendMode = 'add';
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
-    this.world.addChild(this.farLayer, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.textLayer);
+    this.world.addChild(this.farLayer, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
     this.app.stage.sortableChildren = true;
     const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
@@ -1751,6 +1760,121 @@ export class StationScene {
     }
   }
 
+  /**
+   * The rebuilt Hollow Fleet, circling the station on a wide tilted orbit. A ship that just
+   * launched (`launched`) flies out of the drydock with a burst of light.
+   */
+  setFleet(ships: readonly { id: string; hull: art.HullShape; color: number; seed: number }[], launched?: string): void {
+    if (!this.ready) return;
+    const want = new Set(ships.map((x) => x.id));
+    this.fleet = this.fleet.filter((f) => {
+      if (want.has(f.id)) return true;
+      f.s.destroy();
+      f.lamp.destroy();
+      return false;
+    });
+    ships.forEach((x, i) => {
+      if (this.fleet.some((f) => f.id === x.id)) return;
+      const s = new Sprite(art.fleetShip(x.hull, '#' + x.color.toString(16).padStart(6, '0'), x.seed));
+      s.anchor.set(0.5);
+      const lamp = new Sprite(this.tex.glow);
+      lamp.anchor.set(0.5);
+      lamp.blendMode = 'add';
+      lamp.tint = x.color;
+      this.fleetBack.addChild(lamp, s);
+      // Ships spread evenly round the orbit, in fleet order.
+      this.fleet.push({ id: x.id, s, lamp, a: (i / Math.max(ships.length, 3)) * TAU + 0.6, t: x.id === launched ? 0 : 99, tint: x.color });
+    });
+    if (launched) {
+      const f = this.fleet.find((x) => x.id === launched);
+      if (f) {
+        this.fleetT = -f.a + Math.PI * 0.5;
+        this.rings.push({ x: 0, y: 60, r: 30, life: 1.2, color: f.tint, width: 5 });
+        this.burst(0, 60, f.tint, 24, 1);
+      }
+    }
+  }
+
+  private updateFleet(dt: number): void {
+    if (!this.fleet.length) return;
+    this.fleetT += dt * 0.045;
+    const tilt = -0.12;
+    for (const f of this.fleet) {
+      f.t += dt;
+      const a = f.a + this.fleetT;
+      const ox = Math.cos(a) * 166;
+      const oy = Math.sin(a) * 66;
+      const x = ox * Math.cos(tilt) - oy * Math.sin(tilt);
+      const y = ox * Math.sin(tilt) + oy * Math.cos(tilt) + 10;
+      // Front half of the orbit (lower on screen) passes in front of the station, nearer and bigger.
+      const depth = Math.sin(a);
+      const front = depth > 0;
+      const layer = front ? this.fleetFront : this.fleetBack;
+      if (f.s.parent !== layer) layer.addChild(f.lamp, f.s);
+      // A new ship rises from the drydock under the station and eases out to its place.
+      const k = Math.min(1, f.t / 3);
+      const ease = 1 - Math.pow(1 - k, 3);
+      f.s.x = x * ease;
+      f.s.y = y * ease + (1 - ease) * 60;
+      const size = (0.44 + depth * 0.08) * (0.4 + ease * 0.6);
+      // Ships face the way they fly: rightwards along the front, leftwards behind.
+      f.s.scale.set(front ? -size : size, size);
+      f.s.rotation = Math.cos(a) * (front ? -0.05 : 0.05);
+      f.s.alpha = Math.min(1, f.t * 2) * (front ? 1 : 0.72 + depth * 0.25);
+      f.s.tint = front ? 0xffffff : 0xb8bfe0;
+      f.lamp.position.set(f.s.x + (front ? 1 : -1) * 22 * size * 2, f.s.y);
+      f.lamp.scale.set(0.22 + Math.sin(f.t * 3 + f.a) * 0.04);
+      f.lamp.alpha = f.s.alpha * 0.8;
+    }
+  }
+
+  /** A visitor's shuttle glides in to the dock (left of the station), or flies off. */
+  setVisitor(color: number | null): void {
+    if (!this.ready) return;
+    if (color !== null && !this.visitorShip) {
+      const hull: art.HullShape = { len: 40, tall: 18, nose: 'round', fins: 1, decks: 1, dome: true };
+      const s = this.sprite(art.fleetShip(hull, '#' + color.toString(16).padStart(6, '0'), color % 97), this.dockLayer, -420, VISITOR_BERTH.y);
+      s.alpha = 0;
+      const lamp = this.sprite(this.tex.glow, this.dockLayer, s.x, s.y);
+      lamp.blendMode = 'add';
+      lamp.tint = color;
+      this.visitorShip = { s, lamp, t: 0, leaving: false };
+    } else if (color === null && this.visitorShip && !this.visitorShip.leaving) {
+      this.visitorShip.leaving = true;
+      this.visitorShip.t = 0;
+    }
+  }
+
+  private updateVisitor(dt: number): void {
+    const o = this.visitorShip;
+    if (!o) return;
+    o.t += dt;
+    if (o.leaving) {
+      const k = Math.min(1, o.t / 2);
+      o.s.x = VISITOR_BERTH.x - k * k * 300;
+      o.s.alpha = 1 - k;
+      o.s.scale.set(0.8, 0.8);
+      if (k >= 1) {
+        o.s.destroy();
+        o.lamp.destroy();
+        this.visitorShip = null;
+        return;
+      }
+    } else {
+      const k = Math.min(1, o.t / 2.5);
+      const ease = 1 - Math.pow(1 - k, 3);
+      o.s.alpha = ease;
+      o.s.x = -420 + (420 + VISITOR_BERTH.x) * ease;
+      // Points left as painted; flying in to the right, so turn it round.
+      o.s.scale.set(-0.8, 0.8);
+    }
+    o.s.y = VISITOR_BERTH.y + Math.sin(o.t * 1.1) * 3;
+    o.s.rotation = Math.sin(o.t * 0.8) * 0.04;
+    o.lamp.position.set(o.s.x + 14, o.s.y - 6);
+    o.lamp.scale.set(Math.sin(o.t * 3.5) > 0.3 ? 0.26 : 0.1);
+    o.lamp.alpha = o.s.alpha;
+  }
+
   /** Docks the Lantern beside the station (gliding in when `arrive`), or takes it away. */
   setLantern(on: boolean, arrive = false): void {
     if (!this.ready) return;
@@ -2666,6 +2790,8 @@ export class StationScene {
     this.updateTrader(dt);
     this.updateLantern(dt);
     this.updateTank(dt);
+    this.updateFleet(dt);
+    this.updateVisitor(dt);
 
     // Drones dart around in a loose swarm, leaving short trails.
     for (const o of this.drones) {

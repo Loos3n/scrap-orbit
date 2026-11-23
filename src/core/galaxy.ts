@@ -1,5 +1,6 @@
 import type { ResearchEffect } from './content';
 import type { GameState } from './state';
+import { fleetPower } from './fleet';
 
 /*
  * Galaxy Shift, the second reset layer. Once a run has built a Dyson Collector the player can
@@ -128,5 +129,6 @@ export function starIncomeMult(state: GameState): number {
 export function coreGainMult(state: GameState): number {
   let m = 1;
   for (const e of starEffects(state)) if (e.kind === 'coreGain') m *= e.mult;
-  return m;
+  // The tug Thimble hauls the station further each time.
+  return m * fleetPower(state, 'coreGain');
 }

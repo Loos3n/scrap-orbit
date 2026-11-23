@@ -3,6 +3,10 @@ import { buyFestival, dailyPresent, earnFlakes, type FestivalItemId } from './co
 import { hook, landCatch, pickCritter, refillBait, type CatchReward, type Critter } from './core/fishing';
 import { FINALE_CRYSTALS, FINALE_ID, STORY_CRYSTALS, pendingStory } from './core/story';
 import { markOf } from './core/evolve';
+import { FLEET, shipDef, addPlates, collectPatrol, finishJob, jobSecondsLeft, shiftPlates, startJob, welcomeFleet, type ShipId } from './core/fleet';
+import { rushCost } from './core/content';
+import { cropDef, harvest, plant, type CropDef } from './core/garden';
+import { DIVE, finishDive, refillCharges, startDive } from './core/dive';
 import { comboMult, cooled, heatAfterTap } from './core/combo';
 import { CONTRACT_CRYSTALS, checkContract, contractAutoBuyOff, makeOffers, pickContract, type ContractId } from './core/contracts';
 import { recordIncome, recordRun } from './core/history';
@@ -95,7 +99,18 @@ export type GameEvent =
   /** Frost Festival: snowflakes earned (from a crate, a wreck or the daily present), or a shop item bought. */
   | { type: 'festival'; flakes?: number; from?: 'crate' | 'boss' | 'present'; bought?: FestivalItemId }
   /** Space fishing: something landed. */
-  | { type: 'fish'; id: string; reward: CatchReward };
+  | { type: 'fish'; id: string; reward: CatchReward }
+  /** The Hollow Fleet: the drydock opened, a job started, or a ship launched (or gained a rank). */
+  | { type: 'fleet'; phase: 'open' | 'start' | 'launch'; id?: ShipId; rank?: number }
+  /** Hull plates came in. */
+  | { type: 'plates'; n: number; from: 'boss' | 'relocate' | 'shift' | 'patrol' | 'visitor' }
+  /** A visitor docked or flew off unanswered, or was answered. */
+  | { type: 'visitor'; phase: 'arrived' | 'left' }
+  | { type: 'visit'; result: meta.VisitResult }
+  /** The garden: something planted, or harvested into a snack. */
+  | { type: 'garden'; phase: 'plant' | 'harvest'; crop: CropDef; crystals?: number }
+  /** A salvage dive finished. */
+  | { type: 'dive'; points: number; scrap: Decimal; crystals: number; best: boolean };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -104,6 +119,8 @@ export interface OfflineReport {
   bossEscaped: boolean;
   golden: boolean;
   trader: boolean;
+  /** A Hollow Fleet ship that finished in the drydock while away. */
+  ship?: string;
   /** The multiplier offline earnings got (owl, research, greenhouses, loot). */
   mult: number;
 }
@@ -157,6 +174,98 @@ export class Game {
       const from = e.type === 'bonus' ? 'crate' : 'boss';
       const flakes = earnFlakes(this.state, Date.now(), from);
       if (flakes) this.emit({ type: 'festival', flakes, from });
+    }
+    // Every wreck broken gives the drydock a couple of hull plates.
+    if (e.type === 'bossDefeated') this.plates(FLEET.bossPlates, 'boss');
+  }
+
+  private plates(n: number, from: 'boss' | 'relocate' | 'shift'): void {
+    const got = addPlates(this.state, n);
+    if (got) this.emit({ type: 'plates', n: got, from });
+  }
+
+  /** Starts rebuilding (or refitting) a ship in the drydock. */
+  startShip(id: ShipId): void {
+    if (startJob(this.state, id, Date.now())) {
+      this.emit({ type: 'fleet', phase: 'start', id });
+      this.save();
+    }
+  }
+
+  /** Crystals to finish the drydock job now. */
+  shipRushPrice(now = Date.now()): number {
+    const left = jobSecondsLeft(this.state, now);
+    return left > 0 ? rushCost(left) : 0;
+  }
+
+  /** Spends crystals to finish the drydock job now. */
+  rushShip(): void {
+    const now = Date.now();
+    const job = this.state.fleet.job;
+    const price = this.shipRushPrice(now);
+    if (!job || price <= 0 || this.state.crystals < price) return;
+    this.state.crystals -= price;
+    job.endsAt = now;
+    this.checkFleet(now);
+  }
+
+  /** Brings the patrol's haul of plates aboard. */
+  collectPatrol(): void {
+    const n = collectPatrol(this.state, Date.now());
+    if (n > 0) {
+      this.emit({ type: 'plates', n, from: 'patrol' });
+      this.save();
+    }
+  }
+
+  plantCrop(plot: number, id: string): void {
+    if (!plant(this.state, plot, id, Date.now())) return;
+    this.emit({ type: 'garden', phase: 'plant', crop: cropDef(id)! });
+  }
+
+  harvestPlot(plot: number): void {
+    const r = harvest(this.state, plot, Date.now());
+    if (!r) return;
+    if (r.crystals) meta.addCrystals(this.state, r.crystals);
+    this.emit({ type: 'garden', phase: 'harvest', crop: r.crop, crystals: r.crystals });
+    this.save();
+  }
+
+  refillDives(): void {
+    refillCharges(this.state, Date.now());
+  }
+
+  /** Spends a dive charge; false if none are left. */
+  startDive(): boolean {
+    const ok = startDive(this.state, Date.now());
+    if (ok) this.save();
+    return ok;
+  }
+
+  /** Pays out a finished dive. */
+  endDive(points: number, crystalsCaught: number): void {
+    const r = finishDive(this.state, Math.max(0, Math.floor(points)), Math.max(0, Math.floor(crystalsCaught)));
+    const scrap = eco.baseIncome(this.state).mul(Math.max(0, Math.floor(points)) * DIVE.secPerPoint).floor();
+    eco.earn(this.state, scrap);
+    if (r.crystals) meta.addCrystals(this.state, r.crystals);
+    this.emit({ type: 'dive', points, scrap, crystals: r.crystals, best: r.best });
+    this.save();
+  }
+
+  /** Answers the docked visitor. */
+  answerVisitor(pick: 'a' | 'b'): void {
+    const result = meta.answerVisitor(this.state, pick, Date.now());
+    if (!result) return;
+    this.emit({ type: 'visit', result });
+    this.save();
+  }
+
+  private checkFleet(now: number): void {
+    if (welcomeFleet(this.state, now)) this.emit({ type: 'fleet', phase: 'open' });
+    const done = finishJob(this.state, now);
+    if (done) {
+      this.emit({ type: 'fleet', phase: 'launch', id: done.id, rank: done.rank });
+      this.save();
     }
   }
 
@@ -235,6 +344,9 @@ export class Game {
     const trader = meta.updateTrader(s, now);
     if (trader) this.emit({ type: 'trader', phase: trader });
     if (meta.updateSafe(s, now)) this.emit({ type: 'safe' });
+    const visitor = meta.updateVisitors(s, now);
+    if (visitor) this.emit({ type: 'visitor', phase: visitor });
+    this.checkFleet(now);
     meta.noteCollection(s);
     for (const set of meta.checkSets(s)) this.emit({ type: 'set', id: set.id });
     // Decorations wait for the tutorial to finish, so it stays uncluttered.
@@ -491,6 +603,7 @@ export class Game {
       bossEscaped: !!s.boss && s.boss.endsAt <= now,
       golden: s.tutorial < 0 && s.golden.nextAt > 0 && s.golden.nextAt <= now,
       trader: s.tutorial < 0 && s.trader.nextAt > 0 && s.trader.nextAt <= now && !s.trader.until,
+      ship: s.fleet.job && s.fleet.job.endsAt > since && s.fleet.job.endsAt <= now ? shipDef(s.fleet.job.ship)?.name : undefined,
       mult: eco.offlineMult(s),
     };
     const { seconds, earned } = eco.applyOffline(s, now);
@@ -629,6 +742,7 @@ export class Game {
       meta.addCrystals(this.state, RELOCATE_CRYSTALS);
       this.save();
       this.emit({ type: 'relocate', cores, crystals: RELOCATE_CRYSTALS, speed });
+      this.plates(FLEET.relocatePlates, 'relocate');
     }
     return cores;
   }
@@ -646,6 +760,7 @@ export class Game {
     if (stars > 0) {
       this.save();
       this.emit({ type: 'galaxy', stars });
+      this.plates(shiftPlates(stars), 'shift');
     }
     return stars;
   }

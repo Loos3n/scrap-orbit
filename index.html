@@ -61,6 +61,7 @@
           <button id="missions-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="missions"></span><span id="missions-dot" class="badge" hidden>0</span></span><small>Missions</small></button>
           <button id="profile-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="profile"></span><span id="profile-dot" class="dot" hidden></span></span><small>Profile</small></button>
           <button id="fish-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="fish"></span><span id="fish-dot" class="dot" hidden></span></span><small>Fishing</small></button>
+          <button id="dive-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="claw"></span><span id="dive-dot" class="dot" hidden></span></span><small>Dive</small></button>
           <button id="radio-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="radio"></span><span id="radio-dot" class="dot" hidden></span></span><small>Radio</small></button>
           <button id="settings-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="gear"></span></span><small>Settings</small></button>
         </nav>
@@ -73,6 +74,7 @@
           <div class="boss-hp"><i id="boss-hp"></i></div>
         </div>
         <button id="safe-banner" class="trader-banner safe-banner" type="button" hidden><span data-icon="lock"></span>Locked cargo! <b id="safe-time"></b></button>
+        <button id="visitor-banner" class="trader-banner visitor-banner" type="button" hidden><span data-icon="heart"></span><span id="visitor-who">Visitor</span> docked <b id="visitor-time"></b></button>
         <button id="trader-banner" class="trader-banner" type="button" hidden><span data-icon="crystal"></span>Trader docked <b id="trader-time"></b></button>
         <div id="buff-row" class="buff-row" aria-live="polite">
           <div id="buff-surge" class="buff-chip" data-buff="surge" hidden><span data-icon="bolt"></span><span class="buff-text"><small>Surge</small><b></b></span><b id="buff-surge-time" class="buff-time"></b><i class="buff-bar"><i id="buff-surge-bar"></i></i></div>
@@ -104,14 +106,16 @@
           <button type="button" data-pane="trips" aria-selected="false">Trips<span id="trips-dot" class="dot" hidden></span></button>
           <button type="button" data-pane="pets" aria-selected="false">Pets<span id="pets-dot" class="dot" hidden></span></button>
         </div>
-        <div class="segments pane-seg three" data-group="prestige" role="tablist" aria-label="Prestige sections" hidden>
+        <div class="segments pane-seg four" data-group="prestige" role="tablist" aria-label="Prestige sections" hidden>
           <button type="button" data-pane="cores" aria-selected="true">Cores<span id="cores-dot" class="dot" hidden></span></button>
           <button type="button" data-pane="challenges" aria-selected="false">Challenges</button>
           <button type="button" data-pane="galaxy" aria-selected="false">Galaxy<span id="galaxy-dot" class="dot" hidden></span></button>
+          <button type="button" data-pane="fleet" aria-selected="false">Fleet<span id="fleet-dot" class="dot" hidden></span></button>
         </div>
-        <div class="segments pane-seg two" data-group="station" role="tablist" aria-label="Station sections" hidden>
+        <div class="segments pane-seg three" data-group="station" role="tablist" aria-label="Station sections" hidden>
           <button type="button" data-pane="station" aria-selected="true">Rooms</button>
           <button type="button" data-pane="decor" aria-selected="false">Decor</button>
+          <button type="button" data-pane="garden" aria-selected="false">Garden<span id="garden-dot" class="dot" hidden></span></button>
         </div>
         <div id="tab-build" class="tab-body">
           <div id="contract-line" class="contract-line" hidden><span id="contract-line-icon" data-icon="trophy"></span><span class="contract-line-text"><b id="contract-line-name"></b> <span id="contract-line-goal"></span></span><div class="bar"><i id="contract-line-bar"></i></div><b id="contract-line-pct"></b></div>
@@ -204,11 +208,24 @@
           <h3 id="star-map-title" class="section-title" hidden>Star Map</h3>
           <ul id="star-map" class="list challenge-list" hidden></ul>
         </div>
+        <div id="tab-fleet" class="tab-body" hidden>
+          <div id="fleet-card" class="galaxy-card fleet-card"></div>
+          <h3 class="section-title">The Hollow Fleet</h3>
+          <ul id="fleet-list" class="list fleet-list"></ul>
+        </div>
         <div id="tab-station" class="tab-body" hidden>
           <p class="tab-intro">Build rooms on the station grid with crystals. They stay through relocations, and a good layout earns extra.</p>
           <div id="module-total" class="module-total"></div>
           <div id="module-grid" class="module-grid"></div>
           <div id="module-detail" class="module-detail"></div>
+        </div>
+        <div id="tab-garden" class="tab-body" hidden>
+          <p class="tab-intro">Grow crops in the hydroponics bay. They keep growing while you're away. Harvest them to cook snacks: timed boosts for the whole station.</p>
+          <div id="garden-snacks" class="garden-snacks"></div>
+          <div id="garden-plots" class="garden-plots"></div>
+          <button id="garden-harvest" type="button" class="primary garden-harvest" data-harvest-all="1" hidden>Harvest all</button>
+          <h3 class="section-title">Seeds</h3>
+          <ul id="garden-seeds" class="list garden-seeds"></ul>
         </div>
         <div id="tab-decor" class="tab-body" hidden>
           <h3 class="section-title">Decorations <span id="orn-sum" class="section-sub"></span></h3>
@@ -346,6 +363,13 @@
         <p id="trader-left" class="mission-reset"></p>
       </div>
     </div>
+    <div id="visitor" class="modal" hidden>
+      <div class="modal-card visitor-card" role="dialog" aria-modal="true" aria-label="Visitor">
+        <button id="visitor-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">A visitor at the dock</div>
+        <div id="visitor-body"></div>
+      </div>
+    </div>
     <div id="profile" class="modal" hidden>
       <div class="modal-card profile-card" role="dialog" aria-modal="true" aria-labelledby="profile-title">
         <button id="profile-close" class="close-btn" type="button" aria-label="Close">&times;</button>
@@ -369,6 +393,9 @@
         <h3 class="section-title">Collections <span id="book-sum" class="section-sub"></span></h3>
         <p class="tab-intro">Fill a set to earn crystals and unlock a station skin.</p>
         <ul id="book-list" class="book-list"></ul>
+        <h3 class="section-title">Guestbook <span id="guest-sum" class="section-sub"></span></h3>
+        <p class="tab-intro">Visitors dock now and then with a favour to ask. Give the answer they hope for to win a heart; at three hearts they leave a keepsake that lasts forever.</p>
+        <ul id="guest-list" class="guest-list"></ul>
         </div>
         <div id="prof-friends" class="prof-body" hidden>
           <div id="fr-off" class="fr-off" hidden>
@@ -449,6 +476,20 @@
         <p class="modal-time">Gift-wrapped crates hold <b>1 snowflake</b>, boss wrecks <b>5</b>, and there's a present with <b>5</b> under the tree every day.</p>
         <p id="festival-cocoa" class="festival-cocoa" hidden></p>
         <ul id="festival-shop" class="festival-shop"></ul>
+      </div>
+    </div>
+    <div id="dive" class="modal" hidden>
+      <div class="modal-card dive-card" role="dialog" aria-modal="true" aria-label="Salvage dive">
+        <button id="dive-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="dive-hud"><span class="dive-pts"><span id="dive-points">0</span> pts</span><span id="dive-lives" class="dive-lives"></span><i class="dive-timebar"><i id="dive-time"></i></i></div>
+        <div class="dive-field">
+          <canvas id="dive-canvas"></canvas>
+          <div id="dive-over" class="dive-over">
+            <div id="dive-msg" class="dive-msg"></div>
+            <button id="dive-go" type="button" class="primary">Dive!</button>
+            <small id="dive-charges"></small>
+          </div>
+        </div>
       </div>
     </div>
     <div id="fishing" class="modal" hidden>

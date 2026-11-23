@@ -21,6 +21,9 @@ import { InfoSheet } from './info';
 import { LootShelf, ModulePanel, TripPanel, renderCrateBuffs, renderGoldenBanner } from './expansion-ui';
 import { SETS } from '../core/collection';
 import { BookPanel, SafeGame, SkinPanel } from './book-ui';
+import { FleetPanel } from './fleet-ui';
+import { GardenPanel } from './garden-ui';
+import { VisitorPanel } from './visitor-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
 import { GalaxyPanel } from './galaxy-ui';
 import { currentSector } from '../core/sectors';
@@ -154,6 +157,9 @@ export class UI {
   private challenges: ChallengePanel;
   private contracts: ContractPanel;
   private galaxy: GalaxyPanel;
+  private fleet: FleetPanel;
+  private garden: GardenPanel;
+  readonly visitors: VisitorPanel;
   private panel!: PanelToggle;
   readonly streak: StreakModal;
 
@@ -196,6 +202,9 @@ export class UI {
     this.challenges = new ChallengePanel(game, this.fmt);
     this.contracts = new ContractPanel(game);
     this.galaxy = new GalaxyPanel(game);
+    this.fleet = new FleetPanel(game);
+    this.garden = new GardenPanel(game);
+    this.visitors = new VisitorPanel(game, this.fmt);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
     new CloudPanel(game, (d) => this.fmt(d));
@@ -755,8 +764,10 @@ export class UI {
     // Tab dots gather their panes' dots.
     $('build-dot').hidden = $('upgrade-dot').hidden;
     $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
-    $('prestige-dot').hidden = !tabOpen(s, 'prestige') || ($('cores-dot').hidden && $('galaxy-dot').hidden);
-    if (!tabOpen(s, 'station')) $('station-dot').hidden = true;
+    $('fleet-dot').hidden = !this.fleet.hasNews();
+    $('prestige-dot').hidden = !tabOpen(s, 'prestige') || ($('cores-dot').hidden && $('galaxy-dot').hidden && $('fleet-dot').hidden);
+    $('garden-dot').hidden = !this.garden.hasNews();
+    $('station-dot').hidden = !tabOpen(s, 'station') || $('garden-dot').hidden;
     // With the menu hidden, the square carries a dot when any tab has something new.
     $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'lab-dot', 'prestige-dot', 'station-dot'].every((id) => $(id).hidden);
     if (!$('tab-decor').hidden) {
@@ -781,6 +792,9 @@ export class UI {
     this.challenges.render();
     this.contracts.render();
     this.galaxy.render();
+    this.fleet.render();
+    this.garden.render();
+    this.visitors.render();
     this.coach.render();
     this.info.render();
   }
