@@ -62,10 +62,10 @@ export const CRITTERS: readonly Critter[] = [
 
 export const RARITY: Record<Rarity, { name: string; weight: number; color: string; hits: number; zone: number; speed: number; secs: number; crystals: number }> = {
   /** hits: taps in the green needed. zone: green width (share of the bar). speed: sweeps per second. */
-  common: { name: 'Common', weight: 62, color: '#9dff6b', hits: 2, zone: 0.26, speed: 0.55, secs: 45, crystals: 2 },
-  uncommon: { name: 'Uncommon', weight: 26, color: '#5cd6ff', hits: 3, zone: 0.2, speed: 0.7, secs: 120, crystals: 4 },
-  rare: { name: 'Rare', weight: 9, color: '#b58cff', hits: 3, zone: 0.15, speed: 0.85, secs: 300, crystals: 8 },
-  legendary: { name: 'Legendary', weight: 3, color: '#ffd166', hits: 4, zone: 0.12, speed: 1, secs: 900, crystals: 20 },
+  common: { name: 'Common', weight: 62, color: '#9dff6b', hits: 2, zone: 0.22, speed: 0.65, secs: 45, crystals: 2 },
+  uncommon: { name: 'Uncommon', weight: 26, color: '#5cd6ff', hits: 3, zone: 0.17, speed: 0.8, secs: 120, crystals: 4 },
+  rare: { name: 'Rare', weight: 9, color: '#b58cff', hits: 3, zone: 0.13, speed: 0.95, secs: 300, crystals: 8 },
+  legendary: { name: 'Legendary', weight: 3, color: '#ffd166', hits: 4, zone: 0.1, speed: 1.1, secs: 900, crystals: 20 },
 };
 
 export const FISHING = {
@@ -74,6 +74,12 @@ export const FISHING = {
   baitMin: 12,
   /** Misses allowed while reeling before the line snaps. */
   slack: 2,
+  /** Milliseconds to hook a bite before it swims off. */
+  biteMs: 1150,
+  /** Forgiveness at each edge of the green (share of the bar). */
+  edge: 0.012,
+  /** The marker speeds up by this much after each good tug. */
+  ramp: 1.14,
 };
 
 /** Fishing opens once the tutorial is done. */

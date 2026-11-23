@@ -21,16 +21,24 @@ export const DIVE = {
   bestCrystals: 3,
   /** Dives open after the first relocation. */
   openAtRelocations: 1,
+  /** Seconds between drops at the start and how much shorter that gets by the end. */
+  spawnGap: 0.46,
+  spawnSqueeze: 0.28,
+  /** Fall speed (px/s) at the start, and how much faster it gets by the end. */
+  fall: 125,
+  fallRamp: 175,
+  /** Half the claw's catch width, in pixels. */
+  reach: 24,
 };
 
 /** What falls in the stream: points, a crystal, or a mine. */
 export type DropKind = 'scrap' | 'gold' | 'crystal' | 'mine';
 
 export const DROPS: Record<DropKind, { points: number; weight: number; color: string }> = {
-  scrap: { points: 1, weight: 60, color: '#ffb547' },
+  scrap: { points: 1, weight: 56, color: '#ffb547' },
   gold: { points: 5, weight: 8, color: '#ffe066' },
   crystal: { points: 0, weight: 7, color: '#5cd6ff' },
-  mine: { points: 0, weight: 25, color: '#ff5d6c' },
+  mine: { points: 0, weight: 31, color: '#ff5d6c' },
 };
 
 export const diveOpen = (s: GameState) => s.tutorial < 0 && (s.stats.relocations >= DIVE.openAtRelocations || s.galaxy.shifts > 0);

@@ -199,9 +199,9 @@ export class DivePanel {
     this.hurtT = Math.max(0, this.hurtT - dt);
     this.spawnIn -= dt;
     if (this.spawnIn <= 0) {
-      this.spawnIn = 0.5 - 0.28 * k + Math.random() * 0.15;
+      this.spawnIn = DIVE.spawnGap - DIVE.spawnSqueeze * k + Math.random() * 0.15;
       const kind = pickDrop(Math.random());
-      this.drops.push({ kind, x: 20 + Math.random() * (this.w - 40), y: -16, vx: (Math.random() - 0.5) * 30, vy: 110 + 150 * k + Math.random() * 40 + (kind === 'gold' ? 50 : 0), spin: (Math.random() - 0.5) * 4, a: Math.random() * 6 });
+      this.drops.push({ kind, x: 20 + Math.random() * (this.w - 40), y: -16, vx: (Math.random() - 0.5) * (kind === 'mine' ? 30 + 50 * k : 30), vy: DIVE.fall + DIVE.fallRamp * k + Math.random() * 40 + (kind === 'gold' ? 50 : 0), spin: (Math.random() - 0.5) * 4, a: Math.random() * 6 });
     }
     const cx = this.clawX * this.w;
     const cy = this.h - 46;
@@ -210,7 +210,7 @@ export class DivePanel {
       d.y += d.vy * dt;
       d.a += d.spin * dt;
       if (d.x < 12 || d.x > this.w - 12) d.vx = -d.vx;
-      if (Math.abs(d.x - cx) < 28 && d.y > cy - 14 && d.y < cy + 14) {
+      if (Math.abs(d.x - cx) < DIVE.reach && d.y > cy - 14 && d.y < cy + 14) {
         d.y = this.h + 99;
         this.caught(d, cx, cy);
       }
@@ -398,7 +398,7 @@ export class DivePanel {
     }
     if (this.phase === 'play') {
       c.fillStyle = 'rgba(79,227,193,0.12)';
-      c.fillRect(x - 28, y - 14, 56, 28);
+      c.fillRect(x - DIVE.reach, y - 14, DIVE.reach * 2, 28);
     }
   }
 
