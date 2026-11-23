@@ -1,7 +1,7 @@
 import { CanvasSource, Texture } from 'pixi.js';
 import * as sprites from './sprites';
 import { drawMarkup } from './vector';
-import { refit } from '../art/kit';
+import { refit, type Ramp } from '../art/kit';
 import type { GeneratorId } from '../core/config';
 
 /**
@@ -550,8 +550,9 @@ export const vignette = () =>
   paint(64, 64, (ctx) => {
     ctx.fillStyle = radial(ctx, 32, 32, 46, [
       [0, 'rgba(2,2,14,0)'],
-      [0.55, 'rgba(2,2,14,0)'],
-      [1, 'rgba(2,2,14,0.75)'],
+      [0.48, 'rgba(2,2,14,0)'],
+      [0.8, 'rgba(2,2,14,0.42)'],
+      [1, 'rgba(2,2,14,0.85)'],
     ]);
     ctx.fillRect(0, 0, 64, 64);
   }, 2);
@@ -2400,3 +2401,6 @@ export const fishTank = () =>
 
 /** One critter, for the tank. */
 export const critterTex = (draw: (ctx: CanvasRenderingContext2D) => void) => paint(40, 40, draw);
+
+/** A machine bay's deck plate for one machine colour and tier (see sprites.bayPad). */
+export const bayPad = (ramp: Ramp, tier: number) => vector(sprites.bayPad(ramp, tier));

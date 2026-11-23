@@ -9,6 +9,7 @@ import type { Critter } from '../core/fishing';
 import { markOf } from '../core/evolve';
 import type { CrewId } from '../core/content';
 import { CrewDeck } from './crew-deck';
+import { BAY_RADIUS, Bays, bayTier, type BayId } from './bays';
 
 /** Glow colours for Mk II to Mk V: chrome, cyan core, gold, prism violet. */
 const MARK_TINTS = [0xeaf2ff, 0x5ce1ff, 0xffd166, 0xc58cff];
@@ -79,7 +80,7 @@ const SUN_POS = { x: 236, y: -200 };
 const WELL_RADIUS = 238;
 const TURRET_RADIUS = 186;
 /** How far the camera pulls back once each tier is built, so everything fits. */
-const ZOOM_FOR: Partial<Record<GeneratorId, number>> = { laser: 1.16, gravity: 1.4, nanite: 1.42, gate: 1.5, dyson: 1.6 };
+const ZOOM_FOR: Partial<Record<GeneratorId, number>> = { laser: 1.12, gravity: 1.3, nanite: 1.32, gate: 1.4, dyson: 1.45 };
 
 interface Star { s: Sprite; depth: number; phase: number; base: number }
 interface Orbiter { s: Sprite; radius: number; angle: number; speed: number; wobble: number; cargo?: Sprite; engine?: Sprite }
@@ -168,6 +169,12 @@ export class StationScene {
   private coreHot!: Sprite;
   private vignette = new Sprite();
   private keyLight = new Sprite();
+  /** The core's warm light falling on the machines and bays around it. */
+  private coreSpill = new Sprite();
+  /** The hull's light side; tinted by the sector's sky. */
+  private hubLit!: Sprite;
+  /** One bay per early machine, growing with the count (see bays.ts). */
+  private bays!: Bays;
   private dustLayer = new Container();
   /** Frost Festival snow, drifting down across the whole view. */
   private snowLayer = new Container();
@@ -181,7 +188,6 @@ export class StationScene {
   private beams: { x: number; y: number; life: number }[] = [];
   private pet: { s: Sprite; id: PetId; angle: number; pounce: number } | null = null;
   private claw!: Sprite;
-  private podLayer = new Container();
   private lights: Sprite[] = [];
   private antenna!: Sprite;
   /** Polish: running lights chasing round the rim, a glint across each solar wing, a star on the core. */
@@ -203,8 +209,6 @@ export class StationScene {
   private stars: Star[] = [];
   private drones: Orbiter[] = [];
   private haulers: Orbiter[] = [];
-  private pods: Sprite[] = [];
-  private fabs: Sprite[] = [];
   private docks: Sprite[] = [];
   private dockedShips: Sprite[] = [];
   private turrets: Turret[] = [];
@@ -216,6 +220,7 @@ export class StationScene {
   private nextGateShip = 2;
   private sun: { core: Sprite; glow: Sprite; panels: Sprite[] } | null = null;
   private dysonCount = 0;
+  private wellScale = 1;
   private sparks: Spark[] = [];
   private puffs: Puff[] = [];
   private rings: Ring[] = [];
@@ -377,6 +382,11 @@ export class StationScene {
     };
 
     this.buildHub();
+    const bayTex: Record<BayId, 'drone' | 'hauler' | 'smelter' | 'fab'> = { drone: 'drone', hauler: 'hauler', smelter: 'smelter', fabricator: 'fab' };
+    this.bays = new Bays(this.tex.glow, (id) => this.tex[bayTex[id]], this.reducedMotion);
+    this.coreSpill.texture = this.tex.glow;
+    this.coreSpill.anchor.set(0.5);
+    this.coreSpill.blendMode = 'add';
     this.deck = new CrewDeck({
       spark: (x, y, color) => this.burst(x, y + this.hub.y, color, 2, 0.12),
       puff: (x, y, color, size, life) => this.puff(x, y + this.hub.y, color, size * 0.25, life),
@@ -413,14 +423,13 @@ export class StationScene {
     this.keyLight.texture = this.tex.glow;
     this.keyLight.anchor.set(0.5);
     this.keyLight.blendMode = 'add';
-    this.keyLight.tint = 0x9fb0ff;
-    this.keyLight.alpha = 0.16;
+    this.gradeLight();
     this.flareGlow.texture = this.tex.glow;
     this.flareGlow.anchor.set(0.5);
     this.flareGlow.blendMode = 'add';
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
-    this.world.addChild(this.farLayer, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.dockLayer, this.machineLayer, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
+    this.world.addChild(this.farLayer, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.bays.back, this.dockLayer, this.bays.layer, this.machineLayer, this.coreSpill, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
     this.app.stage.sortableChildren = true;
     const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
@@ -736,27 +745,34 @@ export class StationScene {
         g.inner.addChild(m);
       }
     }
-    if (stage >= 2) {
-      for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * TAU + Math.PI / 4;
-        const s = new Graphics();
-        s.rect(70, -3, 44, 6).fill({ color: INK }).rect(71, -2, 42, 4).fill({ color: LO }).rect(71, -2, 42, 1.4).fill({ color: HI, alpha: 0.45 });
-        // Cargo crates stacked along the spoke.
-        for (let k = 0; k < 3; k++) s.roundRect(80 + k * 11, -7, 8, 6, 1.5).fill({ color: [0xffb547, 0x7aa7ff, 0x4fe3c1][(i + k) % 3] }).roundRect(80 + k * 11, -7, 8, 2, 1).fill({ color: 0xffffff, alpha: 0.35 });
-        s.rotation = a;
-        g.outer.addChild(s);
+    // Stage 2's cargo spokes are the bay trusses, which turn heavy (bays.ts).
+    this.bays.setStage(stage);
+    if (stage >= 3) {
+      // The outer deck ring runs through the bays, with crew cabins in the gaps between them.
+      g.outer.addChild(ring(BAY_RADIUS, 6));
+      for (let i = 0; i < 8; i++) {
+        const a = ((i * 45 + 22.5) * Math.PI) / 180;
+        const m = new Graphics();
+        m.roundRect(-11, -6, 22, 12, 3.5).fill({ color: INK }).roundRect(-10, -5, 20, 10, 3).fill({ color: BASE }).roundRect(-10, -5, 20, 3.6, 2).fill({ color: HI, alpha: 0.5 }).rect(-10, 2.5, 20, 2.5).fill({ color: LO });
+        m.position.set(Math.cos(a) * BAY_RADIUS, Math.sin(a) * BAY_RADIUS);
+        m.rotation = a + Math.PI / 2;
+        const w = new Graphics();
+        for (let k = -2; k <= 2; k++) w.rect(k * 3.8 - 1.1, -1.4, 2.2, 2.6).fill({ color: WIN });
+        m.addChild(w);
+        g.windows.push(w);
+        g.outer.addChild(m);
       }
     }
-    if (stage >= 3) g.outer.addChildAt(ring(114, 4), 0);
     if (stage >= 4) {
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * TAU;
+      // Spires stand on the ring between the bays, beacons blinking on their tips.
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU;
         const sp = new Graphics();
-        sp.moveTo(-3, 0).lineTo(0, -16).lineTo(3, 0).closePath().fill({ color: INK }).moveTo(-1.8, -1).lineTo(0, -13).lineTo(1.4, -1).closePath().fill({ color: BASE });
-        sp.position.set(Math.cos(a) * 116, Math.sin(a) * 116);
+        sp.moveTo(-4, 0).lineTo(0, -22).lineTo(4, 0).closePath().fill({ color: INK }).moveTo(-2.6, -1).lineTo(0, -18).lineTo(2, -1).closePath().fill({ color: BASE }).moveTo(-2.6, -1).lineTo(0, -18).lineTo(-0.6, -1).closePath().fill({ color: HI, alpha: 0.6 });
+        sp.position.set(Math.cos(a) * (BAY_RADIUS + 3), Math.sin(a) * (BAY_RADIUS + 3));
         sp.rotation = a + Math.PI / 2;
         g.outer.addChild(sp);
-        const b = this.sprite(this.tex.glow, g.outer, Math.cos(a) * 132, Math.sin(a) * 132);
+        const b = this.sprite(this.tex.glow, g.outer, Math.cos(a) * (BAY_RADIUS + 26), Math.sin(a) * (BAY_RADIUS + 26));
         b.blendMode = 'add';
         b.scale.set(0.24);
         b.tint = i % 2 ? 0xffd166 : 0xff6b9a;
@@ -782,7 +798,6 @@ export class StationScene {
     if (g.stage <= 0) return;
     const t = this.time;
     g.inner.rotation = t * 0.06;
-    g.outer.rotation = -t * 0.025;
     g.crown.rotation = t * 0.04;
     g.inner.y = g.outer.y = g.crown.y = this.hub.y;
     g.windows.forEach((w, i) => (w.alpha = 0.6 + 0.4 * Math.sin(t * 0.7 + i * 1.9)));
@@ -817,7 +832,6 @@ export class StationScene {
     this.antenna = this.sprite(t.antenna, this.hub, 0, 54);
     this.antenna.anchor.set(0.5, 0);
     this.hullSprites.push(this.sprite(t.hull, this.hub));
-    this.hub.addChild(this.podLayer);
     this.habitat = this.sprite(t.habitat, this.hub);
     this.hullSprites.push(this.habitat);
     this.habitat.scale.set(0.82);
@@ -830,6 +844,7 @@ export class StationScene {
     this.sprite(t.shadeDark, this.hub);
     const lit = this.sprite(t.shadeLight, this.hub);
     lit.blendMode = 'add';
+    this.hubLit = lit;
     // Blinking beacon lights around the rim.
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU + Math.PI / 6;
@@ -977,14 +992,16 @@ export class StationScene {
     this.applyMarks(owned);
     const t = this.tex;
 
-    const droneCount = Math.min(30, Math.ceil(Math.sqrt(owned.drone) * 3.2));
+    // The first four machines live in bays that grow (bays.ts); only a few fly around for life.
+    for (const id of this.bays.set(owned)) this.bayGrew(id);
+    const droneCount = owned.drone > 0 ? Math.min(6, 1 + Math.floor(Math.sqrt(owned.drone) * 0.6)) : 0;
     while (this.drones.length < droneCount) {
       const s = this.sprite(t.drone, this.droneLayer);
       this.drones.push({ s, radius: rand(80, 100), angle: rand(0, TAU), speed: rand(0.55, 0.95) * (Math.random() < 0.5 ? 1 : -1), wobble: rand(0, TAU) });
     }
     while (this.drones.length > droneCount) this.drones.pop()!.s.destroy();
 
-    const haulerCount = Math.min(9, Math.ceil(Math.sqrt(owned.hauler) * 1.6));
+    const haulerCount = owned.hauler >= 5 ? Math.min(2, Math.floor(Math.sqrt(owned.hauler) / 3)) : 0;
     while (this.haulers.length < haulerCount) {
       const cargo = this.sprite(t.debris[this.haulers.length % t.debris.length], this.machineLayer);
       cargo.scale.set(0.55);
@@ -993,7 +1010,7 @@ export class StationScene {
       engine.tint = 0x7aa7ff;
       const s = this.sprite(t.hauler, this.machineLayer);
       s.scale.set(0.85);
-      this.haulers.push({ s, cargo, engine, radius: rand(124, 136), angle: rand(0, TAU), speed: rand(0.14, 0.22), wobble: rand(0, TAU) });
+      this.haulers.push({ s, cargo, engine, radius: rand(140, 146), angle: rand(0, TAU), speed: rand(0.12, 0.18), wobble: rand(0, TAU) });
     }
     while (this.haulers.length > haulerCount) {
       const h = this.haulers.pop()!;
@@ -1001,20 +1018,6 @@ export class StationScene {
       h.cargo?.destroy();
       h.engine?.destroy();
     }
-
-    const podCount = Math.min(8, Math.ceil(Math.sqrt(owned.smelter) * 1.6));
-    while (this.pods.length < podCount) this.pods.push(this.sprite(t.smelter, this.podLayer));
-    while (this.pods.length > podCount) this.pods.pop()!.destroy();
-    this.pods.forEach((p, i) => {
-      const a = (i / podCount) * TAU + Math.PI / podCount;
-      p.position.set(Math.cos(a) * 66, Math.sin(a) * 66);
-      p.rotation = a;
-      p.scale.set(0.85);
-    });
-
-    const fabCount = Math.min(8, Math.ceil(Math.sqrt(owned.fabricator) * 1.5));
-    while (this.fabs.length < fabCount) this.fabs.push(this.sprite(t.fab, this.machineLayer));
-    while (this.fabs.length > fabCount) this.fabs.pop()!.destroy();
 
     const dockCount = owned.dock > 0 ? Math.min(12, Math.ceil(owned.dock / 2) + 1) : 0;
     while (this.docks.length < dockCount) {
@@ -1033,21 +1036,23 @@ export class StationScene {
     while (this.dockedShips.length > Math.ceil(dockCount / 2)) this.dockedShips.pop()!.destroy();
 
     // Mining lasers sit just outside the dock ring.
-    const turretCount = owned.laser > 0 ? Math.min(8, Math.ceil(Math.sqrt(owned.laser) * 1.4)) : 0;
+    const turretCount = owned.laser > 0 ? Math.min(4, Math.ceil(Math.sqrt(owned.laser) * 0.7)) : 0;
+    const turretScale = 0.9 + Math.max(0, bayTier(owned.laser)) * 0.09;
     while (this.turrets.length < turretCount) {
       const s = this.sprite(t.turret, this.machineLayer);
-      s.scale.set(0.9);
       this.turrets.push({ s, angle: 0, aim: 0, cool: rand(0.5, 2), beam: 0, tx: 0, ty: 0 });
     }
     while (this.turrets.length > turretCount) this.turrets.pop()!.s.destroy();
     this.turrets.forEach((tu, i) => {
+      tu.s.scale.set(turretScale);
       tu.angle = (i / turretCount) * TAU - Math.PI / 2 + 0.3;
       tu.aim = tu.angle;
       tu.s.position.set(Math.cos(tu.angle) * TURRET_RADIUS, Math.sin(tu.angle) * TURRET_RADIUS);
     });
 
     // Gravity wells, out on the diagonals, pulling in streams of dust.
-    const wellCount = owned.gravity > 0 ? Math.min(4, Math.ceil(Math.sqrt(owned.gravity) * 0.8)) : 0;
+    const wellCount = owned.gravity > 0 ? Math.min(2, Math.ceil(Math.sqrt(owned.gravity) * 0.5)) : 0;
+    this.wellScale = 0.85 + Math.max(0, bayTier(owned.gravity)) * 0.08;
     while (this.wells.length < wellCount) {
       const i = this.wells.length;
       const a = [Math.PI * 0.82, Math.PI * 0.18, Math.PI * 1.12, Math.PI * 1.88][i];
@@ -1055,7 +1060,7 @@ export class StationScene {
       this.wells.push({ s, x: s.x, y: s.y, spin: i % 2 ? 1 : -1 });
     }
     while (this.wells.length > wellCount) this.wells.pop()!.s.destroy();
-    const moteCount = this.wells.length * 14;
+    const moteCount = this.wells.length * 20;
     while (this.motes.length < moteCount) {
       const s = this.sprite(t.glow, this.farLayer);
       s.blendMode = 'add';
@@ -1065,7 +1070,7 @@ export class StationScene {
     while (this.motes.length > moteCount) this.motes.pop()!.s.destroy();
 
     // A ribbon of nanites flowing around the whole station.
-    const naniteCount = owned.nanite > 0 ? Math.min(110, Math.ceil(Math.sqrt(owned.nanite) * 14)) : 0;
+    const naniteCount = owned.nanite > 0 ? Math.min(48, Math.ceil(Math.sqrt(owned.nanite) * 6)) : 0;
     while (this.nanites.length < naniteCount) {
       const s = this.sprite(t.glow, this.droneLayer);
       s.blendMode = 'add';
@@ -1145,10 +1150,10 @@ export class StationScene {
   /** Every sprite on the station that shows one kind of machine. */
   private spritesOf(id: GeneratorId): Sprite[] {
     switch (id) {
-      case 'drone': return this.drones.map((o) => o.s);
-      case 'hauler': return this.haulers.map((o) => o.s);
-      case 'smelter': return this.pods;
-      case 'fabricator': return this.fabs;
+      case 'drone': return [...this.bays.spritesOf('drone'), ...this.drones.map((o) => o.s)];
+      case 'hauler': return [...this.bays.spritesOf('hauler'), ...this.haulers.map((o) => o.s)];
+      case 'smelter': return this.bays.spritesOf('smelter');
+      case 'fabricator': return this.bays.spritesOf('fabricator');
       case 'dock': return this.docks;
       case 'laser': return this.turrets.map((tu) => tu.s);
       case 'gravity': return this.wells.map((w) => w.s);
@@ -1179,6 +1184,16 @@ export class StationScene {
         if (mark < 4) sp.tint = id === 'nanite' ? sp.tint : 0xffffff;
       }
     }
+  }
+
+  /** A bay reached a new tier: a ring of light and a shower of sparks in its colour. */
+  private bayGrew(id: BayId): void {
+    const b = this.bays.at(id);
+    if (!b) return;
+    const color = COLORS[id];
+    this.burst(b.x, b.y, color, this.calmFlash ? 5 : 14, 1);
+    this.rings.push({ x: b.x, y: b.y, r: b.r * 0.6, life: 0.9, color, width: 3 });
+    this.twinkle(b.x, b.y, color, 0.8);
   }
 
   /** A machine just evolved: every one of them flares in its new model's colour. */
@@ -1261,7 +1276,7 @@ export class StationScene {
     const beacons = skin?.beacons ?? theme.beacons;
     this.lights.forEach((l, i) => (l.tint = beacons[i % 2]));
     for (const h of this.hullSprites) h.tint = skin?.hull ?? paint;
-    for (const layer of [this.machineLayer, this.droneLayer, this.podLayer, this.dockLayer]) layer.tint = skin?.machines ?? 0xffffff;
+    for (const layer of [this.machineLayer, this.droneLayer, this.dockLayer, this.bays.layer]) layer.tint = skin?.machines ?? 0xffffff;
     if (changedSky && this.tex) this.layout();
   }
 
@@ -1286,8 +1301,17 @@ export class StationScene {
     // Nothing keeps a moon this close to a black hole.
     this.moon.visible = sector.look !== 'hole';
     this.setRig(false);
+    this.gradeLight();
     this.buildDecor();
     this.layout();
+  }
+
+  /** Each sector's sky colours the light: the key light from the upper left and the hull's lit side. */
+  private gradeLight(): void {
+    const sky = parseInt(this.sector.nebula[0].slice(1), 16);
+    this.keyLight.tint = mixColor(0x9fb0ff, sky, 0.45);
+    this.keyLight.alpha = 0.2;
+    if (this.hubLit) this.hubLit.tint = mixColor(0xffffff, sky, 0.3);
   }
 
   /** Lays out the sector's own scenery; fractions are of the screen width and the focus band's height. */
@@ -2018,11 +2042,11 @@ export class StationScene {
   machineAt(sx: number, sy: number): GeneratorId | null {
     if (!this.ready) return null;
     const groups: [GeneratorId, Container[]][] = [
-      ['drone', this.drones.map((d) => d.s)],
+      ['drone', [...this.drones.map((d) => d.s), ...this.bays.pads('drone')]],
       ['laser', this.turrets.map((t) => t.s)],
-      ['fabricator', this.fabs],
-      ['smelter', this.pods],
-      ['hauler', this.haulers.map((h) => h.s)],
+      ['fabricator', this.bays.pads('fabricator')],
+      ['smelter', this.bays.pads('smelter')],
+      ['hauler', [...this.haulers.map((h) => h.s), ...this.bays.pads('hauler')]],
       ['dock', [...this.dockedShips, ...this.docks]],
       ['gravity', this.wells.map((w) => w.s)],
       ['gate', this.gate ? [this.gate.ring] : []],
@@ -2734,7 +2758,7 @@ export class StationScene {
     }
 
     // Haulers tow scrap around their lane.
-    if (this.haulers.length) g.circle(0, 0, 130).stroke({ width: 1, color: COLORS.hauler, alpha: 0.14 });
+    if (this.haulers.length) g.circle(0, 0, 143).stroke({ width: 1, color: COLORS.hauler, alpha: 0.12 });
     for (const o of this.haulers) {
       o.angle += o.speed * dt;
       const x = Math.cos(o.angle) * o.radius;
@@ -2753,36 +2777,27 @@ export class StationScene {
       this.trail(g, o.radius, o.angle - 0.07, -1, 0.25, 0x7aa7ff, 2.2);
     }
 
-    // Fabricators ride a counter-rotating ring, tethered to the hull.
-    const fabs = this.fabs.length;
-    if (fabs) {
-      g.circle(0, 0, 110).stroke({ width: 2, color: COLORS.fabricator, alpha: 0.28 });
-      this.fabs.forEach((s, i) => {
-        const a = (i / fabs) * TAU - t * 0.25;
-        const x = Math.cos(a) * 110;
-        const y = Math.sin(a) * 110;
-        s.position.set(x, y);
-        s.rotation = a;
-        g.moveTo(Math.cos(a) * 64, Math.sin(a) * 64).lineTo(Math.cos(a) * 100, Math.sin(a) * 100).stroke({ width: 1.4, color: COLORS.fabricator, alpha: 0.35 });
-      });
+    // The workshop's printers weld sparks across its deck.
+    const fab = this.bays.at('fabricator');
+    if (fab) {
       this.nextWeld -= dt;
       if (this.nextWeld <= 0) {
-        const s = this.fabs[Math.floor(Math.random() * fabs)];
-        this.burst(s.x, s.y, 0xe7d0ff, 5, 0.35);
-        this.puff(s.x, s.y, 0xd6b0ff, 0.9, 0.2);
-        this.nextWeld = rand(0.4, 1.4) / Math.sqrt(fabs);
+        const x = fab.x + rand(-0.5, 0.5) * fab.r;
+        const y = fab.y + rand(-0.5, 0.5) * fab.r;
+        this.burst(x, y, 0xe7d0ff, 5, 0.35);
+        this.puff(x, y, 0xd6b0ff, 0.9, 0.2);
+        this.nextWeld = rand(0.5, 1.6) / Math.sqrt(1 + fab.r / 12);
       }
     }
 
-    // Smelters vent a little heat now and then.
-    const pods = this.pods.length;
-    if (pods) {
+    // The foundry vents a little heat now and then.
+    const foundry = this.bays.at('smelter');
+    if (foundry) {
       this.nextSteam -= dt;
       if (this.nextSteam <= 0) {
-        const p = this.pods[Math.floor(Math.random() * pods)];
-        const a = p.rotation;
-        this.puff(p.x + Math.cos(a) * 12, p.y + Math.sin(a) * 12, Math.random() < 0.5 ? 0xffb070 : 0xffe0c0, 1.1, rand(0.5, 0.8));
-        this.nextSteam = rand(0.6, 1.8) / Math.sqrt(pods);
+        const a = foundry.a + rand(-0.6, 0.6);
+        this.puff(foundry.x + Math.cos(a) * foundry.r * 0.5, foundry.y + Math.sin(a) * foundry.r * 0.5, Math.random() < 0.5 ? 0xffb070 : 0xffe0c0, 1.1 + foundry.r / 40, rand(0.5, 0.8));
+        this.nextSteam = rand(0.6, 1.8) / Math.sqrt(1 + foundry.r / 12);
       }
     }
 
@@ -2928,7 +2943,7 @@ export class StationScene {
 
     for (const w of this.wells) {
       w.s.rotation += w.spin * dt * 1.1;
-      w.s.scale.set(0.95 + 0.06 * Math.sin(t * 1.3 + w.x));
+      w.s.scale.set(this.wellScale * (0.95 + 0.06 * Math.sin(t * 1.3 + w.x)));
     }
     for (const m of this.motes) {
       const w = this.wells[m.well % this.wells.length];
@@ -3104,18 +3119,23 @@ export class StationScene {
     this.updatePolish(dt, color, beat);
     this.updateGrowth(dt);
 
-    // Smelter pods breathe heat and throw the odd ember.
-    this.pods.forEach((p, i) => (p.alpha = 0.85 + 0.15 * Math.sin(t * 4 + i)));
+    this.bays.update(t, dt, this.hub.y);
+    // The core's light spills over the bays and machines around it.
+    this.coreSpill.tint = color;
+    this.coreSpill.scale.set(4.6 + beat * 0.3 + this.squash * 0.8);
+    this.coreSpill.y = this.hub.y;
+    this.coreSpill.alpha = 0.2 + beat * 0.06 + this.squash * 0.2;
+    // The foundry throws the odd ember.
     this.nextEmber -= dt;
-    if (this.pods.length && this.nextEmber <= 0) {
-      const p = this.pods[Math.floor(Math.random() * this.pods.length)];
+    const foundry = this.bays.at('smelter');
+    if (foundry && this.nextEmber <= 0) {
       const s = this.sparkPool.get();
-      s.position.set(p.x * 1.1, p.y * 1.1 + this.hub.y);
+      s.position.set(foundry.x, foundry.y);
       s.tint = COLORS.smelter;
       s.scale.set(0.3);
-      const a = p.rotation + rand(-0.4, 0.4);
+      const a = foundry.a + rand(-0.6, 0.6);
       this.sparks.push({ s, vx: Math.cos(a) * 40, vy: Math.sin(a) * 40, life: 0.8, max: 0.8 });
-      this.nextEmber = rand(0.2, 0.6) / Math.sqrt(this.pods.length);
+      this.nextEmber = rand(0.2, 0.6) / Math.sqrt(1 + foundry.r / 12);
     }
   }
 

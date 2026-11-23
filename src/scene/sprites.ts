@@ -454,3 +454,58 @@ export function evolveParts(a: SpriteArt, mark: number): SpriteArt {
   const markup = `<g transform="translate(${n(pad)} ${n(pad)})">${back.join('')}${a.markup}${front.join('')}</g>`;
   return { ...a, w: a.w + (2 * pad) / a.scale, h: a.h + (2 * pad) / a.scale, markup };
 }
+
+/**
+ * A machine bay's deck plate: a hex pad in hull plating with a ring in the machine's colour.
+ * It grows with the bay's tier (0 to 6): wider, landing marks, a lamp per tier, corner
+ * struts from tier 3 and gold trim from tier 5. Seen from above, lit from the upper left.
+ */
+export function bayPad(c: Ramp, tier: number): SpriteArt {
+  const t = Math.max(0, tier);
+  const R = (15 + t * 3.4) * 2;
+  const S = R * 2 + 16;
+  const o = S / 2;
+  const m: string[] = [];
+  m.push(
+    cel(ngon(o, o, R, 6, -60), P.hull, [o, o, R], {
+      hl: 0.35,
+      hlOp: 0.3,
+      ink: 2.4,
+      detail:
+        line(ngon(o, o, R * 0.84, 6, -60), P.hull.lo, 1.4) +
+        // Plate seams from each corner towards the middle.
+        line([0, 1, 2, 3, 4, 5].map((i) => {
+          const a = ((-60 + i * 60) * Math.PI) / 180;
+          return `M${n(o + Math.cos(a) * R * 0.84)} ${n(o + Math.sin(a) * R * 0.84)}L${n(o + Math.cos(a) * R * 0.66)} ${n(o + Math.sin(a) * R * 0.66)}`;
+        }).join(''), P.hull.lo, 1.2) +
+        line(circ(o, o, R * 0.62), c.ink, 4.6) +
+        line(circ(o, o, R * 0.62), c.lo, 3) +
+        line(arc(o, o, R * 0.62, 160, 300), c.base, 1.6) +
+        fill(circ(o, o, R * 0.5), P.dark.base) +
+        fill(circ(o - 1, o - 1, R * 0.46), P.dark.hi, ' opacity=".35"'),
+    }),
+  );
+  if (t >= 1) {
+    // Landing marks: four dashes in the machine's colour between the ring and the rim.
+    const d: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const a = ((45 + i * 90) * Math.PI) / 180;
+      d.push(`M${n(o + Math.cos(a) * R * 0.68)} ${n(o + Math.sin(a) * R * 0.68)}L${n(o + Math.cos(a) * R * 0.78)} ${n(o + Math.sin(a) * R * 0.78)}`);
+    }
+    m.push(line(d.join(''), c.base, 2.2));
+  }
+  if (t >= 3) {
+    for (let i = 0; i < 6; i++) {
+      const a = ((-60 + i * 60) * Math.PI) / 180;
+      const x = o + Math.cos(a) * R * 0.97;
+      const y = o + Math.sin(a) * R * 0.97;
+      m.push(cel(circ(x, y, 3.6), P.steel, [x, y, 3.6], { hl: 0.4, ink: 1.4 }));
+    }
+  }
+  if (t >= 5) m.push(line(ngon(o, o, R + 2.5, 6, -60), P.gold.ink, 3.2) + line(ngon(o, o, R + 2.5, 6, -60), P.gold.base, 1.6) + line(ngon(o - 0.6, o - 0.6, R + 2.5, 6, -60), P.gold.hi, 0.6, ' opacity=".8"'));
+  for (let i = 0; i < t; i++) {
+    const a = ((-90 + 30 + i * 60) * Math.PI) / 180;
+    m.push(lamp(o + Math.cos(a) * R * 0.75, o + Math.sin(a) * R * 0.75, 1.8, c.base));
+  }
+  return { w: S / 2, h: S / 2, scale: 2, markup: m.join('') };
+}
