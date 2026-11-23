@@ -28,6 +28,7 @@
     "@fontsource/rubik": "^5.3.0",
     "break_infinity.js": "^2.2.0",
     "firebase": "12.19.0",
+    "pixi-filters": "6.1.4",
     "pixi.js": "^8.22.0"
   },
   "devDependencies": {
