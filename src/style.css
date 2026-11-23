@@ -1986,3 +1986,62 @@ body.intro :is(.modal, .sample-ad, .fanfare, .confetti, .sector-card, .boss-aler
 #app:not(.panel-closed) .side-rail > * { direction: ltr; }
 #app:not(.panel-closed) .hud-btn small { display: none; }
 #app:not(.panel-closed) .hud-btn .round-btn { width: 32px; height: 32px; padding: 6px; }
+
+/* ---------- Captain ranks (ui/journey-ui.ts) ---------- */
+/* The tracker at the foot of the station view: the next thing to do for the next rank. */
+.rank-tracker {
+  position: absolute; left: 10px; bottom: 10px; z-index: 5; display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 8px; align-items: center;
+  max-width: min(270px, calc(100% - 76px)); padding: 7px 12px 9px 8px; border: 1px solid rgb(92 214 255 / 0.35); border-radius: 16px;
+  background: linear-gradient(rgb(20 26 66 / 0.92), rgb(10 13 38 / 0.92)); box-shadow: 0 6px 18px rgb(0 0 0 / 0.35); text-align: left; color: var(--ink);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); transition: transform 0.15s; pointer-events: auto; cursor: pointer;
+}
+.rank-tracker:active { transform: scale(0.97); }
+.rank-tracker .rank-badge { width: 34px; height: 34px; grid-row: span 2; }
+.rank-badge { display: inline-block; flex: none; }
+.rank-badge svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.4)); }
+.rank-chip-text { display: grid; min-width: 0; }
+.rank-chip-text small { font-size: 10.5px; letter-spacing: 0.04em; color: #8fdcff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-chip-text b { font-size: 13px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-chip-text em { font-style: normal; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.rank-chip-bar { grid-column: 2; display: block; height: 4px; margin-top: 5px; border-radius: 2px; background: rgb(0 0 0 / 0.45); overflow: hidden; }
+.rank-chip-bar > i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, #5cd6ff, #8ff0ff); transition: width 0.4s ease; }
+.rank-tracker.ready { border-color: rgb(255 209 102 / 0.8); background: linear-gradient(rgb(70 48 10 / 0.95), rgb(36 24 6 / 0.95)); animation: rank-glow 1.6s ease-in-out infinite; }
+.rank-tracker.ready small { color: #ffd166; }
+.rank-tracker.ready .rank-chip-bar > i { background: linear-gradient(90deg, #ffd166, #fff0b8); }
+.rank-tracker.tick { animation: rank-tick 0.6s ease-out; }
+@keyframes rank-glow { 50% { box-shadow: 0 0 26px rgb(255 209 102 / 0.65), 0 6px 18px rgb(0 0 0 / 0.35); transform: scale(1.03); } }
+@keyframes rank-tick { 30% { transform: scale(1.08); border-color: #8ff0ff; box-shadow: 0 0 22px rgb(92 214 255 / 0.6); } }
+/* Buffs stack above the tracker. */
+#stage:has(> #rank-chip:not([hidden])) .buff-row { bottom: 70px; }
+/* The Overdrive button gets a nudge when a rank task sends the captain to it. */
+.boost.nudge { animation: rank-tick 0.6s ease-out 3; }
+
+.rank-card { max-width: 380px; }
+.rank-now { display: flex; align-items: center; gap: 14px; margin: 2px 30px 6px 2px; text-align: left; }
+.rank-now .eyebrow, .rank-now h2 { text-align: left; }
+.rank-now h2 { margin: 2px 0; }
+.rank-badge.big { width: 56px; height: 56px; }
+.rank-bonus { margin: 0; font-size: 12.5px; color: #ffd166; }
+.rank-task.done { border-color: rgb(79 227 193 / 0.5); box-shadow: none; }
+.rank-task.done .bar > i { background: var(--go); }
+.rank-reward { margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: radial-gradient(120% 140% at 0% 0%, rgb(255 209 102 / 0.14), transparent 60%), rgb(6 8 24 / 0.5); border: 1px solid rgb(255 209 102 / 0.35); }
+.rank-reward > small { display: block; margin-bottom: 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
+.rank-reward > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.rank-reward p { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-dim); }
+.rank-reward p b { color: var(--ink); }
+.rank-chip-r { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 99px; background: rgb(255 255 255 / 0.07); font-size: 12px; color: var(--ink-dim); }
+.rank-chip-r b { color: var(--ink); font-weight: 600; }
+.rank-chip-r svg { width: 14px; height: 14px; }
+#rank-claim { margin-top: 12px; animation: ready 2.4s ease-in-out infinite; }
+.rank-ladder { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 2px; }
+.rank-ladder li { display: grid; justify-items: center; gap: 2px; opacity: 0.4; }
+.rank-ladder li .rank-badge { width: 26px; height: 26px; }
+.rank-ladder li small { display: none; font-size: 11px; color: var(--ink-dim); white-space: nowrap; }
+.rank-ladder li.got { opacity: 1; }
+.rank-ladder li:first-child.now small { justify-self: start; }
+.rank-ladder li:last-child.now small { justify-self: end; }
+.rank-ladder li.now { opacity: 1; }
+.rank-ladder li.now .rank-badge { animation: rank-glow 1.6s ease-in-out infinite; border-radius: 50%; }
+.rank-ladder li.now small { display: block; color: #8fdcff; }
+.rank-ladder { padding-bottom: 2px; }
+.rank-done { margin: 12px 0 4px; text-align: center; color: var(--ink-dim); }

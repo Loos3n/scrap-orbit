@@ -1,3 +1,4 @@
+import { checkJourney, claimRank, currentRank, rankReady, type JourneyTask, type RankClaim } from './core/journey';
 import { AD_CRYSTALS, useAd, type AdReward } from './core/rewards';
 import { buyFestival, dailyPresent, earnFlakes, type FestivalItemId } from './core/festival';
 import { hook, landCatch, pickCritter, refillBait, type CatchReward, type Critter } from './core/fishing';
@@ -110,7 +111,11 @@ export type GameEvent =
   /** The garden: something planted, or harvested into a snack. */
   | { type: 'garden'; phase: 'plant' | 'harvest'; crop: CropDef; crystals?: number }
   /** A salvage dive finished. */
-  | { type: 'dive'; points: number; scrap: Decimal; crystals: number; best: boolean };
+  | { type: 'dive'; points: number; scrap: Decimal; crystals: number; best: boolean }
+  /** Captain ranks: a task ticked off, every task of the rank met, or the rank claimed. */
+  | { type: 'rankTask'; task: JourneyTask; left: number }
+  | { type: 'rankReady' }
+  | { type: 'rank'; claim: RankClaim };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -373,6 +378,12 @@ export class Game {
       this.storyShown = story.id;
       this.emit({ type: 'story', id: story.id, phase: 'ready' });
     }
+    const ticked = checkJourney(s, now);
+    for (const task of ticked) {
+      const rank = currentRank(s);
+      this.emit({ type: 'rankTask', task, left: rank ? rank.tasks.filter((t) => !s.journey.met.has(t.id)).length : 0 });
+    }
+    if (ticked.length && rankReady(s)) this.emit({ type: 'rankReady' });
     const inc = eco.baseIncome(s);
     if (inc.gt(s.stats.bestIncome)) s.stats.bestIncome = inc.toString();
     // A new day's reward waits until the tutorial is over and a brand-new captain has had a few
@@ -535,6 +546,20 @@ export class Game {
   endTutorial(): void {
     this.state.tutorial = -1;
     this.emit({ type: 'tutorial', step: null });
+  }
+
+  /** Claims the current captain rank, if all its tasks are met. */
+  claimRank(): void {
+    const claim = claimRank(this.state, {
+      scrapFor: (min) => meta.streakScrap(this.state, min, Date.now()),
+      earn: (n) => eco.earn(this.state, n),
+      crystals: (n) => meta.addCrystals(this.state, n),
+      adopt: (id) => meta.givePet(this.state, id),
+    });
+    if (claim) {
+      this.emit({ type: 'rank', claim });
+      this.save();
+    }
   }
 
   trainCrew(id: CrewId): void {

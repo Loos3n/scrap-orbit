@@ -76,6 +76,7 @@
         <button id="safe-banner" class="trader-banner safe-banner" type="button" hidden><span data-icon="lock"></span>Locked cargo! <b id="safe-time"></b></button>
         <button id="visitor-banner" class="trader-banner visitor-banner" type="button" hidden><span data-icon="heart"></span><span id="visitor-who">Visitor</span> docked <b id="visitor-time"></b></button>
         <button id="trader-banner" class="trader-banner" type="button" hidden><span data-icon="crystal"></span>Trader docked <b id="trader-time"></b></button>
+        <button id="rank-chip" class="rank-tracker" type="button" hidden></button>
         <div id="buff-row" class="buff-row" aria-live="polite">
           <div id="buff-surge" class="buff-chip" data-buff="surge" hidden><span data-icon="bolt"></span><span class="buff-text"><small>Surge</small><b></b></span><b id="buff-surge-time" class="buff-time"></b><i class="buff-bar"><i id="buff-surge-bar"></i></i></div>
           <div id="buff-frenzy" class="buff-chip" data-buff="frenzy" hidden><span data-icon="claw"></span><span class="buff-text"><small>Frenzy</small><b></b></span><b id="buff-frenzy-time" class="buff-time"></b><i class="buff-bar"><i id="buff-frenzy-bar"></i></i></div>
@@ -576,6 +577,13 @@
         <dl id="visit-stats" class="stats visit-stats"></dl>
         <button id="visit-gift" class="primary" type="button">Send a gift</button>
         <button id="visit-remove" class="cloud-ask-later" type="button">Remove friend</button>
+      </div>
+    </div>
+    <div id="rank" class="modal" hidden>
+      <div class="modal-card missions-card rank-card" role="dialog" aria-modal="true" aria-labelledby="rank-title">
+        <button id="rank-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div id="rank-now" class="rank-now"></div>
+        <div id="rank-body"></div>
       </div>
     </div>
     <div id="missions" class="modal" hidden>

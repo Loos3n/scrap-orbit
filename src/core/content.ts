@@ -139,6 +139,9 @@ export const PAINTS: readonly PaintDef[] = [
   { id: 'stealth', name: 'Stealth', cost: 35, tint: 0x8088a8 },
 ];
 
+/** Captain's Gold: the paint for reaching the top captain rank (core/journey.ts). */
+export const CAPTAIN_PAINT: PaintDef = { id: 'captain', name: "Captain's Gold", cost: 0, tint: 0xffe6a8 };
+
 // ---------- Missions ----------
 
 export type MissionKind = 'taps' | 'machines' | 'upgrades' | 'crates' | 'boosts' | 'meteors' | 'earn';

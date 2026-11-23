@@ -26,6 +26,8 @@ import { FLEET, SHIPS, powerText, shipsBuilt } from './core/fleet';
 import { visitorHere } from './core/visitors';
 import { SNACK_TEXT, snackMult } from './core/garden';
 import { DivePanel } from './ui/dive-ui';
+import { JourneyPanel, promotionText, rankBadge } from './ui/journey-ui';
+import { CAPTAIN_PAINT_ID, currentRank } from './core/journey';
 import { crewLine } from './core/crew-talk';
 import type { CrewId } from './core/content';
 import { FestivalPanel } from './ui/festival-ui';
@@ -245,6 +247,8 @@ async function boot(): Promise<void> {
     end: () => sfx.event(),
     buzz: (ms) => buzz(ms),
   });
+  const journey = new JourneyPanel(game, (d) => fmt(d), { pane: (name) => ui.showTab(name), toast: (icon, html) => ui.toast(icon, html) });
+  if (import.meta.env.DEV) Object.assign(window, { __journey: journey });
   const festival = new FestivalPanel(game, () => {
     syncFestival();
     syncMusic();
@@ -817,6 +821,37 @@ async function boot(): Promise<void> {
         syncPerks();
         break;
       }
+      case 'rankTask': {
+        const rank = currentRank(game.state);
+        const more = e.left > 0 ? `${3 - e.left}/3 for ${rank?.title ?? 'the next rank'}` : `Promotion to ${rank?.title ?? 'the next rank'} is ready!`;
+        ui.toast(ICONS.check.replace('currentColor', '#4fe3c1'), `<b>${e.task.text}</b> ${more}`);
+        sfx.milestone();
+        buzz(15);
+        break;
+      }
+      case 'rankReady':
+        sfx.achievement();
+        buzz([15, 30, 15]);
+        break;
+      case 'rank': {
+        const c = e.claim;
+        fanfare.cheer({ icon: rankBadge(game.state.journey.rank, true), kicker: 'Promoted!', title: c.rank.title, sub: promotionText(c, fmt) + (c.rank.opens ? `<br>Now open: <b>${c.rank.opens}</b>` : ''), color: '#ffd166' });
+        scene.fireworks([0xffd166, 0x5cd6ff, 0xffffff]);
+        scene.celebrate(0xffd166);
+        sfx.fanfare();
+        buzz([30, 50, 30, 50, 60]);
+        if (c.scrap.gt(0)) ui.bigGain(c.scrap);
+        if (c.pet) {
+          scene.setPet(game.state.pets.active, petTint());
+          syncPerks();
+        }
+        if (c.paint) {
+          // Put the new paint straight on, so the captain sees it.
+          game.state.decor.paint = CAPTAIN_PAINT_ID;
+          syncDecor();
+        }
+        break;
+      }
       case 'dive':
         dive.showResult(e);
         if (e.scrap.gt(0)) ui.bigGain(e.scrap);
@@ -1236,6 +1271,7 @@ async function boot(): Promise<void> {
       festival.render();
       fishing.render();
       dive.render();
+      journey.render();
       syncCrew();
       scene.crewChatter = game.state.tutorial < 0 && !introShowing();
       syncFestival();
@@ -1252,12 +1288,12 @@ async function boot(): Promise<void> {
     } else void cancelReminders();
   });
   void cancelReminders();
-  // In the Android app, ask once for notification permission a minute after the tutorial.
+  // In the Android app, ask once for notification permission, ten minutes into a new captain's play.
   if (notificationsAvailable()) {
     const ask = window.setInterval(() => {
       const s = game.state;
       if (s.tips.has('notify-asked')) return window.clearInterval(ask);
-      if (s.tutorial >= 0 || s.stats.playSec < 60) return;
+      if (s.tutorial >= 0 || s.stats.playSec < 600) return;
       s.tips.add('notify-asked');
       window.clearInterval(ask);
       void askPermission().then((ok) => (s.settings.notifications = ok));

@@ -1,3 +1,4 @@
+import { fishingOpen } from '../core/fishing';
 import { isWide } from './gestures';
 import { WEEKLY_CRYSTALS, currentWeekly, weekEnds, weeklyClaimable, weeklyProgress } from '../core/weekly';
 import { EVENT_PAINTS } from '../core/weekly';
@@ -548,7 +549,14 @@ const MIKA = CREW.find((c) => c.id === 'mika')!;
 const TIP_LINGER_MS = 15_000;
 
 /** One-time tips for things that unlock after the tutorial. Each is seen once its tab is opened, or after a short while. */
-const TIPS: { id: string; tab: string; text: string; when: (game: Game) => boolean }[] = [
+const TIPS: { id: string; tab: string; target?: string; text: string; when: (game: Game) => boolean }[] = [
+  {
+    id: 'fishing',
+    tab: '',
+    target: '#fish-btn',
+    text: 'Fishing is open! Cast a line from the station tank for crystals, bait and odd little critters.',
+    when: (g) => fishingOpen(g.state) && g.state.fishing.casts === 0 && !$('fish-btn').hidden,
+  },
   {
     id: 'crew',
     tab: 'crew',
@@ -641,20 +649,13 @@ export class Coach {
         return { text: 'Nice haul! Build a Salvage Drone. It salvages for you, even while you are away.', target: '#gen-list .gen:first-child .buy', tab: 'build' };
       }
       case 'more': {
-        // Can't afford the next drone yet: point at the station and say to tap, not at a grey button.
+        // One card for the whole step (so it doesn't flick between two as scrap comes and goes):
+        // it points at the Buy button when a drone is affordable, and at the station when not.
         const next = eco.costFor(GENERATORS[0], s.owned.drone, 1, eco.costDiscount(s)).toNumber();
-        if (s.scrap.lt(next))
-          return {
-            text: 'Not enough scrap for the next drone yet. Tap the station to salvage more, or let your drones bring it in.',
-            target: '#stage',
-            progress: [Math.min(s.owned.drone, TUTORIAL_DRONES), TUTORIAL_DRONES],
-          };
-        return {
-          text: 'Drones add up fast. Build a few more. Tip: hold the button down to keep buying.',
-          target: '#gen-list .gen:first-child .buy',
-          tab: 'build',
-          progress: [Math.min(s.owned.drone, TUTORIAL_DRONES), TUTORIAL_DRONES],
-        };
+        const text = `Drones add up fast. Build ${TUTORIAL_DRONES} of them! Tap the station whenever you are short of scrap.`;
+        const progress: [number, number] = [Math.min(s.owned.drone, TUTORIAL_DRONES), TUTORIAL_DRONES];
+        if (s.scrap.lt(next)) return { text, target: '#stage', progress };
+        return { text, target: '#gen-list .gen:first-child .buy', tab: 'build', progress };
       }
       case 'upgradeTab':
         if ($('upgrade-dot').hidden) return { text: "Keep tapping and building. I'll shout when an upgrade is ready." };
@@ -680,7 +681,8 @@ export class Coach {
         return { text: 'Tap this square to hide the menu and see your whole station. Tap it again to bring the menu back.', target: '#menu-btn' };
       case 'done':
         return {
-          text: "That's the basics, captain! Crew, research and new sectors open up as you go. I'll pop by when there's something new.",
+          text: "That's the basics! Down here is your captain rank. Do its three tasks to earn a promotion, with a reward each time. Crew, research and new sectors open up as you climb.",
+          target: '#rank-chip',
           next: "Let's salvage!",
         };
       default:
@@ -699,7 +701,7 @@ export class Coach {
       this.game.seeTip(tip.id);
       tip = this.tip();
     }
-    let def = tip ? { text: tip.text, target: paneTarget(tip.tab), next: 'Got it' } : this.step();
+    let def = tip ? { text: tip.text, target: tip.target ?? paneTarget(tip.tab), next: 'Got it' } : this.step();
     // Never sit on top of a pop-up such as the welcome-back screen.
     // Nor on a celebration card or the new-sector title.
     const modalOpen = [...document.querySelectorAll<HTMLElement>('.modal')].some((m) => !m.hidden) || !$('fanfare').hidden || !$('sector-card').hidden;
