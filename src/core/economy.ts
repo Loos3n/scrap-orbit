@@ -25,6 +25,7 @@ import { crateIncomeMult, crateTapMult } from './crate-buffs';
 import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, timeStretch } from './sectors';
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { fleetEffects } from './fleet';
+import { snackMult } from './garden';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
 
@@ -177,7 +178,7 @@ export function baseIncome(state: GameState): Decimal {
 
 export function income(state: GameState, now: number): Decimal {
   const base = baseIncome(state);
-  const boosted = (boostActive(state, now) ? base.mul(BOOST.mult) : base).mul(crateIncomeMult(state, now) * cocoaMult(state, now));
+  const boosted = (boostActive(state, now) ? base.mul(BOOST.mult) : base).mul(crateIncomeMult(state, now) * cocoaMult(state, now) * snackMult(state, 'income', now));
   return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 
@@ -215,7 +216,7 @@ export function tapValue(state: GameState, now: number, plain = false): Decimal 
   mult *= contractTapMult(state);
   const value = D(mult * globalMult(state) * (1 + bonuses(state).tap)).add(baseIncome(state).mul(share));
   if (plain) return value;
-  const boosted = (boostActive(state, now) ? value.mul(BOOST.mult) : value).mul(crateTapMult(state, now));
+  const boosted = (boostActive(state, now) ? value.mul(BOOST.mult) : value).mul(crateTapMult(state, now) * snackMult(state, 'tap', now));
   return goldenActive(state, now) ? boosted.mul(GOLDEN.mult) : boosted;
 }
 

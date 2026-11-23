@@ -5,6 +5,8 @@ import { FINALE_CRYSTALS, FINALE_ID, STORY_CRYSTALS, pendingStory } from './core
 import { markOf } from './core/evolve';
 import { FLEET, shipDef, addPlates, collectPatrol, finishJob, jobSecondsLeft, shiftPlates, startJob, welcomeFleet, type ShipId } from './core/fleet';
 import { rushCost } from './core/content';
+import { cropDef, harvest, plant, type CropDef } from './core/garden';
+import { DIVE, finishDive, refillCharges, startDive } from './core/dive';
 import { comboMult, cooled, heatAfterTap } from './core/combo';
 import { CONTRACT_CRYSTALS, checkContract, contractAutoBuyOff, makeOffers, pickContract, type ContractId } from './core/contracts';
 import { recordIncome, recordRun } from './core/history';
@@ -104,7 +106,11 @@ export type GameEvent =
   | { type: 'plates'; n: number; from: 'boss' | 'relocate' | 'shift' | 'patrol' | 'visitor' }
   /** A visitor docked or flew off unanswered, or was answered. */
   | { type: 'visitor'; phase: 'arrived' | 'left' }
-  | { type: 'visit'; result: meta.VisitResult };
+  | { type: 'visit'; result: meta.VisitResult }
+  /** The garden: something planted, or harvested into a snack. */
+  | { type: 'garden'; phase: 'plant' | 'harvest'; crop: CropDef; crystals?: number }
+  /** A salvage dive finished. */
+  | { type: 'dive'; points: number; scrap: Decimal; crystals: number; best: boolean };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -210,6 +216,40 @@ export class Game {
       this.emit({ type: 'plates', n, from: 'patrol' });
       this.save();
     }
+  }
+
+  plantCrop(plot: number, id: string): void {
+    if (!plant(this.state, plot, id, Date.now())) return;
+    this.emit({ type: 'garden', phase: 'plant', crop: cropDef(id)! });
+  }
+
+  harvestPlot(plot: number): void {
+    const r = harvest(this.state, plot, Date.now());
+    if (!r) return;
+    if (r.crystals) meta.addCrystals(this.state, r.crystals);
+    this.emit({ type: 'garden', phase: 'harvest', crop: r.crop, crystals: r.crystals });
+    this.save();
+  }
+
+  refillDives(): void {
+    refillCharges(this.state, Date.now());
+  }
+
+  /** Spends a dive charge; false if none are left. */
+  startDive(): boolean {
+    const ok = startDive(this.state, Date.now());
+    if (ok) this.save();
+    return ok;
+  }
+
+  /** Pays out a finished dive. */
+  endDive(points: number, crystalsCaught: number): void {
+    const r = finishDive(this.state, Math.max(0, Math.floor(points)), Math.max(0, Math.floor(crystalsCaught)));
+    const scrap = eco.baseIncome(this.state).mul(Math.max(0, Math.floor(points)) * DIVE.secPerPoint).floor();
+    eco.earn(this.state, scrap);
+    if (r.crystals) meta.addCrystals(this.state, r.crystals);
+    this.emit({ type: 'dive', points, scrap, crystals: r.crystals, best: r.best });
+    this.save();
   }
 
   /** Answers the docked visitor. */

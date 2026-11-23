@@ -11,6 +11,8 @@ import { FESTIVAL_SHOP } from './festival';
 import { CRITTERS, FISHING } from './fishing';
 import { SHIPS, FLEET, type ShipId } from './fleet';
 import { VISITORS, type VisitorId } from './visitors';
+import { CROPS, type SnackKind } from './garden';
+import { DIVE } from './dive';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -126,6 +128,10 @@ export interface GameState {
    * Dock visitors (core/visitors.ts): who is docked and which request they brought, when the next
    * is due, hearts won and visits made by each, and who came last.
    */
+  /** The hydroponics garden (core/garden.ts): what grows in each plot and since when, snacks running, harvests made. */
+  garden: { plots: ({ crop: string; at: number } | null)[]; snacks: Partial<Record<SnackKind, { mult: number; until: number }>>; harvested: number };
+  /** Salvage dives (core/dive.ts): charges held and when they last refilled, best score, dives made. */
+  dive: { charges: number; chargeAt: number; best: number; dives: number };
   visitors: { here: { id: VisitorId; req: number; until: number } | null; nextAt: number; hearts: Partial<Record<VisitorId, number>>; met: Partial<Record<VisitorId, number>>; last: VisitorId | null; answered: number };
   /**
    * Friend codes (core/friends.ts): this player's own code and station name once signed in,
@@ -243,6 +249,8 @@ interface SaveData {
   fishing?: { bait?: number; baitAt?: number; caught?: Record<string, number>; casts?: number };
   fleet?: Partial<GameState['fleet']>;
   visitors?: Partial<GameState['visitors']>;
+  garden?: Partial<GameState['garden']>;
+  dive?: Partial<GameState['dive']>;
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
   stats?: Partial<GameState['stats']>;
@@ -319,6 +327,8 @@ export function newState(now: number): GameState {
     fishing: { bait: FISHING.baitMax, baitAt: now, caught: {}, casts: 0 },
     fleet: { plates: 0, earned: 0, ranks: {}, job: null, patrolAt: now, welcomed: false },
     visitors: { here: null, nextAt: 0, hearts: {}, met: {}, last: null, answered: 0 },
+    garden: { plots: [], snacks: {}, harvested: 0 },
+    dive: { charges: DIVE.chargesMax, chargeAt: now, best: 0, dives: 0 },
     rig: false,
     friends: { mine: '', name: '', list: [], sent: {}, day: '', opened: 0, sentRewards: 0 },
     stats: {
@@ -399,6 +409,8 @@ export function serialize(state: GameState): string {
     fishing: { ...state.fishing, caught: { ...state.fishing.caught } },
     fleet: { ...state.fleet, ranks: { ...state.fleet.ranks }, job: state.fleet.job ? { ...state.fleet.job } : null },
     visitors: { ...state.visitors, here: state.visitors.here ? { ...state.visitors.here } : null, hearts: { ...state.visitors.hearts }, met: { ...state.visitors.met } },
+    garden: { plots: state.garden.plots.map((x) => (x ? { ...x } : null)), snacks: { ...state.garden.snacks }, harvested: state.garden.harvested },
+    dive: { ...state.dive },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
     stats: { ...state.stats },
@@ -621,6 +633,26 @@ export function deserialize(json: string | null, now: number): GameState | null 
       if (hearts > 0) v.hearts[x.id] = hearts;
       if (met > 0) v.met[x.id] = met;
     }
+  }
+  const gd = data.garden;
+  if (gd && typeof gd === 'object') {
+    const g = state.garden;
+    g.harvested = int(gd.harvested);
+    if (Array.isArray(gd.plots))
+      g.plots = gd.plots.slice(0, 4).map((p) => (p && typeof p === 'object' && CROPS.some((c) => c.id === p.crop) && typeof p.at === 'number' && Number.isFinite(p.at) ? { crop: p.crop, at: Math.min(p.at, now) } : null));
+    if (gd.snacks && typeof gd.snacks === 'object')
+      for (const k of ['income', 'tap', 'crates', 'boss'] as SnackKind[]) {
+        const sn = (gd.snacks as Record<string, { mult?: unknown; until?: unknown }>)[k];
+        if (sn && typeof sn.mult === 'number' && typeof sn.until === 'number' && sn.mult > 0 && sn.mult <= 5) g.snacks[k] = { mult: sn.mult, until: sn.until };
+      }
+  }
+  const dv = data.dive;
+  if (dv && typeof dv === 'object') {
+    const d = state.dive;
+    d.charges = Math.min(DIVE.chargesMax, int(dv.charges));
+    d.chargeAt = typeof dv.chargeAt === 'number' && Number.isFinite(dv.chargeAt) ? Math.min(dv.chargeAt, now) : now;
+    d.best = int(dv.best);
+    d.dives = int(dv.dives);
   }
   state.rig = data.rig === true;
   const fr = data.friends;

@@ -1929,3 +1929,60 @@ body.intro :is(.modal, .sample-ad, .fanfare, .confetti, .sector-card, .boss-aler
 .guest-face { flex: none; width: 46px; height: 46px; }
 .guest small { display: block; font-size: 12px; color: var(--ink-dim); }
 .guest-note { font-size: 12px; line-height: 1.35; color: var(--ink-dim); margin-top: 2px; }
+
+/* ---------- Garden (Station > Garden) ---------- */
+.garden-snacks { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.snack-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 99px; background: rgb(255 209 102 / 0.14); border: 1px solid rgb(255 209 102 / 0.4); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.snack-chip svg { width: 14px; height: 14px; color: #ffd166; }
+.snack-none { font-size: 12.5px; color: var(--ink-dim); }
+.garden-plots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.plot { position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; min-height: 128px; padding: 10px 8px; border-radius: 16px; border: 1px solid rgb(157 255 107 / 0.25); background: radial-gradient(90% 70% at 50% 100%, rgb(157 255 107 / 0.12), transparent 70%), rgb(6 8 24 / 0.5); color: inherit; font: inherit; text-align: center; }
+.plot:disabled { cursor: default; opacity: 1; }
+.plot.empty { border-style: dashed; color: var(--ink-dim); }
+.plot.empty .plot-art { width: 40px; height: 40px; margin: 12px 0 6px; opacity: 0.35; }
+.plot.locked { display: grid; place-items: center; align-content: center; gap: 6px; border-style: dashed; border-color: rgb(140 150 210 / 0.2); color: var(--ink-dim); }
+.plot.locked > svg { width: 20px; height: 20px; opacity: 0.6; }
+.plot-art { width: 64px; height: 64px; display: block; }
+.plot-art svg { width: 100%; height: 100%; }
+.plot b { font-family: var(--font-display); font-size: 14px; }
+.plot small { font-size: 11.5px; color: var(--ink-dim); }
+.plot.ripe { cursor: pointer; border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 0 18px color-mix(in srgb, var(--c) 40%, transparent); animation: ripe-bob 1.8s ease-in-out infinite; }
+.plot.ripe small { color: var(--c); font-weight: 700; }
+@keyframes ripe-bob { 50% { transform: translateY(-2px); } }
+.plot-bar { width: 80%; height: 5px; margin-top: 4px; border-radius: 3px; background: rgb(255 255 255 / 0.1); overflow: hidden; }
+.plot-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #7ed957, var(--c)); }
+.garden-harvest { width: 100%; margin-top: 10px; }
+.seed { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: rgb(6 8 24 / 0.45); border: 1px solid color-mix(in srgb, var(--c, #8a90c0) 30%, transparent); }
+.seed.locked { opacity: 0.55; }
+.seed-art { width: 44px; height: 44px; display: grid; place-items: center; }
+.seed-art svg { width: 100%; height: 100%; }
+.seed.locked .seed-art svg { width: 20px; height: 20px; }
+.seed b { font-family: var(--font-display); font-size: 15px; }
+.seed small { display: block; font-size: 12px; line-height: 1.35; color: var(--ink-dim); }
+.seed .crew-btn { min-width: 0; margin: 0; }
+
+/* ---------- Salvage dives ---------- */
+.dive-card { padding-top: 14px; }
+.dive-hud { display: flex; align-items: center; gap: 10px; margin: 0 40px 8px 0; font-family: var(--font-display); }
+.dive-pts { font-size: 18px; font-variant-numeric: tabular-nums; color: #ffd166; white-space: nowrap; }
+.dive-lives { display: flex; gap: 3px; }
+.dive-lives i { width: 10px; height: 10px; border-radius: 50%; background: rgb(255 255 255 / 0.15); }
+.dive-lives i.on { background: #ff5d6c; box-shadow: 0 0 6px #ff5d6c; }
+.dive-timebar { flex: 1; height: 6px; border-radius: 3px; background: rgb(255 255 255 / 0.1); overflow: hidden; }
+.dive-timebar > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #4fe3c1, #7cf0ff); }
+.dive-field { position: relative; border-radius: 16px; overflow: hidden; touch-action: none; }
+#dive-canvas { display: block; width: 100%; height: 360px; touch-action: none; }
+.dive-over { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 20px; text-align: center; background: rgb(6 8 24 / 0.6); backdrop-filter: blur(2px); }
+.dive-msg { display: grid; gap: 4px; font-size: 13.5px; line-height: 1.4; max-width: 280px; }
+.dive-msg b { font-family: var(--font-display); font-size: 20px; }
+.dive-score { color: #ffd166; font-size: 26px !important; }
+.dive-best { color: #ffd166; font-weight: 700; }
+.dive-over .primary { min-width: 160px; }
+.dive-over small { font-size: 12px; color: var(--ink-dim); }
+
+/* With the menu open the view is half as tall: the button column goes compact (no words) so it
+   stays clear of the menu, and wraps into a second column on very short screens. */
+#app:not(.panel-closed) .side-rail { gap: 6px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 38px); max-height: calc(100% - 16px); direction: rtl; }
+#app:not(.panel-closed) .side-rail > * { direction: ltr; }
+#app:not(.panel-closed) .hud-btn small { display: none; }
+#app:not(.panel-closed) .hud-btn .round-btn { width: 32px; height: 32px; padding: 6px; }

@@ -24,6 +24,8 @@ import { FINALE_ID, storyDone } from './core/story';
 import { festivalActive } from './core/festival';
 import { FLEET, SHIPS, powerText, shipsBuilt } from './core/fleet';
 import { visitorHere } from './core/visitors';
+import { SNACK_TEXT, snackMult } from './core/garden';
+import { DivePanel } from './ui/dive-ui';
 import { crewLine } from './core/crew-talk';
 import type { CrewId } from './core/content';
 import { FestivalPanel } from './ui/festival-ui';
@@ -184,7 +186,7 @@ async function boot(): Promise<void> {
   scene.setViewZoom(game.state.settings.viewZoom);
   scene.setBatterySaver(game.state.settings.batterySaver);
   const syncPerks = () =>
-    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state) * contractCrateMult(game.state) * (weeklyOn(game.state, 'comets') ? 2 : 1));
+    scene.setCrateRate((eco.hasPerk(game.state, 'magnet') ? 2 : 1) * eco.researchProduct(game.state, 'crateRate') * (meta.petActive(game.state, 'pup') ? 1.5 : 1) * sectorCrateMult(game.state) * contractCrateMult(game.state) * (weeklyOn(game.state, 'comets') ? 2 : 1) * snackMult(game.state, 'crates', Date.now()));
   syncPerks();
   const syncDecor = () => {
     const s = game.state;
@@ -234,6 +236,13 @@ async function boot(): Promise<void> {
     miss: () => sfx.reelMiss(),
     escape: () => sfx.escape(),
     landed: (c) => (c.rarity === 'common' || c.rarity === 'uncommon' ? sfx.coins() : sfx.achievement()),
+    buzz: (ms) => buzz(ms),
+  });
+  const dive = new DivePanel(game, (d) => fmt(d), {
+    catch: (kind) => (kind === 'scrap' ? sfx.reelHit(1) : kind === 'gold' ? sfx.coins() : sfx.crate()),
+    hurt: () => sfx.reelMiss(),
+    start: () => sfx.boost(),
+    end: () => sfx.event(),
     buzz: (ms) => buzz(ms),
   });
   const festival = new FestivalPanel(game, () => {
@@ -302,7 +311,11 @@ async function boot(): Promise<void> {
   if (import.meta.env.DEV) Object.assign(window, { __friends: friends });
   // Test builds (VITE_PROBE=1) expose the game and scene to scripted checks.
   if (import.meta.env.VITE_PROBE) Object.assign(window, { __game: game, __scene: scene });
-  window.setInterval(() => syncDaylight(), 20_000);
+  window.setInterval(() => {
+    syncDaylight();
+    // A crate snack from the garden may have run out.
+    syncPerks();
+  }, 20_000);
   ui.onDayNightChange = () => {
     lastPhase = null;
     syncDaylight();
@@ -791,6 +804,24 @@ async function boot(): Promise<void> {
         if (e.result.surge) scene.celebrate(0x7cf0ff);
         break;
       }
+      case 'garden': {
+        if (e.phase === 'plant') {
+          sfx.buy();
+          break;
+        }
+        const sn = e.crop.snack;
+        ui.toast(ICONS.bolt.replace('currentColor', e.crop.color), `<b>${sn.name}!</b> ${sn.mult}x ${SNACK_TEXT[sn.kind]} for ${sn.minutes} minutes${e.crystals ? `, +${e.crystals} crystals` : ''}`);
+        scene.celebrate(parseInt(e.crop.color.slice(1), 16));
+        sfx.coins();
+        buzz(20);
+        syncPerks();
+        break;
+      }
+      case 'dive':
+        dive.showResult(e);
+        if (e.scrap.gt(0)) ui.bigGain(e.scrap);
+        if (e.best) sfx.fanfare();
+        break;
       case 'bossEscape':
         scene.setBoss(null);
         ui.toast(ICONS.warp, '<b>The wreck flew away!</b> Break the next one within a minute.');
@@ -1204,6 +1235,7 @@ async function boot(): Promise<void> {
       ui.render();
       festival.render();
       fishing.render();
+      dive.render();
       syncCrew();
       scene.crewChatter = game.state.tutorial < 0 && !introShowing();
       syncFestival();

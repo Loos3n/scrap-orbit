@@ -29,6 +29,7 @@ import {
   type StreakReward,
 } from './content';
 import { addPlates, fleetOpen, fleetPower } from './fleet';
+import { snackMult } from './garden';
 import { VISITS, hearts, pickVisitor, visitorHere, type VisitReward, type VisitorId } from './visitors';
 import { FISHING } from './fishing';
 import { baseIncome, claimableCores, earn, giveStarterKit, globalMult, income, researchProduct, resetRun, tapValue } from './economy';
@@ -461,7 +462,7 @@ export function bossReward(state: GameState, now: number): Decimal {
 
 /** Damage multiplier on boss wrecks (the Goo Blob likes to chew). */
 export function bossDamageMult(state: GameState): number {
-  return (petActive(state, 'blob') ? 1.5 : 1) * (1 + bonuses(state).boss);
+  return (petActive(state, 'blob') ? 1.5 : 1) * (1 + bonuses(state).boss) * snackMult(state, 'boss', Date.now());
 }
 
 /**

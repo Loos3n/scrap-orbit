@@ -10,7 +10,7 @@ export const GROUPS: Record<string, readonly string[]> = {
   crew: ['crew', 'trips', 'pets'],
   lab: ['lab'],
   prestige: ['cores', 'challenges', 'galaxy', 'fleet'],
-  station: ['station', 'decor'],
+  station: ['station', 'decor', 'garden'],
 };
 
 export const GROUP_NAMES: Record<string, string> = { build: 'Build', crew: 'Crew', lab: 'Lab', prestige: 'Prestige', station: 'Station' };
@@ -27,6 +27,7 @@ export const PANE_NAMES: Record<string, string> = {
   fleet: 'Fleet',
   station: 'Rooms',
   decor: 'Decor',
+  garden: 'Garden',
 };
 
 export const ALL_PANES = Object.values(GROUPS).flat();

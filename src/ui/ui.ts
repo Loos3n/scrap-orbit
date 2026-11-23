@@ -22,6 +22,7 @@ import { LootShelf, ModulePanel, TripPanel, renderCrateBuffs, renderGoldenBanner
 import { SETS } from '../core/collection';
 import { BookPanel, SafeGame, SkinPanel } from './book-ui';
 import { FleetPanel } from './fleet-ui';
+import { GardenPanel } from './garden-ui';
 import { VisitorPanel } from './visitor-ui';
 import { ChallengePanel, TraderPanel, offlineReportHtml } from './trade-ui';
 import { GalaxyPanel } from './galaxy-ui';
@@ -157,6 +158,7 @@ export class UI {
   private contracts: ContractPanel;
   private galaxy: GalaxyPanel;
   private fleet: FleetPanel;
+  private garden: GardenPanel;
   readonly visitors: VisitorPanel;
   private panel!: PanelToggle;
   readonly streak: StreakModal;
@@ -201,6 +203,7 @@ export class UI {
     this.contracts = new ContractPanel(game);
     this.galaxy = new GalaxyPanel(game);
     this.fleet = new FleetPanel(game);
+    this.garden = new GardenPanel(game);
     this.visitors = new VisitorPanel(game, this.fmt);
     $('rate-btn').addEventListener('click', () => this.info.open({ kind: 'income' }));
     this.streak = new StreakModal(game, this.fmt);
@@ -763,7 +766,8 @@ export class UI {
     $('galaxy-dot').hidden = !(meta.galaxyOpen(s) && meta.starsOnShift(s) > 0) && !STAR_NODES.some((n) => !s.galaxy.map.has(n.id) && s.galaxy.stars >= n.cost);
     $('fleet-dot').hidden = !this.fleet.hasNews();
     $('prestige-dot').hidden = !tabOpen(s, 'prestige') || ($('cores-dot').hidden && $('galaxy-dot').hidden && $('fleet-dot').hidden);
-    if (!tabOpen(s, 'station')) $('station-dot').hidden = true;
+    $('garden-dot').hidden = !this.garden.hasNews();
+    $('station-dot').hidden = !tabOpen(s, 'station') || $('garden-dot').hidden;
     // With the menu hidden, the square carries a dot when any tab has something new.
     $('menu-dot').hidden = this.panel.open || ['build-dot', 'crew-dot', 'lab-dot', 'prestige-dot', 'station-dot'].every((id) => $(id).hidden);
     if (!$('tab-decor').hidden) {
@@ -789,6 +793,7 @@ export class UI {
     this.contracts.render();
     this.galaxy.render();
     this.fleet.render();
+    this.garden.render();
     this.visitors.render();
     this.coach.render();
     this.info.render();
