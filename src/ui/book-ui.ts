@@ -3,6 +3,7 @@ import * as meta from '../core/meta';
 import { formatDuration, type Decimal } from '../core/num';
 import type { Game } from '../game';
 import { ICONS } from './icons';
+import { colorBlindOn } from './comfort';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const hex = (c: number) => '#' + c.toString(16).padStart(6, '0');
@@ -87,7 +88,7 @@ export class SafeGame {
     this.dir = 1;
     this.newZone();
     this.drawLocks();
-    setText($('safe-status'), 'Tap the dial when the needle is in the green.');
+    setText($('safe-status'), `Tap the dial when the needle is in the ${colorBlindOn() ? 'blue' : 'green'}.`);
     $('safe-done').hidden = true;
     $('safe').hidden = false;
     $('safe').classList.remove('won', 'jammed');

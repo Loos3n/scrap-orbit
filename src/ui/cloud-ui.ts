@@ -1,4 +1,4 @@
-import { cloudAvailable, download, signIn, signOut, upload, watchUser, type CloudSave } from '../cloud';
+import { cloudAvailable, deleteCloudData, download, signIn, signOut, upload, watchUser, type CloudSave } from '../cloud';
 import { D, type Decimal } from '../core/num';
 import { exportCode, importCode } from '../core/state';
 import type { Game } from '../game';
@@ -48,6 +48,10 @@ export class CloudPanel {
       this.status('Signed out. Your station stays on this device.');
     }));
     $('cloud-use').addEventListener('click', () => this.useCloud());
+    // Deleting the cloud copy can't be undone, so it asks first.
+    $('cloud-delete').addEventListener('click', () => ($('cloud-delete-confirm').hidden = false));
+    $('cloud-delete-no').addEventListener('click', () => ($('cloud-delete-confirm').hidden = true));
+    $('cloud-delete-yes').addEventListener('click', () => void this.run(() => this.deleteAll()));
     // Keeping this station replaces the cloud copy for good, so it takes a second tap to confirm.
     const keep = $('cloud-keep');
     keep.addEventListener('click', () => {
@@ -71,7 +75,8 @@ export class CloudPanel {
       // Already signed in when the game opened: check the cloud before backing anything up.
       else if (!wasSignedIn && !this.synced && !this.busy) void this.run(() => this.checkOnOpen());
       $('cloud-signin').hidden = this.signedIn;
-      for (const id of ['cloud-backup', 'cloud-restore', 'cloud-signout']) $(id).hidden = !this.signedIn;
+      for (const id of ['cloud-backup', 'cloud-restore', 'cloud-signout', 'cloud-delete']) $(id).hidden = !this.signedIn;
+      if (!user) $('cloud-delete-confirm').hidden = true;
       if (user) this.status(`Signed in as ${user.displayName || user.email || 'you'}. ${this.lastText()}`);
     });
     window.setInterval(() => {
@@ -218,6 +223,19 @@ export class CloudPanel {
     $('cloud-choice-text').textContent = `The cloud has a station from ${when} with ${this.fmt(D(cloud.allTime))} scrap salvaged (${cloud.relocations} relocations). This one has ${this.fmt(this.game.state.allTime)}. Which do you want to keep?`;
     $('cloud-choice').hidden = false;
     this.status('Backups are paused until you pick which station to keep.');
+  }
+
+  /** Settings > Delete my cloud save: wipes the cloud copy and the friend profile, then signs out. */
+  private async deleteAll(): Promise<void> {
+    $('cloud-delete-confirm').hidden = true;
+    $('cloud-choice').hidden = true;
+    // No backup may slip in while (or after) the cloud copy is deleted.
+    this.pending = null;
+    this.synced = false;
+    this.status('Deleting your cloud save…');
+    await deleteCloudData();
+    this.lastBackup = 0;
+    this.status('Your cloud save, friend code and gifts are deleted, and you are signed out. Your station stays on this device.');
   }
 
   private useCloud(): void {

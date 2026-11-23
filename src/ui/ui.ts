@@ -1,4 +1,6 @@
+import { Capacitor } from '@capacitor/core';
 import { Graphs } from './graphs';
+import { applyComfort } from './comfort';
 import { ContractPanel } from './contract-ui';
 import { CloudPanel } from './cloud-ui';
 import { playRewardedAd } from '../ads';
@@ -11,7 +13,7 @@ import { ACHIEVEMENTS, type AchievementDef } from '../core/achievements';
 import { ACHIEVEMENT_BONUS, BOOST, CLAW, CORE_PERKS, GENERATORS, MARKS, MILESTONE_MULT, UPGRADES, type GeneratorId, type PerkId, type UpgradeDef } from '../core/config';
 import * as eco from '../core/economy';
 import { bestPurchase, goalByKey, goalProgress, pickGoal, type Purchase } from '../core/advisor';
-import { exportCode, importCode, type GameState } from '../core/state';
+import { exportCode, importCode, type GameState, type TextSize } from '../core/state';
 import { CREW, PETS, RESEARCH, sectorFor } from '../core/content';
 import { CHALLENGES, LOOT, MODULES } from '../core/expansion';
 import { D, Decimal, format, formatDuration, type NumberStyle } from '../core/num';
@@ -493,6 +495,7 @@ export class UI {
     const shake = $<HTMLInputElement>('opt-shake');
     const auto = $<HTMLInputElement>('opt-auto');
     const nums = document.querySelectorAll<HTMLButtonElement>('#opt-numbers button');
+    const sizes = document.querySelectorAll<HTMLButtonElement>('#opt-text button');
     const pct = (v: number) => (v > 0 ? `${Math.round(v * 100)}%` : 'Off');
     const sync = () => {
       const o = settings();
@@ -511,12 +514,18 @@ export class UI {
       shake.checked = o.reduceShake;
       document.body.classList.toggle('reduce-flash', o.reduceFlash);
       document.body.classList.toggle('reduce-shake', o.reduceShake);
+      applyComfort(o);
+      ($('opt-cb') as HTMLInputElement).checked = o.colorBlind;
+      ($('opt-lefty') as HTMLInputElement).checked = o.leftHanded;
+      sizes.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.size === o.textSize)));
       nums.forEach((b) => b.setAttribute('aria-checked', String(b.dataset.num === o.numbers)));
       this.onSoundChange?.(o.sfxVol, o.musicVol);
       this.onComfortChange?.(o.reduceFlash, o.reduceShake);
     };
     this.syncSettings = sync;
     sync();
+    // In the app the policy opens in the phone's browser, from the game's website.
+    if (Capacitor.isNativePlatform()) document.querySelector<HTMLAnchorElement>('.legal-links a')!.href = 'https://scrap-orbit.web.app/privacy.html';
     $('settings-btn').addEventListener('click', () => {
       sync();
       $('settings').hidden = false;
@@ -577,6 +586,26 @@ export class UI {
     });
     shake.addEventListener('change', () => {
       settings().reduceShake = shake.checked;
+      sync();
+    });
+    sizes.forEach((b) =>
+      b.addEventListener('click', () => {
+        settings().textSize = b.dataset.size as TextSize;
+        sync();
+        // Bigger text can change how much fits, so lines that shorten themselves measure again.
+        this.goalFit = '';
+        this.render();
+        window.dispatchEvent(new Event('resize'));
+      }),
+    );
+    const cb = $('opt-cb') as HTMLInputElement;
+    cb.addEventListener('change', () => {
+      settings().colorBlind = cb.checked;
+      sync();
+    });
+    const lefty = $('opt-lefty') as HTMLInputElement;
+    lefty.addEventListener('change', () => {
+      settings().leftHanded = lefty.checked;
       sync();
     });
     $('replay-tutorial').addEventListener('click', () => {
@@ -1310,3 +1339,4 @@ export class UI {
     setTimeout(() => el.remove(), 2900);
   }
 }
+

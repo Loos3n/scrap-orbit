@@ -74,6 +74,13 @@ export function incomePurchases(state: GameState): Purchase[] {
   return out;
 }
 
+/** Seconds to save up for a purchase plus seconds for its extra income to earn back its price. */
+function score(state: GameState, p: Purchase, income: Decimal): number {
+  const short = p.cost.sub(state.scrap);
+  const wait = short.lte(0) ? 0 : income.gt(0) ? short.div(income).toNumber() : Infinity;
+  return wait + p.cost.div(p.gain).toNumber();
+}
+
 /**
  * The purchase that pays off soonest: seconds to save up for it, plus seconds for its extra
  * income to earn back its price. Waiting counts, so a far-off bargain loses to something buyable now.
@@ -82,21 +89,39 @@ export function bestPurchase(state: GameState): Purchase | null {
   const income = worth(state);
   let best: Purchase | null = null;
   let bestScore = Infinity;
-  for (const p of incomePurchases(state)) {
-    const short = p.cost.sub(state.scrap);
-    const wait = short.lte(0) ? 0 : income.gt(0) ? short.div(income).toNumber() : Infinity;
-    const score = wait + p.cost.div(p.gain).toNumber();
-    if (score < bestScore || (score === bestScore && best && p.cost.lt(best.cost))) {
+  const all = incomePurchases(state);
+  for (const p of all) {
+    const sc = score(state, p, income);
+    if (sc < bestScore || (sc === bestScore && best && p.cost.lt(best.cost))) {
       best = p;
-      bestScore = score;
+      bestScore = sc;
     }
   }
+  // A brand-new machine opens the next tier (and the goals and tasks that wait on it), which its
+  // payback alone never counts: when it pays off nearly as soon, save for it rather than stack older ones.
+  const fresh = best && best.kind === 'machine' && state.owned[best.id] === 0 ? null : newMachine(state, all, income, bestScore);
+  if (fresh) return fresh;
   // With no income yet, the first machine is the way forward.
   if (!best && income.lte(0)) {
     const id = GENERATORS[0].id;
     return { kind: 'machine', id, count: 1, cost: costFor(genById(id), state.owned[id], 1, costDiscount(state)), gain: D(0) };
   }
   return best;
+}
+
+/**
+ * How much slower a brand-new machine may pay off than the best buy and still be chosen: opening
+ * the next tier (and the goals, tasks and milestones that wait on it) is worth more than its payback says.
+ */
+export const NEW_MACHINE_EDGE = 2;
+
+/** The first unit of the next machine, when it pays off nearly as soon as the best buy. */
+function newMachine(state: GameState, all: Purchase[], income: Decimal, bestScore: number): Purchase | null {
+  for (const p of all) {
+    if (p.kind !== 'machine' || p.count !== 1 || state.owned[p.id] !== 0) continue;
+    if (score(state, p, income) <= bestScore * NEW_MACHINE_EDGE) return p;
+  }
+  return null;
 }
 
 export type Goal = {

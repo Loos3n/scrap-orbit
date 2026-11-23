@@ -26,6 +26,10 @@ export interface Mission {
   claimed: boolean;
 }
 
+/** Text sizes on offer in Settings, Comfort. */
+export const TEXT_SIZES = ['normal', 'large', 'larger'] as const;
+export type TextSize = (typeof TEXT_SIZES)[number];
+
 export interface GameState {
   scrap: Decimal;
   /** Scrap earned this run; resets when the station relocates. */
@@ -196,6 +200,12 @@ export interface GameState {
     adOffers: boolean;
     /** Day and night follow the device clock (core/daynight.ts); off keeps it always day. */
     dayNight: boolean;
+    /** How big the menu and window text is drawn. */
+    textSize: TextSize;
+    /** Colours that read for red-green colour blindness: blue for go, orange for danger. */
+    colorBlind: boolean;
+    /** Mirrors the screen's buttons so the round buttons, Overdrive and menu square sit on the left. */
+    leftHanded: boolean;
   };
 }
 
@@ -356,7 +366,7 @@ export function newState(now: number): GameState {
     boostUntil: 0,
     boostReadyAt: 0,
     lastSeen: now,
-    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true, adOffers: true, dayNight: true },
+    settings: { numbers: 'letters', haptics: true, sound: true, music: true, sfxVol: 0.8, musicVol: 0.6, reduceFlash: false, reduceShake: false, autoBuy: true, viewZoom: 1, batterySaver: false, notifications: true, adOffers: true, dayNight: true, textSize: 'normal', colorBlind: false, leftHanded: false },
   };
 }
 
@@ -717,6 +727,9 @@ export function deserialize(json: string | null, now: number): GameState | null 
   state.settings.reduceFlash = settings.reduceFlash === true;
   state.settings.reduceShake = settings.reduceShake === true;
   state.settings.dayNight = settings.dayNight !== false;
+  state.settings.textSize = (TEXT_SIZES as readonly unknown[]).includes(settings.textSize) ? (settings.textSize as TextSize) : 'normal';
+  state.settings.colorBlind = settings.colorBlind === true;
+  state.settings.leftHanded = settings.leftHanded === true;
   state.settings.viewZoom = typeof settings.viewZoom === 'number' && Number.isFinite(settings.viewZoom) ? settings.viewZoom : 1;
   return state;
 }
