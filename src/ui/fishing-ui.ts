@@ -211,7 +211,7 @@ export class FishingPanel {
     this.timer = window.setTimeout(() => {
       this.reset();
       $('fish-msg').textContent = 'It nibbled the bait and swam off. Cast again!';
-    }, 1500);
+    }, FISHING.biteMs);
   }
 
   private hookIt(): void {
@@ -274,7 +274,7 @@ export class FishingPanel {
     const at = this.marker();
     const bar = $('fish-bar');
     // A little forgiveness at the edges of the green.
-    if (at >= this.zone0 - 0.02 && at <= this.zone0 + r.zone + 0.02) {
+    if (at >= this.zone0 - FISHING.edge && at <= this.zone0 + r.zone + FISHING.edge) {
       this.hits++;
       this.hooks.hit(this.hits);
       this.hooks.buzz(15);
@@ -283,7 +283,7 @@ export class FishingPanel {
       bar.classList.add('good');
       this.pips();
       if (this.hits >= r.hits) return this.land();
-      this.speed *= 1.12;
+      this.speed *= FISHING.ramp;
       this.newZone(at);
     } else {
       this.misses++;

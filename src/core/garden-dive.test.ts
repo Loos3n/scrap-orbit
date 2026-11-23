@@ -80,3 +80,24 @@ describe('Salvage dives', () => {
     expect(back.dive.best).toBe(33);
   });
 });
+
+describe('minigame difficulty', () => {
+  it('keeps dives tougher but fair', async () => {
+    const { DIVE, DROPS } = await import('./dive');
+    const total = Object.values(DROPS).reduce((n, d) => n + d.weight, 0);
+    expect(DROPS.mine.weight / total).toBeGreaterThan(0.25);
+    expect(DROPS.mine.weight / total).toBeLessThan(0.4);
+    expect(DIVE.spawnGap - DIVE.spawnSqueeze).toBeGreaterThan(0.1);
+    expect(DIVE.reach).toBeGreaterThanOrEqual(20);
+  });
+
+  it('gives each rarer catch a smaller, faster green zone', async () => {
+    const { FISHING, RARITY } = await import('./fishing');
+    const order = ['common', 'uncommon', 'rare', 'legendary'] as const;
+    for (let i = 1; i < order.length; i++) {
+      expect(RARITY[order[i]].zone).toBeLessThan(RARITY[order[i - 1]].zone);
+      expect(RARITY[order[i]].speed).toBeGreaterThan(RARITY[order[i - 1]].speed);
+    }
+    expect(FISHING.biteMs).toBeGreaterThanOrEqual(900);
+  });
+});
