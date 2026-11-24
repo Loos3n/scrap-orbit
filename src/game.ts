@@ -25,6 +25,7 @@ import * as meta from './core/meta';
 import { D, type Decimal } from './core/num';
 import { deserialize, newState, serialize, type GameState } from './core/state';
 import * as whale from './core/whale';
+import * as planet from './core/planet';
 
 const SAVE_KEY = 'scrap-orbit-save';
 const AUTOSAVE_MS = 30_000;
@@ -118,7 +119,16 @@ export type GameEvent =
   | { type: 'rankReady' }
   | { type: 'rank'; claim: RankClaim }
   /** Stardrifter (core/whale.ts): the egg turned up, hatched, ate, grew, gulped a wreck, sang, or towed the station. */
-  | WhaleEvent;
+  | WhaleEvent
+  /** The living planet (core/planet.ts): found, a pod landed, a project took hold, a new era, a path, a shuttle, a story. */
+  | PlanetEvent;
+
+export type PlanetEvent =
+  | { type: 'planet'; kind: 'found' | 'name' | 'path' }
+  | { type: 'planet'; kind: 'pod'; filled: boolean }
+  | { type: 'planet'; kind: 'settled'; done: planet.Settled }
+  | { type: 'planet'; kind: 'shuttle'; value: Decimal }
+  | { type: 'planet'; kind: 'story'; era: planet.PlanetEra; phase: 'ready' | 'heard' };
 
 export type WhaleEvent =
   | { type: 'whale'; kind: 'egg' | 'warm' | 'hatch' | 'pet' | 'tow' | 'name' }
@@ -255,6 +265,86 @@ export class Game {
   }
 
   private whaleSongShown = '';
+
+  /** What the next pod to the planet costs, in scrap (never less than a drone) or crystals. */
+  planetPodCost(): { scrap: Decimal; crystals: number } | null {
+    const c = planet.podCost(this.state);
+    if (!c) return null;
+    if (c.kind === 'crystals') return { scrap: D(0), crystals: c.n };
+    const v = eco.baseIncome(this.state).mul(60 * c.minutes);
+    return { scrap: v.lt(15) ? D(15) : v, crystals: 0 };
+  }
+
+  canAffordPod(): boolean {
+    const c = this.planetPodCost();
+    return !!c && planet.canSendPod(this.state) && this.state.scrap.gte(c.scrap) && this.state.crystals >= c.crystals;
+  }
+
+  /** Sends a salvage pod down to the planet. */
+  sendPod(): boolean {
+    const c = this.planetPodCost();
+    if (!c || !this.canAffordPod()) return false;
+    const landed = planet.landPod(this.state, Date.now());
+    if (!landed) return false;
+    this.state.scrap = this.state.scrap.sub(c.scrap);
+    this.state.crystals -= c.crystals;
+    this.emit({ type: 'planet', kind: 'pod', filled: landed === 'filled' });
+    if (landed === 'filled') this.save();
+    return true;
+  }
+
+  choosePlanetPath(path: planet.PlanetPath): void {
+    if (!planet.choosePath(this.state, path)) return;
+    this.emit({ type: 'planet', kind: 'path' });
+    this.save();
+  }
+
+  renamePlanet(raw: string): void {
+    const name = planet.cleanPlanetName(raw);
+    if (!name || !this.state.planet.found) return;
+    this.state.planet.name = name;
+    this.emit({ type: 'planet', kind: 'name' });
+  }
+
+  hearPlanetStory(): void {
+    const era = planet.pendingStory(this.state);
+    if (!era || !planet.hearStory(this.state)) return;
+    this.planetStoryShown = '';
+    this.emit({ type: 'planet', kind: 'story', era, phase: 'heard' });
+    this.save();
+  }
+
+  private planetStoryShown = '';
+
+  /** Once a second: the scanners finding it, a project taking hold, a trade shuttle, a story waiting. */
+  private updatePlanet(now: number): void {
+    const s = this.state;
+    if (planet.planetDue(s)) {
+      planet.findPlanet(s, now);
+      this.emit({ type: 'planet', kind: 'found' });
+      this.save();
+    }
+    if (!s.planet.found) return;
+    const done = planet.settleIfReady(s, now);
+    if (done) {
+      this.emit({ type: 'planet', kind: 'settled', done });
+      this.save();
+    }
+    if (planet.shuttleDue(s, now)) {
+      const minutes = planet.shuttleDue(s, now);
+      planet.scheduleShuttle(s, now);
+      const value = eco.baseIncome(s).mul(60 * minutes);
+      if (value.gt(0)) {
+        eco.earn(s, value);
+        this.emit({ type: 'planet', kind: 'shuttle', value });
+      }
+    }
+    const story = planet.pendingStory(s);
+    if (story && story.id !== this.planetStoryShown) {
+      this.planetStoryShown = story.id;
+      this.emit({ type: 'planet', kind: 'story', era: story, phase: 'ready' });
+    }
+  }
 
   /** Once a second: the egg hatching, hunger and mood, a gulp, and a song waiting to be heard. */
   private updateWhale(now: number): void {
@@ -452,6 +542,7 @@ export class Game {
     if (visitor) this.emit({ type: 'visitor', phase: visitor });
     this.checkFleet(now);
     this.updateWhale(now);
+    this.updatePlanet(now);
     meta.noteCollection(s);
     for (const set of meta.checkSets(s)) this.emit({ type: 'set', id: set.id });
     // Decorations wait for the tutorial to finish, so it stays uncluttered.

@@ -11,6 +11,8 @@ import type { CrewId } from '../core/content';
 import { CrewDeck } from './crew-deck';
 import { BAY_RADIUS, Bays, bayTier, type BayId } from './bays';
 import { WhaleView } from './whale-view';
+import { PlanetView } from './planet-view';
+import type { PlanetLook } from './planet-art';
 
 /** Glow colours for Mk II to Mk V: chrome, cyan core, gold, prism violet. */
 const MARK_TINTS = [0xeaf2ff, 0x5ce1ff, 0xffd166, 0xc58cff];
@@ -253,6 +255,8 @@ export class StationScene {
   /** Stardrifter (scene/whale-view.ts): a grown whale glides here, behind everything on the station. */
   private whaleFar = new Container();
   private whaleView: WhaleView | null = null;
+  /** The living planet (scene/planet-view.ts), hanging in the sky beside the station. */
+  private planetView: PlanetView | null = null;
   private fleet: { id: string; s: Sprite; lamp: Sprite; a: number; t: number; tint: number }[] = [];
   private fleetT = 0;
   /** A visitor's shuttle at the dock. */
@@ -324,7 +328,7 @@ export class StationScene {
   /** The open band of screen between the HUD and the panel, where the station sits. */
   private focus = { top: 0, bottom: 0, left: 0, right: 0 };
   /** Where layout() puts things before the player's pan is added. */
-  private home = { world: { x: 0, y: 0 }, planet: { x: 0, y: 0 }, galaxy: { x: 0, y: 0 } };
+  private home = { world: { x: 0, y: 0 }, planet: { x: 0, y: 0 }, galaxy: { x: 0, y: 0 }, living: { x: 0, y: 0, r: 40 } };
   /** The view's offset in screen pixels: `raw` follows the finger, `pan` is what is shown. */
   private pan = { x: 0, y: 0 };
   private panRaw = { x: 0, y: 0 };
@@ -392,6 +396,7 @@ export class StationScene {
       burst: (x, y, color, count, power) => this.burst(x, y, color, count, power),
       ring: (x, y, r, color) => this.rings.push({ x, y, r, life: 1, color, width: 3 }),
     });
+    this.planetView = new PlanetView(this.tex.glow, this.tex.streak, Math.min(window.devicePixelRatio || 1, MAX_RES), this.reducedMotion);
     this.coreSpill.texture = this.tex.glow;
     this.coreSpill.anchor.set(0.5);
     this.coreSpill.blendMode = 'add';
@@ -439,7 +444,7 @@ export class StationScene {
     this.flareGlow.alpha = 0;
     this.world.addChild(this.farLayer, this.whaleFar, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.bays.back, this.dockLayer, this.bays.layer, this.machineLayer, this.coreSpill, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
     this.app.stage.sortableChildren = true;
-    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
+    const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.planetView!.layer, 9], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.planetView!.flyLayer, 11], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
       c.zIndex = i;
       this.app.stage.addChild(c);
@@ -944,6 +949,10 @@ export class StationScene {
     if (this.sector.look === 'hole') this.home.planet = { x: cx + Math.min(fw, 540) * 0.3, y: top + fh * 0.1 };
     this.moon.scale.set(ps / 220);
     this.home.galaxy = { x: left + fw * 0.16, y: top + fh * 0.86 };
+    // The living planet hangs off the left edge, halfway down, peeking out from behind the station.
+    const lr = Math.max(34, Math.min(fw * 0.19, fh * 0.2, 130));
+    const narrow = fw < 700;
+    this.home.living = { x: left + (narrow ? lr * 0.45 : Math.max(lr * 1.1, fw * 0.13)), y: top + fh * (narrow ? 0.54 : 0.52), r: lr };
     this.galaxyScale = Math.min(w, 600) / 300;
     this.galaxy.scale.set(this.galaxyScale);
     this.flash.width = w;
@@ -1542,6 +1551,7 @@ export class StationScene {
     const { x, y } = this.pan;
     this.world.position.set(this.home.world.x + x, this.home.world.y + y + this.cineLift);
     this.planet.position.set(this.home.planet.x + x * 0.45, this.home.planet.y + y * 0.45);
+    this.planetView?.place(this.home.living.x + x * 0.55, this.home.living.y + y * 0.55, this.home.living.r);
     const gx = this.home.galaxy.x + x * 0.2;
     const gy = this.home.galaxy.y + y * 0.2;
     // During the galaxy shift the old galaxy slides in behind the station as it dives in.
@@ -2130,6 +2140,44 @@ export class StationScene {
       if (Math.abs(sx - cx) < Math.max(20, b.width * 0.42) && Math.abs(sy - cy) < Math.max(16, b.height * 0.36)) return 'whale';
     }
     return null;
+  }
+
+  /** The living planet's look, or null while it is still undiscovered; `flash` washes in a new era. */
+  setPlanet(look: PlanetLook | null, flash = false): void {
+    if (!this.ready || !this.planetView) return;
+    const was = this.planetView.shown;
+    this.planetView.setLook(look, flash);
+    if (was !== this.planetView.shown) this.layout();
+    if (flash) this.wake();
+  }
+
+  /** A salvage pod streaks from the station down to the planet. */
+  planetPod(landed: () => void = () => {}): void {
+    const v = this.planetView;
+    if (!v) return landed();
+    const from = this.world.toGlobal({ x: 0, y: 0 });
+    v.sendPod(from, landed);
+    this.wake();
+  }
+
+  /** A trade shuttle rises from the planet to the station; `label` floats up when it docks. */
+  planetShuttle(label: string): void {
+    const v = this.planetView;
+    const dock = () => this.world.toGlobal({ x: -40, y: 50 });
+    const arrived = () => {
+      this.floatText(-40, 40, label, true);
+      this.burst(-40, 50, 0x9ff0ff, 14, 0.6);
+    };
+    if (!v) return arrived();
+    v.sendShuttle(dock, arrived);
+    this.wake();
+  }
+
+  /** Whether a screen point is on the living planet (and not on the station in front of it). */
+  planetAt(sx: number, sy: number): boolean {
+    if (!this.ready || !this.planetView?.at(sx, sy)) return false;
+    const w = this.toWorld(sx, sy);
+    return Math.hypot(w.x, w.y) > 150;
   }
 
   /** Whether a screen point is on the docked trader's ship. */
@@ -2872,6 +2920,7 @@ export class StationScene {
     this.updateTank(dt);
     this.updateFleet(dt);
     this.whaleView?.update(dt);
+    this.planetView?.update(dt, this.daylight.night);
     this.updateVisitor(dt);
 
     // Drones dart around in a loose swarm, leaving short trails.

@@ -50,6 +50,8 @@ import { CONTRACT_CRYSTALS, contractCrateMult, contractDef, goalText } from './c
 import { CRATE_BUFFS } from './core/crate-buffs';
 import { GEN_ICONS, ICONS, genIcon } from './ui/icons';
 import { WhalePanel } from './ui/whale-ui';
+import { PlanetPanel, planetLook } from './ui/planet-ui';
+import { PLANET_PATHS, planetEra, pathText } from './core/planet';
 import { WHALE, whaleStage } from './core/whale';
 
 const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -332,6 +334,25 @@ async function boot(): Promise<void> {
     },
     tow: () => {
       game.towToNursery();
+    },
+  });
+  /** The living planet (core/planet.ts) in the sky beside the station. */
+  let planetKey = '';
+  const syncPlanet = (flash = false) => {
+    const look = planetLook(game);
+    const key = look ? `${look.era}|${look.path}|${look.lights}` : '';
+    if (key === planetKey && !flash) return;
+    planetKey = key;
+    scene.setPlanet(look, flash);
+  };
+  const planetPanel = new PlanetPanel(game, (d) => fmt(d), {
+    pod: () => {
+      sfx.boost();
+      buzz(10);
+      scene.planetPod(() => {
+        sfx.meteor();
+        syncPlanet();
+      });
     },
   });
   /** Now and then, while it is out, the whale sings on its own. */
@@ -896,6 +917,57 @@ async function boot(): Promise<void> {
         }
         break;
       }
+      case 'planet': {
+        const p = game.state.planet;
+        const tint = (icon: string) => icon.replace('currentColor', '#8ff0b0');
+        switch (e.kind) {
+          case 'found':
+            sfx.radio();
+            syncPlanet();
+            fanfare.whenIdle(() => {
+              fanfare.cheer({ icon: ICONS.planet, kicker: 'The scanners found something', title: 'A dead planet below!', sub: `Grey dust and old craters. Mika thinks salvage could bring ${p.name} back to life.`, color: '#8ff0b0' });
+              window.setTimeout(() => planetPanel.open(true), 2800);
+            });
+            break;
+          case 'pod':
+            syncPerks();
+            if (e.filled) ui.toast(tint(ICONS.planet), `Every pod has landed. <b>${esc(pathText(game.state, planetEra(game.state).projects[p.project]?.name ?? ''))}</b> is taking hold`);
+            break;
+          case 'settled':
+            syncPerks();
+            if (e.done.era) {
+              sfx.fanfare();
+              buzz(30);
+              syncPlanet(true);
+              scene.celebrate(0x8ff0b0);
+              fanfare.whenIdle(() => fanfare.cheer({ icon: ICONS.planet, kicker: `${p.name} changed`, title: e.done.era!.name, sub: e.done.era!.look, color: '#8ff0b0' }));
+            } else {
+              sfx.achievement();
+              syncPlanet();
+              ui.toast(tint(ICONS.planet), `<b>${esc(pathText(game.state, e.done.project.name))}</b> took hold on ${esc(p.name)}. +3% income`);
+            }
+            break;
+          case 'path': {
+            const path = PLANET_PATHS.find((x) => x.id === p.path);
+            sfx.achievement();
+            syncPerks();
+            syncPlanet(true);
+            if (path) ui.toast(tint(ICONS.planet), `<b>${esc(path.name)}</b> it is. ${esc(path.gives)}`);
+            break;
+          }
+          case 'shuttle':
+            sfx.coins();
+            scene.planetShuttle(`+${fmt(e.value)}`);
+            ui.toast(tint(ICONS.planet), `A trade shuttle from <b>${esc(p.name)}</b> docked: <b>+${fmt(e.value)}</b> scrap`);
+            break;
+          case 'story':
+            if (e.phase === 'ready' && !planetPanel.isOpen && p.stories > 0) ui.toast(tint(ICONS.planet), `<b>News from ${esc(p.name)}.</b> Tap its button to read`);
+            break;
+          default:
+            break;
+        }
+        break;
+      }
       case 'garden': {
         if (e.phase === 'plant') {
           sfx.buy();
@@ -1223,6 +1295,11 @@ async function boot(): Promise<void> {
       buzz(10);
       return;
     }
+    if (game.state.tutorial < 0 && game.state.planet.found && scene.planetAt(x, y)) {
+      planetPanel.open();
+      buzz(10);
+      return;
+    }
     const onWhale = game.state.tutorial < 0 ? scene.whaleAt(x, y) : null;
     if (onWhale === 'egg') {
       whalePanel.open();
@@ -1333,6 +1410,7 @@ async function boot(): Promise<void> {
   syncFleet();
   syncVisitor();
   syncWhale();
+  syncPlanet();
   syncMusic();
 
   // Combo heat meter (core/combo.ts), redrawn only when it moves.
@@ -1378,6 +1456,8 @@ async function boot(): Promise<void> {
       journey.render();
       whalePanel.render();
       syncWhale();
+      planetPanel.render();
+      syncPlanet();
       if (game.state.whale.phase === 'born' && now > nextSong && document.visibilityState === 'visible') {
         nextSong = now + 70_000 + Math.random() * 90_000;
         sfx.whaleSong(whaleStage(game.state).size);
