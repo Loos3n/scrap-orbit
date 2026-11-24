@@ -15,6 +15,7 @@ import { CROPS, type SnackKind } from './garden';
 import { DIVE } from './dive';
 import { RANKS } from './journey';
 import { newWhale, readWhale, type WhaleState } from './whale';
+import { newPlanet, readPlanet, type PlanetState } from './planet';
 import { D, Decimal, type NumberStyle } from './num';
 
 export interface Mission {
@@ -138,6 +139,8 @@ export interface GameState {
   garden: { plots: ({ crop: string; at: number } | null)[]; snacks: Partial<Record<SnackKind, { mult: number; until: number }>>; harvested: number };
   /** Stardrifter, the cosmic whale (core/whale.ts): egg, growth, hunger, mood and songs. */
   whale: WhaleState;
+  /** The living planet below the scrap field (core/planet.ts): its era, projects and path. */
+  planet: PlanetState;
   /** Salvage dives (core/dive.ts): charges held and when they last refilled, best score, dives made. */
   dive: { charges: number; chargeAt: number; best: number; dives: number };
   visitors: { here: { id: VisitorId; req: number; until: number } | null; nextAt: number; hearts: Partial<Record<VisitorId, number>>; met: Partial<Record<VisitorId, number>>; last: VisitorId | null; answered: number };
@@ -271,6 +274,7 @@ interface SaveData {
   garden?: Partial<GameState['garden']>;
   dive?: Partial<GameState['dive']>;
   whale?: unknown;
+  planet?: unknown;
   journey?: { rank?: number; met?: string[]; days?: number; lastDay?: string; legacy?: boolean };
   rig?: boolean;
   friends?: Partial<GameState['friends']>;
@@ -350,6 +354,7 @@ export function newState(now: number): GameState {
     visitors: { here: null, nextAt: 0, hearts: {}, met: {}, last: null, answered: 0 },
     garden: { plots: [], snacks: {}, harvested: 0 },
     whale: newWhale(),
+    planet: newPlanet(),
     dive: { charges: DIVE.chargesMax, chargeAt: now, best: 0, dives: 0 },
     journey: { rank: 0, met: new Set(), days: 0, lastDay: '', legacy: false },
     rig: false,
@@ -435,6 +440,7 @@ export function serialize(state: GameState): string {
     garden: { plots: state.garden.plots.map((x) => (x ? { ...x } : null)), snacks: { ...state.garden.snacks }, harvested: state.garden.harvested },
     dive: { ...state.dive },
     whale: { ...state.whale },
+    planet: { ...state.planet },
     journey: { ...state.journey, met: [...state.journey.met] },
     rig: state.rig,
     friends: { ...state.friends, list: state.friends.list.map((x) => ({ ...x })), sent: { ...state.friends.sent } },
@@ -672,6 +678,7 @@ export function deserialize(json: string | null, now: number): GameState | null 
       }
   }
   state.whale = readWhale(data.whale, now);
+  state.planet = readPlanet(data.planet, now);
   const dv = data.dive;
   if (dv && typeof dv === 'object') {
     const d = state.dive;

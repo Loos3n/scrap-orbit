@@ -2162,3 +2162,40 @@ body.lefty #panel .tabs { padding: 6px 6px 6px 70px; }
 @keyframes whale-line { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .reduce-flash .whale-song p { animation: none; opacity: 1; }
 #opt-whale-row small { display: block; color: var(--ink-dim); font-size: calc(12px * var(--ts)); }
+
+/* ---------- The living planet (ui/planet-ui.ts) ---------- */
+.planet-card { --pl: #8ff0b0; }
+.planet-hero { display: grid; place-items: center; height: 150px; margin: 2px -6px 0; border-radius: 18px; background: radial-gradient(50% 70% at 50% 50%, rgb(143 240 176 / 0.16), transparent 70%), radial-gradient(120% 100% at 50% 100%, rgb(30 40 110 / 0.6), rgb(10 12 34 / 0.4)); overflow: hidden; }
+.planet-hero img { width: 136px; height: 136px; border-radius: 50%; box-shadow: 0 0 28px rgb(143 240 176 / 0.25); animation: planet-bob 6s ease-in-out infinite; }
+.planet-hero.small { height: 110px; }
+.planet-hero.small img { width: 96px; height: 96px; }
+@keyframes planet-bob { 50% { transform: translateY(-4px); } }
+.planet-chip { background: rgb(143 240 176 / 0.14); color: var(--pl); }
+.planet-steps { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.planet-steps i { height: 6px; border-radius: 99px; background: rgb(0 0 0 / 0.35); }
+.planet-steps i.done { background: linear-gradient(90deg, #5cd6ff, var(--pl)); }
+.planet-steps i.now { background: rgb(143 240 176 / 0.45); box-shadow: 0 0 8px rgb(143 240 176 / 0.5); }
+.planet-project { display: grid; gap: 6px; padding: 12px; border-radius: 16px; background: rgb(10 12 34 / 0.55); border: 1px solid rgb(143 240 176 / 0.18); }
+.planet-project > b { font-family: var(--font-display); font-size: calc(18px * var(--ts)); }
+.planet-project p { margin: 0; color: var(--ink-dim); font-size: calc(13px * var(--ts)); line-height: 1.4; }
+.planet-project-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.planet-pods { display: flex; gap: 4px; }
+.planet-pods i { width: 12px; height: 12px; border-radius: 4px; border: 2px solid rgb(255 255 255 / 0.22); }
+.planet-pods i.on { border-color: #ffb86b; background: radial-gradient(circle at 40% 35%, #ffe0b0, #ff9f4a); box-shadow: 0 0 6px rgb(255 159 74 / 0.6); }
+.planet-send { min-height: 56px; margin-top: 4px; }
+.planet-send .buy-count small { display: block; font-family: var(--font-body); font-weight: 500; font-size: calc(11px * var(--ts)); opacity: 0.8; }
+.planet-settle { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; background: rgb(143 240 176 / 0.08); color: var(--ink-dim); font-size: calc(14px * var(--ts)); }
+.planet-settle svg { width: 18px; height: 18px; color: var(--pl); flex: none; }
+.planet-settle b { color: var(--ink); }
+.planet-paths { display: grid; gap: 8px; }
+.planet-paths button { display: grid; gap: 3px; padding: 12px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--pc) 55%, transparent); background: color-mix(in srgb, var(--pc) 10%, rgb(10 12 34 / 0.6)); color: var(--ink); text-align: left; }
+.planet-paths b { font-family: var(--font-display); font-size: calc(17px * var(--ts)); color: var(--pc); }
+.planet-paths span { color: var(--ink-dim); font-size: calc(13px * var(--ts)); line-height: 1.35; }
+.planet-paths small { color: var(--ink); font-size: calc(12px * var(--ts)); font-weight: 600; }
+.planet-story-ready { border-color: var(--pl); background: rgb(143 240 176 / 0.1); }
+.planet-story-ready svg { color: var(--pl); }
+.planet-card .whale-gives li svg { color: var(--pl); }
+.planet-song h2 { color: #d4ffe2; text-shadow: 0 0 18px rgb(143 240 176 / 0.5); }
+#opt-planet-row small { display: block; color: var(--ink-dim); font-size: calc(12px * var(--ts)); }
+#planet-body { display: grid; gap: 10px; }
+#planet-body .whale-lede { margin-top: -4px; }

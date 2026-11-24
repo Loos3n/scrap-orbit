@@ -4,6 +4,7 @@ import { sectorBonuses } from './sectors';
 import { fleetPower } from './fleet';
 import { keepsakeBonuses } from './visitors';
 import type { GameState } from './state';
+import { planetBonuses } from './planet';
 
 /*
  * Station modules, expeditions, boss loot, golden scrap, the trading post and challenge runs:
@@ -273,6 +274,8 @@ export function bonuses(state: GameState): Bonuses {
   // The escort Corvid, and keepsakes left by visitors who became friends.
   b.boss += fleetPower(state, 'boss');
   for (const [stat, a] of keepsakeBonuses(state)) b[stat] += a;
+  // The living planet's path: coral seas, great forests or crystal dunes.
+  for (const [stat, a] of Object.entries(planetBonuses(state)) as [keyof Bonuses, number][]) b[stat] += a;
   return b;
 }
 

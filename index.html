@@ -63,6 +63,7 @@
           <button id="fish-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="fish"></span><span id="fish-dot" class="dot" hidden></span></span><small>Fishing</small></button>
           <button id="dive-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="claw"></span><span id="dive-dot" class="dot" hidden></span></span><small>Dive</small></button>
           <button id="whale-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="whale"></span><span id="whale-dot" class="dot" hidden></span></span><small id="whale-btn-name">Whale</small></button>
+          <button id="planet-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="planet"></span><span id="planet-dot" class="dot" hidden></span></span><small id="planet-btn-name">Planet</small></button>
           <button id="radio-btn" class="hud-btn" type="button" hidden><span class="round-btn"><span data-icon="radio"></span><span id="radio-dot" class="dot" hidden></span></span><small>Radio</small></button>
           <button id="settings-btn" class="hud-btn" type="button"><span class="round-btn"><span data-icon="gear"></span></span><small>Settings</small></button>
         </nav>
@@ -281,6 +282,7 @@
             <label id="opt-notify-row" class="toggle" hidden><input id="opt-notify" type="checkbox" /><span>Reminders<small>When storage fills up, research finishes or crew come home</small></span></label>
             <label class="toggle"><input id="opt-daynight" type="checkbox" /><span>Day and night<small>The station follows your clock: sleepy lights and slower music late at night</small></span></label>
             <label class="toggle" id="opt-festival-row" hidden><input id="opt-festival" type="checkbox" /><span>Try the Frost Festival now<small>For testing: the winter festival normally runs 1 December to 6 January</small></span></label>
+            <div class="setting-row" id="opt-planet-row" hidden><span>Planet test<small>Playable test build only: skip the waiting</small></span><button id="opt-planet-test" type="button" class="whale-rename">Next step</button></div>
             <div class="setting-row" id="opt-whale-row" hidden><span>Whale test<small>Playable test build only: skip the waiting</small></span><button id="opt-whale-test" type="button" class="whale-rename">Next step</button></div>
             <label class="toggle"><input id="opt-battery" type="checkbox" /><span>Battery saver<small>Smoother on older phones and easier on the battery</small></span></label>
             <h3 class="section-title">Game</h3>
@@ -381,6 +383,13 @@
         <p class="trader-hello">"Fine wares for a fine station! One of each, mind."</p>
         <ul id="trader-offers" class="offer-list"></ul>
         <p id="trader-left" class="mission-reset"></p>
+      </div>
+    </div>
+    <div id="planet" class="modal" hidden>
+      <div class="modal-card whale-card planet-card" role="dialog" aria-modal="true" aria-label="Your planet">
+        <button id="planet-close" class="close-btn" type="button" aria-label="Close">&times;</button>
+        <div class="eyebrow">The living planet</div>
+        <div id="planet-body"></div>
       </div>
     </div>
     <div id="whale" class="modal" hidden>
