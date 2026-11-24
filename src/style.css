@@ -2161,3 +2161,4 @@ body.lefty #panel .tabs { padding: 6px 6px 6px 70px; }
 .whale-song .primary { margin-top: 6px; }
 @keyframes whale-line { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .reduce-flash .whale-song p { animation: none; opacity: 1; }
+#opt-whale-row small { display: block; color: var(--ink-dim); font-size: calc(12px * var(--ts)); }

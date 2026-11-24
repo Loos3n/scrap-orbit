@@ -27,6 +27,22 @@ export class WhalePanel {
     private hooks: { pet: () => void; tow: () => void },
   ) {
     $('whale-btn').addEventListener('click', () => this.open());
+    // The playable test build can skip the waiting: find the egg, hatch it, then grow a stage at a time.
+    $('opt-whale-row').hidden = import.meta.env.MODE !== 'single' && !import.meta.env.DEV;
+    $('opt-whale-test').addEventListener('click', () => {
+      const s = this.game.state;
+      const w = s.whale;
+      if (w.phase === 'none') whale.findEgg(s, Date.now());
+      else if (w.phase === 'egg') w.eggAt = Date.now() - WHALE.hatchMinutes * 60_000;
+      else {
+        const next = WHALE_STAGES[whale.stageIndex(w.growth) + 1];
+        w.growth = next ? next.at : w.growth;
+        w.hunger = WHALE.mealsMax;
+        w.gulpAt = 0;
+      }
+      $('settings').hidden = true;
+      if (w.phase !== 'born') this.open();
+    });
     $('whale-close').addEventListener('click', () => this.close());
     $('whale').addEventListener('click', (e) => {
       if (e.target === $('whale')) return this.close();
