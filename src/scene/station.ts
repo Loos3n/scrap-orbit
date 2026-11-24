@@ -10,6 +10,7 @@ import { markOf } from '../core/evolve';
 import type { CrewId } from '../core/content';
 import { CrewDeck } from './crew-deck';
 import { BAY_RADIUS, Bays, bayTier, type BayId } from './bays';
+import { WhaleView } from './whale-view';
 
 /** Glow colours for Mk II to Mk V: chrome, cyan core, gold, prism violet. */
 const MARK_TINTS = [0xeaf2ff, 0x5ce1ff, 0xffd166, 0xc58cff];
@@ -249,6 +250,9 @@ export class StationScene {
   /** The Hollow Fleet circling the station: ships behind it in fleetBack, in front in fleetFront. */
   private fleetBack = new Container();
   private fleetFront = new Container();
+  /** Stardrifter (scene/whale-view.ts): a grown whale glides here, behind everything on the station. */
+  private whaleFar = new Container();
+  private whaleView: WhaleView | null = null;
   private fleet: { id: string; s: Sprite; lamp: Sprite; a: number; t: number; tint: number }[] = [];
   private fleetT = 0;
   /** A visitor's shuttle at the dock. */
@@ -384,6 +388,10 @@ export class StationScene {
     this.buildHub();
     const bayTex: Record<BayId, 'drone' | 'hauler' | 'smelter' | 'fab'> = { drone: 'drone', hauler: 'hauler', smelter: 'smelter', fabricator: 'fab' };
     this.bays = new Bays(this.tex.glow, (id) => this.tex[bayTex[id]], this.reducedMotion);
+    this.whaleView = new WhaleView(this.fleetBack, this.fleetFront, this.whaleFar, this.tex.glow, {
+      burst: (x, y, color, count, power) => this.burst(x, y, color, count, power),
+      ring: (x, y, r, color) => this.rings.push({ x, y, r, life: 1, color, width: 3 }),
+    });
     this.coreSpill.texture = this.tex.glow;
     this.coreSpill.anchor.set(0.5);
     this.coreSpill.blendMode = 'add';
@@ -429,7 +437,7 @@ export class StationScene {
     this.flareGlow.blendMode = 'add';
     this.flareGlow.tint = 0xffb070;
     this.flareGlow.alpha = 0;
-    this.world.addChild(this.farLayer, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.bays.back, this.dockLayer, this.bays.layer, this.machineLayer, this.coreSpill, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
+    this.world.addChild(this.farLayer, this.whaleFar, this.fleetBack, this.growth.crown, this.bossLayer, this.debrisLayer, this.lines, this.growth.outer, this.bays.back, this.dockLayer, this.bays.layer, this.machineLayer, this.coreSpill, this.growth.inner, this.hub, this.droneLayer, this.beamG, this.fxLayer, this.ringG, this.fleetFront, this.textLayer);
     this.app.stage.sortableChildren = true;
     const z: [Container, number][] = [[this.bg, 0], [this.galaxy, 1], [this.starLayer, 2], [this.moon, 3], [this.sectorDecor, 3.5], [this.planet, 4], [this.flareGlow, 6], [this.keyLight, 7], [this.nightShade, 8], [this.warmShade, 8.5], [this.world, 10], [this.dustLayer, 15], [this.snowLayer, 16], [this.fgLayer, 20], [this.vignette, 25], [this.cineLayer, 27], [this.flash, 30]];
     for (const [c, i] of z) {
@@ -2067,6 +2075,63 @@ export class StationScene {
     return best?.id ?? null;
   }
 
+  /** The whale's egg is waiting by the station (true), or not. */
+  setWhaleEgg(on: boolean): void {
+    if (this.ready) this.whaleView?.setEgg(on);
+  }
+
+  /** The whale at `size` (share of a full-grown elder, 0 for none) and `mood` (0 to 1); `hatch` swims it out of the egg. */
+  setWhale(size: number, mood: number, hatch = false): void {
+    if (!this.ready) return;
+    this.whaleView?.setWhale(size, mood, hatch);
+    if (hatch) {
+      this.rings.push({ x: -78, y: 66, r: 10, life: 1.2, color: 0x7cf0ff, width: 4 });
+      this.burst(-78, 66, 0xbfe8ff, 30, 1.2);
+      this.wake();
+    }
+  }
+
+  /** Little whales from the Nursery, circling the station. */
+  setWhaleBabies(n: number): void {
+    if (this.ready) this.whaleView?.setBabies(n);
+  }
+
+  whalePet(): void {
+    this.whaleView?.pet();
+    this.wake();
+  }
+
+  /** The whale gulps a passing wreck; `label` floats up where it happened. */
+  whaleGulp(label: string): void {
+    const p = this.whaleView?.gulp();
+    if (p) this.floatText(p.x, p.y - 20, label, true);
+    this.wake();
+  }
+
+  /** What of the whale is at a screen point: its egg, the whale itself, or nothing. */
+  whaleAt(sx: number, sy: number): 'egg' | 'whale' | null {
+    const v = this.whaleView;
+    if (!this.ready || !v) return null;
+    const hit = (sp: Sprite | null, pad: number) => {
+      if (!sp || sp.destroyed) return false;
+      const b = sp.getBounds();
+      return sx >= b.x - pad && sx <= b.x + b.width + pad && sy >= b.y - pad && sy <= b.y + b.height + pad;
+    };
+    if (hit(v.eggSprite(), 12)) return 'egg';
+    // Taps on the station itself always go to the claw, even with the whale gliding behind.
+    const w = this.toWorld(sx, sy);
+    if (Math.hypot(w.x, w.y) < 80) return null;
+    // The body's box includes empty corners, so trim it a little.
+    const body = v.bodySprite();
+    if (body && !body.destroyed) {
+      const b = body.getBounds();
+      const cx = b.x + b.width / 2;
+      const cy = b.y + b.height / 2;
+      if (Math.abs(sx - cx) < Math.max(20, b.width * 0.42) && Math.abs(sy - cy) < Math.max(16, b.height * 0.36)) return 'whale';
+    }
+    return null;
+  }
+
   /** Whether a screen point is on the docked trader's ship. */
   traderAt(sx: number, sy: number): boolean {
     const o = this.traderShip;
@@ -2806,6 +2871,7 @@ export class StationScene {
     this.updateLantern(dt);
     this.updateTank(dt);
     this.updateFleet(dt);
+    this.whaleView?.update(dt);
     this.updateVisitor(dt);
 
     // Drones dart around in a loose swarm, leaving short trails.
