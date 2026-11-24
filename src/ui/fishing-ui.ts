@@ -3,6 +3,7 @@ import { format, formatDuration } from '../core/num';
 import type { Game } from '../game';
 import { critterSvg } from '../scene/critter-art';
 import { ICONS } from './icons';
+import { colorBlindOn } from './comfort';
 
 /**
  * Space fishing: a round Fishing button on the side rail, and a card with the pond (cast, wait
@@ -236,7 +237,7 @@ export class FishingPanel {
     $('fish-reel').hidden = false;
     $('fish-reel').style.setProperty('--rar', r.color);
     $('fish-reel-label').textContent = c.rarity === 'legendary' ? 'Something huge!' : c.rarity === 'rare' ? 'Something big!' : 'Reel it in!';
-    $('fish-msg').textContent = 'Tap when the marker is in the green!';
+    $('fish-msg').textContent = `Tap when the marker is in the ${colorBlindOn() ? 'blue' : 'green'}!`;
     this.newZone(-1);
     this.pips();
     this.reelStart = performance.now();

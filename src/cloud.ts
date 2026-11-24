@@ -101,3 +101,30 @@ export async function download(): Promise<CloudSave | null> {
   if (typeof d.code !== 'string') return null;
   return { code: d.code, savedAt: Number(d.savedAt) || 0, allTime: String(d.allTime ?? '0'), relocations: Number(d.relocations) || 0 };
 }
+
+/**
+ * Deletes everything this player keeps in the cloud: the save, the friend profile and any
+ * unopened gifts, then the sign-in account itself, and signs out. The station on this device
+ * is left alone. Firebase only deletes an account after a recent sign-in; when it refuses, the
+ * data is still gone and the player is signed out (signing in again later starts afresh).
+ */
+export async function deleteCloudData(): Promise<void> {
+  const { auth, db } = await connect();
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not signed in');
+  const { collection, deleteDoc, doc, getDocs } = await import('firebase/firestore');
+  const { codeForUser } = await import('./friends');
+  const code = await codeForUser(user.uid);
+  // Gifts first: the rules check the profile to let its owner see them.
+  try {
+    const gifts = await getDocs(collection(db, 'profiles', code, 'gifts'));
+    await Promise.all(gifts.docs.map((g) => deleteDoc(g.ref)));
+  } catch {
+    // No friend profile was ever made, so there are no gifts to read.
+  }
+  await deleteDoc(doc(db, 'profiles', code)).catch(() => undefined);
+  await deleteDoc(doc(db, 'saves', user.uid));
+  const { deleteUser } = await import('firebase/auth');
+  await deleteUser(user).catch(() => undefined);
+  await signOut();
+}

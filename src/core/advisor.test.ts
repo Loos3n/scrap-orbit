@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestPurchase, goalByKey, goalProgress, incomePurchases, pickGoal } from './advisor';
+import { bestPurchase, worth, goalByKey, goalProgress, incomePurchases, pickGoal } from './advisor';
 import { baseIncome, buyGenerator } from './economy';
 import { D } from './num';
 import { newState } from './state';
@@ -49,6 +49,7 @@ describe('Buy best', () => {
   it('grabs a cheap upgrade that doubles a big stack', () => {
     const s = newState(NOW);
     s.owned.drone = 40;
+    s.owned.hauler = 1;
     s.scrap = D(1000);
     const p = bestPurchase(s)!;
     expect(p).toMatchObject({ kind: 'upgrade', id: 'drone1' });
@@ -61,6 +62,36 @@ describe('Buy best', () => {
     s.scrap = D(500);
     const p = bestPurchase(s)!;
     expect(p).toMatchObject({ kind: 'machine', id: 'drone', count: 1 });
+  });
+
+  it('opens each new machine soon after it is in reach', () => {
+    // Hold Buy best from a fresh start: every new machine should arrive near the time it could
+    // first be afforded, not after a long detour through more of the old ones.
+    const s = newState(NOW);
+    s.scrap = D(15);
+    const first: Record<string, number> = {};
+    for (let t = 0; t < 1200; t++) {
+      s.scrap = s.scrap.add(worth(s));
+      for (let k = 0; k < 50; k++) {
+        const p = bestPurchase(s);
+        if (!p || p.cost.gt(s.scrap)) break;
+        s.scrap = s.scrap.sub(p.cost);
+        if (p.kind === 'upgrade') s.upgrades.add(p.id);
+        else if (p.kind === 'claw') s.claw++;
+        else s.owned[p.id] += p.count;
+      }
+      for (const id of ['hauler', 'smelter', 'fabricator'] as const) if (s.owned[id] > 0 && first[id] === undefined) first[id] = t;
+    }
+    expect(first.hauler).toBeLessThan(100);
+    expect(first.smelter).toBeLessThan(220);
+    expect(first.fabricator).toBeLessThan(450);
+  });
+
+  it('does not hold out for a new machine that is far off', () => {
+    const s = newState(NOW);
+    s.owned.drone = 3;
+    s.scrap = D(20);
+    expect(bestPurchase(s)!.id).not.toBe('hauler');
   });
 
   it('keeps finding something to buy through a long run', () => {

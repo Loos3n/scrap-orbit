@@ -264,6 +264,16 @@
             <label class="slider-row"><span>Effects</span><input id="opt-sfx-vol" type="range" min="0" max="100" step="5" aria-label="Effects volume" /><b id="opt-sfx-val"></b></label>
             <label class="slider-row"><span>Music</span><input id="opt-music-vol" type="range" min="0" max="100" step="5" aria-label="Music volume" /><b id="opt-music-val"></b></label>
             <h3 class="section-title">Comfort</h3>
+            <div class="setting-row">
+              <span>Text size</span>
+              <div id="opt-text" class="mini-segments" role="radiogroup" aria-label="Text size">
+                <button type="button" role="radio" data-size="normal">Aa</button>
+                <button type="button" role="radio" data-size="large" class="ts-large">Aa</button>
+                <button type="button" role="radio" data-size="larger" class="ts-larger">Aa</button>
+              </div>
+            </div>
+            <label class="toggle"><input id="opt-cb" type="checkbox" /><span>Colour-blind friendly<small>Blue for go and orange for danger, instead of green and red</small></span></label>
+            <label class="toggle"><input id="opt-lefty" type="checkbox" /><span>Left-handed<small>Round buttons, Overdrive and the menu square move to the left</small></span></label>
             <label class="toggle"><input id="opt-flash" type="checkbox" /><span>Reduce flashing<small>Softer warps, glows and pops</small></span></label>
             <label class="toggle"><input id="opt-shake" type="checkbox" /><span>Reduce screen shake<small>Keep the station still on big moments</small></span></label>
             <label class="toggle"><input id="opt-haptics" type="checkbox" /><span>Vibration</span></label>
@@ -300,6 +310,12 @@
                 <button id="cloud-restore" type="button" hidden>Load cloud save</button>
                 <button id="cloud-signout" type="button" hidden>Sign out</button>
               </div>
+              <button id="cloud-delete" type="button" class="link-btn danger-link" hidden>Delete my cloud save</button>
+              <div id="cloud-delete-confirm" class="reset-confirm" hidden>
+                <span>Delete your cloud save, friend code and gifts, and sign out? Your station stays on this device.</span>
+                <button id="cloud-delete-yes" type="button" class="danger">Delete</button>
+                <button id="cloud-delete-no" type="button">Keep it</button>
+              </div>
             </div>
             <div id="install-box" class="cloud-box" hidden>
               <h3 class="section-title">Install the game</h3>
@@ -324,6 +340,7 @@
               <button id="reset-yes" type="button" class="danger">Erase</button>
               <button id="reset-no" type="button">Keep playing</button>
             </div>
+            <p class="legal-links"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a></p>
                 </div>
     </div>
     <div id="info" class="modal" hidden>

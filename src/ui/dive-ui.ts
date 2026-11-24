@@ -1,6 +1,7 @@
 import { DIVE, DROPS, chargeSecondsLeft, diveOpen, pickDrop, type DropKind } from '../core/dive';
 import { formatDuration, type Decimal } from '../core/num';
 import type { Game } from '../game';
+import { colorBlindOn } from './comfort';
 
 /**
  * Salvage dives: a Dive button on the side rail and a card holding a little canvas arcade.
@@ -343,8 +344,10 @@ export class DivePanel {
       c.fillStyle = 'rgba(255,255,255,0.7)';
       c.fillRect(-2, -7, 3, 6);
     } else {
+      // Mines: dark with spikes. Colour-blind colours swap the red (close to the orange scrap) for white.
+      const warn = colorBlindOn() ? '#ffffff' : '#ff5d6c';
       c.fillStyle = '#3a2440';
-      c.strokeStyle = '#ff5d6c';
+      c.strokeStyle = warn;
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2;
         c.beginPath();
@@ -357,7 +360,7 @@ export class DivePanel {
       c.fill();
       c.strokeStyle = ink;
       c.stroke();
-      c.fillStyle = Math.sin(this.t * 10 + d.x) > 0 ? '#ff5d6c' : '#6a2030';
+      c.fillStyle = Math.sin(this.t * 10 + d.x) > 0 ? warn : '#6a2030';
       c.beginPath();
       c.arc(0, 0, 3.5, 0, Math.PI * 2);
       c.fill();
