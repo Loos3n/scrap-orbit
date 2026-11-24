@@ -24,6 +24,7 @@ import type { ModuleId } from './core/expansion';
 import * as meta from './core/meta';
 import { D, type Decimal } from './core/num';
 import { deserialize, newState, serialize, type GameState } from './core/state';
+import * as whale from './core/whale';
 
 const SAVE_KEY = 'scrap-orbit-save';
 const AUTOSAVE_MS = 30_000;
@@ -115,7 +116,16 @@ export type GameEvent =
   /** Captain ranks: a task ticked off, every task of the rank met, or the rank claimed. */
   | { type: 'rankTask'; task: JourneyTask; left: number }
   | { type: 'rankReady' }
-  | { type: 'rank'; claim: RankClaim };
+  | { type: 'rank'; claim: RankClaim }
+  /** Stardrifter (core/whale.ts): the egg turned up, hatched, ate, grew, gulped a wreck, sang, or towed the station. */
+  | WhaleEvent;
+
+export type WhaleEvent =
+  | { type: 'whale'; kind: 'egg' | 'warm' | 'hatch' | 'pet' | 'tow' | 'name' }
+  | { type: 'whale'; kind: 'fed' | 'treat'; grew: whale.Grew; from?: 'fish' | 'garden' | 'boss' }
+  | { type: 'whale'; kind: 'grow'; stage: whale.WhaleStage }
+  | { type: 'whale'; kind: 'gulp'; value: Decimal }
+  | { type: 'whale'; kind: 'song'; song: whale.WhaleSong; phase: 'ready' | 'heard' };
 
 /** What happened while the player was away, for the welcome-back screen. */
 export interface OfflineReport {
@@ -182,6 +192,95 @@ export class Game {
     }
     // Every wreck broken gives the drydock a couple of hull plates.
     if (e.type === 'bossDefeated') this.plates(FLEET.bossPlates, 'boss');
+    // The crew save the whale a bite of a fresh catch, a harvest or a broken wreck.
+    const treat = e.type === 'fish' ? 'fish' : e.type === 'garden' && e.phase === 'harvest' ? 'garden' : e.type === 'bossDefeated' ? 'boss' : null;
+    if (treat) {
+      const grew = whale.treatWhale(this.state, Date.now());
+      if (grew) this.whaleGrew('treat', grew, treat);
+    }
+  }
+
+  private whaleGrew(kind: 'fed' | 'treat', grew: whale.Grew, from?: 'fish' | 'garden' | 'boss'): void {
+    this.emit({ type: 'whale', kind, grew, from });
+    if (grew.stage) this.emit({ type: 'whale', kind: 'grow', stage: grew.stage });
+  }
+
+  /** Scrap a whale meal costs: some minutes of income, and never less than a drone. */
+  whaleMealCost(): Decimal {
+    const c = eco.baseIncome(this.state).mul(60 * whale.WHALE.mealMinutes);
+    return c.lt(15) ? D(15) : c;
+  }
+
+  feedWhale(): boolean {
+    const cost = this.whaleMealCost();
+    if (this.state.scrap.lt(cost) || this.state.whale.hunger <= 0) return false;
+    const grew = whale.feedWhale(this.state, Date.now());
+    if (!grew) return false;
+    this.state.scrap = this.state.scrap.sub(cost);
+    this.whaleGrew('fed', grew);
+    return true;
+  }
+
+  warmEgg(): void {
+    if (whale.warmEgg(this.state)) this.emit({ type: 'whale', kind: 'warm' });
+    this.updateWhale(Date.now());
+  }
+
+  /** A tap on the whale; true if it counted as a pet. */
+  petWhale(): boolean {
+    if (!whale.petWhale(this.state, Date.now())) return false;
+    this.emit({ type: 'whale', kind: 'pet' });
+    return true;
+  }
+
+  renameWhale(raw: string): void {
+    const name = whale.cleanWhaleName(raw);
+    if (!name || this.state.whale.phase === 'none') return;
+    this.state.whale.name = name;
+    this.emit({ type: 'whale', kind: 'name' });
+  }
+
+  hearWhaleSong(id: whale.WhaleSongId): void {
+    const song = whale.pendingSong(this.state);
+    if (!song || song.id !== id || !whale.hearSong(this.state, id)) return;
+    this.whaleSongShown = '';
+    this.emit({ type: 'whale', kind: 'song', song, phase: 'heard' });
+    this.save();
+  }
+
+  towToNursery(): void {
+    if (!whale.towToNursery(this.state)) return;
+    this.emit({ type: 'whale', kind: 'tow' });
+    this.save();
+  }
+
+  private whaleSongShown = '';
+
+  /** Once a second: the egg hatching, hunger and mood, a gulp, and a song waiting to be heard. */
+  private updateWhale(now: number): void {
+    const s = this.state;
+    if (whale.hatchIfReady(s, now)) {
+      this.emit({ type: 'whale', kind: 'hatch' });
+      this.save();
+    }
+    if (s.whale.phase !== 'born') return;
+    whale.settleWhale(s, now);
+    if (now >= s.whale.gulpAt) {
+      const minutes = whale.gulpDue(s, now);
+      whale.scheduleGulp(s, now);
+      if (minutes > 0) {
+        const value = eco.baseIncome(s).mul(60 * minutes);
+        if (value.gt(0)) {
+          eco.earn(s, value);
+          this.emit({ type: 'whale', kind: 'gulp', value });
+        }
+      }
+    }
+    const song = whale.pendingSong(s);
+    if (song && song.id !== this.whaleSongShown) {
+      this.whaleSongShown = song.id;
+      this.emit({ type: 'whale', kind: 'song', song, phase: 'ready' });
+    }
   }
 
   private plates(n: number, from: 'boss' | 'relocate' | 'shift'): void {
@@ -352,6 +451,7 @@ export class Game {
     const visitor = meta.updateVisitors(s, now);
     if (visitor) this.emit({ type: 'visitor', phase: visitor });
     this.checkFleet(now);
+    this.updateWhale(now);
     meta.noteCollection(s);
     for (const set of meta.checkSets(s)) this.emit({ type: 'set', id: set.id });
     // Decorations wait for the tutorial to finish, so it stays uncluttered.
@@ -667,6 +767,12 @@ export class Game {
     const prize = openCrate(this.state, now, Math.random(), this.state.tutorial < 0);
     if (prize.kind === 'swarm') this.swarmEach = prize.each;
     this.emit({ type: 'bonus', prize });
+    // Once a new captain has settled in, one crate holds something warm that hums.
+    if (whale.eggDue(this.state)) {
+      whale.findEgg(this.state, now);
+      this.emit({ type: 'whale', kind: 'egg' });
+      this.save();
+    }
     return prize;
   }
 

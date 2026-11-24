@@ -26,6 +26,7 @@ import { RIG, currentSector, sectorCostMult, sectorCrewMult, sectorGenMult, time
 import { coreGainMult, starEffects, starIncomeMult } from './galaxy';
 import { fleetEffects } from './fleet';
 import { snackMult } from './garden';
+import { whaleMult } from './whale';
 import { rankMult } from './journey';
 import { D, Decimal } from './num';
 import { emptyOwned, type GameState } from './state';
@@ -128,10 +129,10 @@ export function hasPerk(state: GameState, id: PerkId): boolean {
   return state.cores >= at || (state.galaxy.map.has('memory') && state.galaxy.bestCores >= at);
 }
 
-/** Permanent multiplier from Star Cores, Galaxy Stars, achievements and captain ranks; applies to machines and taps. */
+/** Permanent multiplier from Star Cores, Galaxy Stars, achievements, captain ranks and the whale; applies to machines and taps. */
 export function globalMult(state: GameState): number {
   const perCore = PRESTIGE.perCore + researchSum(state, 'corePerCore');
-  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult') * starIncomeMult(state) * contractIncomeMult(state) * rankMult(state);
+  return (1 + state.cores * perCore) * (1 + state.achievements.size * ACHIEVEMENT_BONUS) * researchProduct(state, 'allMult') * starIncomeMult(state) * contractIncomeMult(state) * rankMult(state) * whaleMult(state);
 }
 
 /** How many times faster the station runs after relocating now, from the cores it would bank. */

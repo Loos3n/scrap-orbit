@@ -630,4 +630,60 @@ export class Sfx {
     this.voice({ freq: 1320, dur: 0.08, vol: 0.05, type: 'sine', start: 0.08 });
     this.noise(0, 0.06, 0.02, { type: 'bandpass', freq: 2500, q: 1 });
   }
+
+  /**
+   * The whale sings: a slow sine that swoops up and settles, with a lazy vibrato, sent mostly
+   * into the echo so it sounds far off and huge. `size` (0 to 1) lowers it as the whale grows.
+   */
+  whaleSong(size = 0.3, short = false): void {
+    if (!this.ready()) return;
+    const ctx = this.ctx!;
+    const base = 420 - size * 260;
+    const notes: [number, number, number, number][] = short
+      ? [[0, 0.9, 1, 1.35]]
+      : [
+          [0, 1.4, 1, 1.5],
+          [1.2, 1.1, 1.33, 1.12],
+          [2.1, 1.6, 1.12, 0.84],
+        ];
+    for (const [start, dur, from, to] of notes) {
+      const t = ctx.currentTime + start;
+      const osc = ctx.createOscillator();
+      const vib = ctx.createOscillator();
+      const vibDepth = ctx.createGain();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(base * from, t);
+      osc.frequency.exponentialRampToValueAtTime(base * to, t + dur * 0.7);
+      vib.frequency.value = 4.5;
+      vibDepth.gain.setValueAtTime(0, t);
+      vibDepth.gain.linearRampToValueAtTime(base * 0.02, t + dur);
+      vib.connect(vibDepth).connect(osc.frequency);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.07, t + dur * 0.35);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+      osc.connect(g);
+      this.out(g, 0.9);
+      osc.start(t);
+      vib.start(t);
+      osc.stop(t + dur + 0.05);
+      vib.stop(t + dur + 0.05);
+    }
+  }
+
+  /** The egg cracks: a crunch, then a bright little rising chime. */
+  hatch(): void {
+    if (!this.ready()) return;
+    this.noise(0, 0.12, 0.08, { type: 'bandpass', freq: 3200, q: 1 });
+    this.noise(0.18, 0.1, 0.07, { type: 'bandpass', freq: 2600, q: 1 });
+    [0, 4, 7, 12].forEach((st, k) => this.bell(660 * Math.pow(2, st / 12), 0.4 + k * 0.12, 0.9, 0.06));
+    this.whaleSong(0.05, true);
+  }
+
+  /** A big happy gulp: a deep swoop down and a bubbly pop. */
+  gulp(): void {
+    if (!this.ready()) return;
+    this.voice({ freq: 260, slideTo: 70, dur: 0.5, vol: 0.12, type: 'sine', echo: 0.4 });
+    this.voice({ freq: 500, slideTo: 1200, dur: 0.12, vol: 0.06, type: 'sine', start: 0.45 });
+  }
 }

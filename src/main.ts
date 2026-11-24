@@ -49,6 +49,10 @@ import { comboMult } from './core/combo';
 import { CONTRACT_CRYSTALS, contractCrateMult, contractDef, goalText } from './core/contracts';
 import { CRATE_BUFFS } from './core/crate-buffs';
 import { GEN_ICONS, ICONS, genIcon } from './ui/icons';
+import { WhalePanel } from './ui/whale-ui';
+import { WHALE, whaleStage } from './core/whale';
+
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 import { shakeBossBanner, showBossAlert } from './ui/meta-ui';
 import { SafeGame, safeText } from './ui/book-ui';
 import { galaxyText } from './ui/galaxy-ui';
@@ -308,6 +312,30 @@ async function boot(): Promise<void> {
       shipsBuilt(game.state).map((d) => ({ id: d.id, hull: d.hull, color: d.color, seed: SHIPS.indexOf(d) * 17 + 5 })),
       launched,
     );
+  /** Stardrifter (core/whale.ts): the egg by the station, then the whale at its stage's size. */
+  let whaleKey = '';
+  const syncWhale = (hatch = false) => {
+    const w = game.state.whale;
+    const size = w.phase === 'born' ? whaleStage(game.state).size : 0;
+    const key = `${w.phase}|${size}|${Math.round(w.mood / 10)}|${w.nursery}`;
+    if (key === whaleKey && !hatch) return;
+    whaleKey = key;
+    scene.setWhaleEgg(w.phase === 'egg');
+    scene.setWhale(size, w.mood / 100, hatch);
+    scene.setWhaleBabies(w.nursery ? 3 : 0);
+  };
+  const whalePanel = new WhalePanel(game, (d) => fmt(d), {
+    pet: () => {
+      scene.whalePet();
+      sfx.whaleSong(whaleStage(game.state).size, true);
+      buzz(8);
+    },
+    tow: () => {
+      game.towToNursery();
+    },
+  });
+  /** Now and then, while it is out, the whale sings on its own. */
+  let nextSong = Date.now() + 45_000;
   /** A visitor's shuttle at the dock (core/visitors.ts). */
   const syncVisitor = () => scene.setVisitor(visitorHere(game.state, Date.now())?.def.color ?? null);
   const friends = new FriendsPanel(game, (d) => fmt(d), () => scene.snapshot(), (icon, html) => ui.toast(icon, html));
@@ -561,6 +589,7 @@ async function boot(): Promise<void> {
         scene.setTank(tankCritters(game.state));
         syncFleet();
         syncVisitor();
+        syncWhale();
         radio.render();
         syncPerks();
         syncDecor();
@@ -806,6 +835,65 @@ async function boot(): Promise<void> {
           buzz(25);
         } else sfx.coins();
         if (e.result.surge) scene.celebrate(0x7cf0ff);
+        break;
+      }
+      case 'whale': {
+        const w = game.state.whale;
+        switch (e.kind) {
+          case 'egg':
+            sfx.crate();
+            fanfare.whenIdle(() => fanfare.cheer({ icon: ICONS.whale, kicker: 'Something in the crate', title: 'A warm egg!', sub: 'It hums when you hold it. It is floating by the station now: tap it to see.', color: '#7cf0ff' }));
+            syncWhale();
+            break;
+          case 'warm':
+            sfx.upgrade();
+            break;
+          case 'hatch':
+            sfx.hatch();
+            buzz(30);
+            syncWhale(true);
+            fanfare.whenIdle(() => {
+              fanfare.cheer({ icon: ICONS.whale, kicker: 'The egg hatched', title: 'A baby space whale!', sub: 'It thinks the station is its mother. Give it a name.', color: '#7cf0ff' });
+              window.setTimeout(() => whalePanel.openNaming(), 2800);
+            });
+            break;
+          case 'fed':
+            sfx.coins();
+            scene.whalePet();
+            buzz(12);
+            syncPerks();
+            break;
+          case 'treat':
+            ui.toast(ICONS.whale.replace('currentColor', '#7cf0ff'), `The crew saved <b>${esc(w.name)}</b> a treat from that ${e.from === 'fish' ? 'catch' : e.from === 'garden' ? 'harvest' : 'wreck'}`);
+            scene.whalePet();
+            break;
+          case 'grow':
+            sfx.whaleSong(e.stage.size);
+            syncWhale();
+            syncPerks();
+            fanfare.whenIdle(() => fanfare.cheer({ icon: ICONS.whale, kicker: `${w.name} grew`, title: e.stage.name, sub: e.stage.gulp ? `Bigger, happier, and now gulps passing wrecks for ${e.stage.gulp} minutes of scrap.` : 'Bigger, and a little louder.', color: '#7cf0ff' }));
+            break;
+          case 'gulp':
+            sfx.gulp();
+            scene.whaleGulp(`+${fmt(e.value)}`);
+            ui.toast(ICONS.whale.replace('currentColor', '#7cf0ff'), `<b>${esc(w.name)}</b> gulped a passing wreck: <b>+${fmt(e.value)}</b> scrap`);
+            break;
+          case 'song':
+            if (e.phase === 'ready') ui.toast(ICONS.whale.replace('currentColor', '#7cf0ff'), `<b>${esc(w.name)} is singing.</b> Tap its button to listen`);
+            break;
+          case 'tow':
+            sfx.whaleSong(1);
+            scene.warpJump();
+            window.setTimeout(() => {
+              syncWhale();
+              syncPerks();
+              fanfare.cheer({ icon: ICONS.whale, kicker: 'The Nursery', title: `${w.name} brought you home`, sub: `A nebula full of whales and warm eggs. +${Math.round(WHALE.nurseryIncome * 100)}% income for good.`, color: '#7cf0ff' });
+              window.setTimeout(() => whalePanel.open(true), 3000);
+            }, JUMP_SWAP_MS.relocate + 600);
+            break;
+          default:
+            break;
+        }
         break;
       }
       case 'garden': {
@@ -1135,6 +1223,21 @@ async function boot(): Promise<void> {
       buzz(10);
       return;
     }
+    const onWhale = game.state.tutorial < 0 ? scene.whaleAt(x, y) : null;
+    if (onWhale === 'egg') {
+      whalePanel.open();
+      buzz(10);
+      return;
+    }
+    if (onWhale === 'whale') {
+      // A tap on the whale pets it; a second tap soon after opens its window.
+      if (game.petWhale()) {
+        scene.whalePet();
+        sfx.whaleSong(whaleStage(game.state).size, true);
+        buzz(8);
+      } else whalePanel.open();
+      return;
+    }
     cancelHold();
     if (!drag && !pinch) {
       drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moving: false };
@@ -1229,6 +1332,7 @@ async function boot(): Promise<void> {
   scene.setTank(tankCritters(game.state));
   syncFleet();
   syncVisitor();
+  syncWhale();
   syncMusic();
 
   // Combo heat meter (core/combo.ts), redrawn only when it moves.
@@ -1272,6 +1376,12 @@ async function boot(): Promise<void> {
       fishing.render();
       dive.render();
       journey.render();
+      whalePanel.render();
+      syncWhale();
+      if (game.state.whale.phase === 'born' && now > nextSong && document.visibilityState === 'visible') {
+        nextSong = now + 70_000 + Math.random() * 90_000;
+        sfx.whaleSong(whaleStage(game.state).size);
+      }
       syncCrew();
       scene.crewChatter = game.state.tutorial < 0 && !introShowing();
       syncFestival();

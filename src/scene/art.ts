@@ -2404,3 +2404,201 @@ export const critterTex = (draw: (ctx: CanvasRenderingContext2D) => void) => pai
 
 /** A machine bay's deck plate for one machine colour and tier (see sprites.bayPad). */
 export const bayPad = (ramp: Ramp, tier: number) => vector(sprites.bayPad(ramp, tier));
+
+// ---------------------------------------------------------------- Stardrifter, the cosmic whale
+
+/** Body canvas size (world units at full size); the whale faces right, tail stock at the left edge. */
+export const WHALE_W = 220;
+export const WHALE_H = 100;
+/** Fluke canvas size; it hinges on its right edge, middle, where it meets the body. */
+export const FLUKE_W = 74;
+export const FLUKE_H = 80;
+
+function whaleBodyPath(ctx: Ctx): void {
+  ctx.beginPath();
+  ctx.moveTo(8, 52);
+  ctx.bezierCurveTo(50, 42, 100, 14, 156, 16);
+  ctx.bezierCurveTo(192, 18, 214, 36, 214, 54);
+  ctx.bezierCurveTo(214, 72, 192, 86, 150, 86);
+  ctx.bezierCurveTo(100, 86, 52, 68, 8, 58);
+  ctx.closePath();
+}
+
+function drawWhaleBody(ctx: Ctx, glow: string): void {
+  // Soft deep-blue back fading to a pale belly.
+  whaleBodyPath(ctx);
+  ctx.fillStyle = linear(ctx, 0, 14, 0, 86, [
+    [0, '#2b3f8f'],
+    [0.42, '#3f74c9'],
+    [0.62, '#7fb6ea'],
+    [1, '#d9f0ff'],
+  ]);
+  ctx.fill();
+  ctx.save();
+  whaleBodyPath(ctx);
+  ctx.clip();
+  // Throat grooves along the belly.
+  ctx.strokeStyle = 'rgba(120,160,215,0.55)';
+  ctx.lineWidth = 1.4;
+  for (let i = 0; i < 5; i++) {
+    const y = 66 + i * 4.2;
+    ctx.beginPath();
+    ctx.moveTo(196 - i * 4, y - 2);
+    ctx.bezierCurveTo(170, y + 3, 130, y + 3, 92 + i * 6, y - 1);
+    ctx.stroke();
+  }
+  // A darker saddle across the back, freckled like a little star chart.
+  ctx.fillStyle = 'rgba(20,28,80,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(118, 22, 70, 14, -0.08, 0, TAU);
+  ctx.fill();
+  const r = rng(77);
+  ctx.fillStyle = 'rgba(235,245,255,0.85)';
+  for (let i = 0; i < 26; i++) {
+    const x = 60 + r() * 120;
+    const y = 18 + r() * 16 + (x < 100 ? (100 - x) * 0.18 : 0);
+    ctx.beginPath();
+    ctx.arc(x, y, 0.5 + r() * 1.1, 0, TAU);
+    ctx.fill();
+  }
+  // Rim light along the top from the reactor.
+  ctx.strokeStyle = 'rgba(170,215,255,0.5)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(30, 47);
+  ctx.bezierCurveTo(70, 38, 110, 15, 156, 17);
+  ctx.bezierCurveTo(188, 19, 206, 30, 212, 44);
+  ctx.stroke();
+  ctx.restore();
+  // Glowing spots down the flank.
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 7; i++) {
+    const x = 52 + i * 18;
+    const y = 52 - Math.sin(i * 0.5) * 3 + (i < 2 ? 3 : 0);
+    ctx.fillStyle = radial(ctx, x, y, 6, [
+      [0, glow],
+      [1, 'rgba(0,0,0,0)'],
+    ]);
+    ctx.fillRect(x - 6, y - 6, 12, 12);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(x, y, 1.2, 0, TAU);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // Pectoral fin.
+  ctx.fillStyle = linear(ctx, 0, 66, 0, 96, [
+    [0, '#3f74c9'],
+    [1, '#2b3f8f'],
+  ]);
+  ctx.beginPath();
+  ctx.moveTo(150, 70);
+  ctx.bezierCurveTo(140, 82, 120, 94, 104, 97);
+  ctx.bezierCurveTo(118, 88, 128, 78, 134, 70);
+  ctx.closePath();
+  ctx.fill();
+  // A sleepy, friendly eye and a little smile.
+  ctx.fillStyle = '#0d1236';
+  ctx.beginPath();
+  ctx.ellipse(186, 50, 4.2, 4.6, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(187.4, 48.4, 1.5, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(13,18,54,0.7)';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(213, 60);
+  ctx.quadraticCurveTo(204, 66, 192, 64);
+  ctx.stroke();
+  // Blush.
+  ctx.fillStyle = 'rgba(255,140,190,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(194, 58, 5, 2.6, 0, 0, TAU);
+  ctx.fill();
+}
+
+function drawWhaleFluke(ctx: Ctx, glow: string): void {
+  ctx.fillStyle = linear(ctx, 0, 0, FLUKE_W, 0, [
+    [0, '#2b3f8f'],
+    [1, '#3f74c9'],
+  ]);
+  ctx.beginPath();
+  ctx.moveTo(FLUKE_W, FLUKE_H / 2 - 5);
+  ctx.bezierCurveTo(48, 30, 30, 10, 4, 4);
+  ctx.bezierCurveTo(12, 18, 16, 30, 22, FLUKE_H / 2);
+  ctx.bezierCurveTo(16, 50, 12, 62, 4, FLUKE_H - 4);
+  ctx.bezierCurveTo(30, 70, 48, 50, FLUKE_W, FLUKE_H / 2 + 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(170,215,255,0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(FLUKE_W - 4, FLUKE_H / 2 - 6);
+  ctx.bezierCurveTo(48, 30, 30, 12, 6, 6);
+  ctx.stroke();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const [x, y] of [
+    [14, 12],
+    [14, FLUKE_H - 12],
+  ]) {
+    ctx.fillStyle = radial(ctx, x, y, 6, [
+      [0, glow],
+      [1, 'rgba(0,0,0,0)'],
+    ]);
+    ctx.fillRect(x - 6, y - 6, 12, 12);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+const WHALE_GLOW = 'rgba(120,240,255,0.95)';
+
+export const whaleBody = () => paint(WHALE_W, WHALE_H, (ctx) => drawWhaleBody(ctx, WHALE_GLOW), 3);
+export const whaleFluke = () => paint(FLUKE_W, FLUKE_H, (ctx) => drawWhaleFluke(ctx, WHALE_GLOW), 3);
+
+/** The egg: a pearly oval with glowing freckles. */
+function drawWhaleEgg(ctx: Ctx): void {
+  const cx = 16;
+  const cy = 20;
+  ctx.fillStyle = radial(ctx, cx - 4, cy - 7, 22, [
+    [0, '#f4fbff'],
+    [0.45, '#a9d8ff'],
+    [1, '#4a6fc4'],
+  ]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 12, 16, 0, 0, TAU);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  const r = rng(5);
+  for (let i = 0; i < 9; i++) {
+    const x = cx - 8 + r() * 16;
+    const y = cy - 10 + r() * 22;
+    ctx.fillStyle = radial(ctx, x, y, 3, [
+      [0, 'rgba(140,250,255,0.95)'],
+      [1, 'rgba(0,0,0,0)'],
+    ]);
+    ctx.fillRect(x - 3, y - 3, 6, 6);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.ellipse(cx - 4, cy - 7, 3, 5, -0.4, Math.PI * 1.1, Math.PI * 1.7);
+  ctx.stroke();
+}
+
+export const whaleEgg = () => paint(32, 40, drawWhaleEgg, 4);
+export const whaleEggUrl = () => paintUrl(32, 40, drawWhaleEgg, 4);
+
+/** The whale as a picture for the menus. */
+export const whaleUrl = () =>
+  paintUrl(WHALE_W + FLUKE_W - 14, WHALE_H, (ctx) => {
+    ctx.save();
+    ctx.translate(0, (WHALE_H - FLUKE_H) / 2 + 5);
+    drawWhaleFluke(ctx, WHALE_GLOW);
+    ctx.restore();
+    ctx.translate(FLUKE_W - 14, 0);
+    drawWhaleBody(ctx, WHALE_GLOW);
+  }, 2);

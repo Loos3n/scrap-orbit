@@ -2102,3 +2102,62 @@ body.lefty #panel .tabs { padding: 6px 6px 6px 70px; }
 .cloud-box .reset-confirm span { flex-basis: 100%; color: var(--ink-dim); font-size: calc(13px * var(--ts)); }
 .legal-links { margin: 14px 0 0; font-size: calc(12px * var(--ts)); }
 .legal-links a { color: var(--ink-dim); text-underline-offset: 3px; }
+
+/* ---------- Stardrifter, the cosmic whale (ui/whale-ui.ts) ---------- */
+.whale-card { text-align: left; gap: 10px; max-height: min(88vh, 760px); overflow-y: auto; }
+.whale-card h2 { margin: 0; font-size: calc(22px * var(--ts)); }
+.whale-hero { display: grid; place-items: center; height: 120px; margin: 2px -6px 0; border-radius: 18px; background: radial-gradient(60% 80% at 50% 55%, rgb(92 214 255 / 0.28), transparent 70%), radial-gradient(120% 100% at 50% 100%, rgb(40 60 140 / 0.6), rgb(10 12 34 / 0.4)); overflow: hidden; }
+.whale-hero img { width: calc(100% * var(--size, 1)); max-width: 300px; max-height: 110px; object-fit: contain; filter: drop-shadow(0 0 14px rgb(92 214 255 / 0.45)); animation: whale-swim 4s ease-in-out infinite; }
+.whale-hero.egg img { width: auto; height: 92px; animation: whale-egg 2.6s ease-in-out infinite; }
+@keyframes whale-swim { 50% { transform: translateY(-5px) rotate(-1.5deg); } }
+@keyframes whale-egg { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+.whale-lede { margin: 0; color: var(--ink-dim); line-height: 1.45; }
+.whale-name { display: flex; align-items: center; gap: 10px; }
+.whale-rename { padding: 3px 10px; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--ink-dim); font-size: calc(12px * var(--ts)); font-weight: 600; }
+.whale-naming { display: flex; gap: 8px; }
+.whale-naming input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgb(8 10 30 / 0.7); color: var(--ink); font: inherit; font-size: calc(17px * var(--ts)); user-select: text; -webkit-user-select: text; }
+.whale-naming .primary { width: auto; padding: 10px 16px; font-size: calc(16px * var(--ts)); }
+.whale-stage { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.whale-chip { padding: 3px 10px; border-radius: 99px; background: rgb(92 214 255 / 0.16); color: #7cf0ff; font-family: var(--font-display); font-weight: 700; font-size: calc(13px * var(--ts)); letter-spacing: 0.03em; text-transform: uppercase; }
+.whale-next { color: var(--ink-dim); font-size: calc(13px * var(--ts)); }
+.whale-bar { height: 8px; border-radius: 99px; background: rgb(0 0 0 / 0.35); overflow: hidden; }
+.whale-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #5cd6ff, #b49cff); transition: width 0.4s ease; }
+.whale-bar.mood { height: 6px; margin-top: 6px; }
+.whale-bar.mood i { background: linear-gradient(90deg, #ff8fa8, #ffd166); }
+.whale-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.whale-stat { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; background: rgb(10 12 34 / 0.55); border: 1px solid rgb(255 255 255 / 0.06); }
+.whale-stat > span { color: var(--ink-dim); font-size: calc(12px * var(--ts)); text-transform: uppercase; letter-spacing: 0.04em; }
+.whale-stat b { font-family: var(--font-display); font-size: calc(17px * var(--ts)); }
+.whale-stat small { color: var(--ink-dim); font-size: calc(12px * var(--ts)); line-height: 1.3; }
+.mood-overjoyed, .mood-happy { color: #ffd166; }
+.mood-content { color: var(--ink); }
+.mood-peckish { color: #ffb08a; }
+.mood-sulking { color: #ff8fa8; }
+.whale-bowls { display: flex; gap: 5px; padding: 3px 0; }
+.whale-bowls i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgb(255 255 255 / 0.25); }
+.whale-bowls i.on { border-color: #ffb547; background: radial-gradient(circle at 40% 35%, #ffe1a0, #ffb547); box-shadow: 0 0 8px rgb(255 181 71 / 0.6); }
+.whale-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.whale-feed { min-height: 56px; }
+.whale-pet { display: flex; align-items: center; gap: 6px; padding: 0 16px; border-radius: 14px; border: 1px solid rgb(255 143 168 / 0.5); background: rgb(255 143 168 / 0.12); color: #ffc2d1; font-weight: 600; }
+.whale-pet svg { width: 18px; height: 18px; }
+.whale-act { display: grid; gap: 2px; font-size: calc(17px * var(--ts)); }
+.whale-act small { font-family: var(--font-body); font-weight: 500; font-size: calc(12px * var(--ts)); opacity: 0.8; }
+.whale-act.tow { background: linear-gradient(#bff4ff, #5cd6ff); color: #062a3a; box-shadow: 0 5px 0 #2a8fb5, 0 0 24px rgb(92 214 255 / 0.5); }
+.whale-song-ready { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid #7cf0ff; background: rgb(92 214 255 / 0.12); color: var(--ink); text-align: left; box-shadow: 0 0 16px rgb(92 214 255 / 0.25); animation: whale-glow 2s ease-in-out infinite; }
+.whale-song-ready svg { width: 24px; height: 24px; color: #7cf0ff; flex: none; }
+.whale-song-ready span { display: grid; }
+.whale-song-ready small { color: var(--ink-dim); }
+@keyframes whale-glow { 50% { box-shadow: 0 0 26px rgb(92 214 255 / 0.5); } }
+.whale-gives { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.whale-gives li { display: flex; gap: 8px; align-items: flex-start; color: var(--ink-dim); font-size: calc(13px * var(--ts)); line-height: 1.35; }
+.whale-gives li svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: #7cf0ff; }
+.whale-gives b { color: var(--ink); }
+.whale-songs { display: flex; flex-wrap: wrap; gap: 6px; }
+.whale-songs button { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: rgb(46 52 107 / 0.5); color: var(--ink); font-size: calc(13px * var(--ts)); }
+.whale-songs svg { width: 14px; height: 14px; color: #7cf0ff; }
+.whale-song { display: grid; gap: 10px; padding: 6px 0 2px; }
+.whale-song h2 { color: #bff4ff; text-shadow: 0 0 18px rgb(92 214 255 / 0.6); }
+.whale-song p { margin: 0; line-height: 1.55; opacity: 0; animation: whale-line 0.9s ease-out forwards; animation-delay: var(--d); }
+.whale-song .primary { margin-top: 6px; }
+@keyframes whale-line { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.reduce-flash .whale-song p { animation: none; opacity: 1; }
