@@ -1,6 +1,14 @@
 import { GENERATORS, UPGRADES } from './config';
 import { baseIncome } from './economy';
 import type { GameState } from './state';
+import { WHALE_STAGES } from './whale';
+import { PLANET_ERAS } from './planet';
+import { journeyDone } from './journey';
+
+const whaleAt = (id: string) => WHALE_STAGES.find((x) => x.id === id)!.at;
+const eraOf = (id: string) => PLANET_ERAS.findIndex((x) => x.id === id);
+const caught = (s: GameState) => Object.values(s.fishing.caught).reduce((n, k) => n + k, 0);
+const hearts = (s: GameState) => Object.values(s.visitors.hearts).filter((n) => (n ?? 0) >= 3).length;
 
 export interface AchievementDef {
   id: string;
@@ -40,6 +48,19 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'galaxy3', name: 'Intergalactic', desc: 'Shift galaxies 3 times.', test: (s) => s.galaxy.shifts >= 3 },
   { id: 'starmap', name: 'Cartographer', desc: 'Fill in the whole Star Map.', test: (s) => s.galaxy.map.size >= 8 },
   { id: 'all-upgrades', name: 'Fully Loaded', desc: 'Install every upgrade.', test: (s) => UPGRADES.every((u) => s.upgrades.has(u.id)) },
+  // The newer corners of the station: the whale, the planet, the crew's hobbies and the fleet.
+  { id: 'whale-hatch', name: 'It Thinks You Are Its Mother', desc: 'Hatch the warm egg.', test: (s) => s.whale.phase === 'born' },
+  { id: 'whale-adult', name: 'Big Fish (Technically)', desc: 'Raise your whale to an Adult.', test: (s) => s.whale.phase === 'born' && s.whale.growth >= whaleAt('adult') },
+  { id: 'whale-nursery', name: 'Home Waters', desc: 'Let your whale tow the station to the Nursery.', test: (s) => s.whale.nursery },
+  { id: 'planet-oceans', name: 'First Rain', desc: 'Bring your planet to the Oceans era.', test: (s) => s.planet.found && s.planet.era >= eraOf('oceans') },
+  { id: 'planet-thriving', name: 'World Builder', desc: 'Bring your planet all the way to a Thriving world.', test: (s) => s.planet.found && s.planet.era >= eraOf('thriving') },
+  { id: 'boss10', name: 'Wreck Breaker', desc: 'Break 10 boss wrecks.', test: (s) => s.stats.bosses >= 10 },
+  { id: 'fish10', name: 'Gone Fishing', desc: 'Land 10 catches.', test: (s) => caught(s) >= 10 },
+  { id: 'garden10', name: 'Green Thumb', desc: 'Harvest the garden 10 times.', test: (s) => s.garden.harvested >= 10 },
+  { id: 'dive10', name: 'Deep Diver', desc: 'Make 10 salvage dives.', test: (s) => s.dive.dives >= 10 },
+  { id: 'visitor-friend', name: 'Good Neighbour', desc: 'Make a dock visitor a friend of the station.', test: (s) => hearts(s) >= 1 },
+  { id: 'fleet1', name: 'Shipwright', desc: 'Rebuild a ship of the Hollow Fleet.', test: (s) => Object.values(s.fleet.ranks).some((n) => (n ?? 0) > 0) },
+  { id: 'captain', name: 'Captain on Deck', desc: 'Reach the rank of Captain.', test: journeyDone },
 ];
 
 /** Unlocks any achievements the state now meets and returns the new ones. */

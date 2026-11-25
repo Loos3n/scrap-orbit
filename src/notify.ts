@@ -3,15 +3,21 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { CREW, RESEARCH } from './core/content';
 import { baseIncome, offlineCapSec } from './core/economy';
 import type { GameState } from './core/state';
+import { WHALE, hatchAt } from './core/whale';
+import { currentProject, pathText } from './core/planet';
+import { plotCount, plotState } from './core/garden';
+import { shipDef } from './core/fleet';
 
 /*
  * Phone notifications for the Android app (nothing happens on the web). When the app goes to
  * the background we schedule a few reminders from the save: offline storage filling up, research
- * finishing and crew coming home. Coming back cancels them all.
+ * finishing, crew coming home, the whale's egg hatching or the whale going hungry, a planet
+ * project taking hold, the garden ripening and a ship leaving the drydock. Coming back cancels
+ * them all.
  */
 
 const native = () => Capacitor.isNativePlatform();
-const IDS = { storage: 1, research: 2, trip: 3 };
+const IDS = { storage: 1, research: 2, trip: 3, whale: 4, planet: 5, garden: 6, ship: 7 };
 
 export const notificationsAvailable = native;
 
@@ -44,6 +50,30 @@ export function reminders(state: GameState, now: number): { id: number; at: numb
   if (trip) {
     const who = CREW.find((c) => c.id === trip.crew)?.name ?? 'Your crew';
     out.push({ id: IDS.trip, at: trip.endsAt, title: `${who} is back`, body: `${who} came home from a trip with a haul to unpack.` });
+  }
+  const w = state.whale;
+  if (w.phase === 'egg' && hatchAt(state) > now + 60_000) {
+    out.push({ id: IDS.whale, at: hatchAt(state), title: 'The egg is hatching!', body: 'Something tiny is knocking from inside. Come and meet it.' });
+  } else if (w.phase === 'born' && w.hunger < WHALE.mealsMax) {
+    // Only once every bowl is empty, so a nap never turns into nagging.
+    const at = w.hungerAt + (WHALE.mealsMax - w.hunger) * WHALE.mealEveryMin * 60_000;
+    if (at > now + 60_000) out.push({ id: IDS.whale, at, title: `${w.name} is hungry`, body: `${w.name} is circling the station with a rumbling tummy. A meal keeps it happy (and keeps the bonus up).` });
+  }
+  const pr = currentProject(state);
+  if (pr && state.planet.settleAt > now + 60_000) {
+    const name = pathText(state, pr.name);
+    out.push({ id: IDS.planet, at: state.planet.settleAt, title: `${name} took hold`, body: `Good news from ${state.planet.name}. The next project is ready for pods.` });
+  }
+  let ripe = 0;
+  for (let i = 0; i < plotCount(state); i++) {
+    const p = plotState(state, i, now);
+    if (p.crop && !p.ripe && p.secondsLeft > 60) ripe = Math.max(ripe, now + p.secondsLeft * 1000);
+  }
+  if (ripe) out.push({ id: IDS.garden, at: ripe, title: 'The garden is ripe', body: 'Everything in the hydroponics bay is ready to pick. The crew are hungry for a snack.' });
+  const job = state.fleet.job;
+  if (job && job.endsAt > now + 60_000) {
+    const ship = shipDef(job.ship)?.name ?? 'Your ship';
+    out.push({ id: IDS.ship, at: job.endsAt, title: `${ship} is ready`, body: `${ship} is out of the drydock and waiting to join the fleet.` });
   }
   return out;
 }

@@ -212,7 +212,7 @@ export const PLANET_ERAS: readonly PlanetEra[] = [
 
 export const PLANET = {
   /** The scanners pick it up once a new captain has played this long (and finished the tutorial). */
-  openAfterPlaySec: 45 * 60,
+  openAfterPlaySec: 30 * 60,
   /** Extra income for every project done. */
   perProject: 0.03,
   /** Extra income once it is thriving. */

@@ -2128,9 +2128,10 @@ export class StationScene {
       return sx >= b.x - pad && sx <= b.x + b.width + pad && sy >= b.y - pad && sy <= b.y + b.height + pad;
     };
     if (hit(v.eggSprite(), 12)) return 'egg';
-    // Taps on the station itself always go to the claw, even with the whale gliding behind.
+    // Taps on the station itself always go to the claw, even with the whale gliding behind it
+    // (the hull, the bays and the haulers' orbit).
     const w = this.toWorld(sx, sy);
-    if (Math.hypot(w.x, w.y) < 80) return null;
+    if (Math.hypot(w.x, w.y) < 160) return null;
     // The body's box includes empty corners, so trim it a little.
     const body = v.bodySprite();
     if (body && !body.destroyed) {

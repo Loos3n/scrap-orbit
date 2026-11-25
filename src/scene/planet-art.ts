@@ -255,9 +255,10 @@ function buildMaps(look: PlanetLook): Maps {
         const coast = smooth(sea + 0.14, sea, h);
         const n = B.town[i];
         // Towns cluster near the coasts; each lit pixel is a single speck, brighter in the middle.
-        const th = 0.7 - look.lights * 0.16 - coast * 0.1;
-        const town = smooth(th, th + 0.1, n);
-        if (town > 0 && B.speck[i] < town * (0.25 + look.lights * 0.45)) lights[i] = 0.55 + 0.45 * town;
+        // Kept sparse: a thriving world reads as strings of little towns, not lit-up continents.
+        const th = 0.72 - look.lights * 0.08 - coast * 0.08;
+        const town = smooth(th, th + 0.12, n);
+        if (town > 0 && B.speck[i] < town * town * (0.1 + look.lights * 0.22)) lights[i] = 0.5 + 0.5 * town;
       }
     }
   }

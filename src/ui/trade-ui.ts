@@ -26,6 +26,10 @@ export function offlineReportHtml(r: OfflineReport): string {
     const names = r.trips.map((id) => CREW.find((c) => c.id === id)?.name ?? id);
     lines.push([ICONS.crew, `<b>${esc(names.join(' and '))}</b> came back from ${r.trips.length > 1 ? 'their trips' : 'a trip'}. Open Crew, Trips for the haul`]);
   }
+  if (r.whale?.hatched) lines.push([ICONS.whale, `The egg hatched! <b>A baby space whale</b> is waiting to meet you`]);
+  else if (r.whale) lines.push([ICONS.whale, `<b>${esc(r.whale.name)}</b> is hungry for ${r.whale.hunger === 1 ? 'a meal' : `${r.whale.hunger} meals`}. Tap its button to feed it`]);
+  if (r.planet) lines.push([ICONS.planet, r.planet.era ? `<b>${esc(r.planet.project)}</b> took hold. ${esc(r.planet.name)} reached <b>${esc(r.planet.era)}</b>` : `<b>${esc(r.planet.project)}</b> took hold on ${esc(r.planet.name)}. The next project is ready`]);
+  if (r.ripe) lines.push([ICONS.station, `${r.ripe === 1 ? 'A crop is' : `${r.ripe} crops are`} ripe in the garden (Station, Garden)`]);
   if (r.ship) lines.push([ICONS.fleet, `The <b>${esc(r.ship)}</b> is out of the drydock. See it in Prestige, Fleet`]);
   if (r.trader) lines.push([ICONS.crystal, 'A trader is on the way with deals']);
   if (r.golden) lines.push([ICONS.star, 'Golden scrap is drifting nearby. Keep an eye out']);

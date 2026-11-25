@@ -32,6 +32,8 @@ export function closeTop(): boolean {
     // The contract choice waits for an answer, so back leaves it up.
     const closer = CLOSERS[top.id];
     if (closer) document.getElementById(closer)?.click();
+    // Newer windows (the whale, the planet, visitors, dives, a friend's station) close with their × button.
+    else top.querySelector<HTMLButtonElement>(':scope > .modal-card > .close-btn')?.click();
     return true;
   }
   const menu = document.getElementById('menu-btn');
