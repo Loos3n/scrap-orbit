@@ -128,11 +128,28 @@ export class PlanetPanel {
     if ($('planet-btn-name').textContent !== p.name) $('planet-btn-name').textContent = p.name;
     if ($('planet').hidden) return;
     const cost = this.game.planetPodCost();
-    const key = [p.era, p.project, p.loads, p.path, p.name, p.stories, p.settleAt, this.naming, this.reading?.era.id ?? '', ...(this.naming || this.reading ? [] : [Math.floor(now / 1000), this.game.canAffordPod(), cost ? this.fmt(cost.scrap) : ''])].join('|');
-    if (key === this.key) return;
+    // Rebuilt only when something changes shape; the countdowns and head count tick in place, so a
+    // tap on Send a pod is never lost to the button being swapped out under the finger.
+    const live = !this.naming && !this.reading;
+    const key = [p.era, p.project, p.loads, p.path, p.name, p.stories, p.settleAt, p.shuttles, this.naming, this.reading?.era.id ?? '', ...(live ? [planet.settleSeconds(s, now) > 0, this.game.canAffordPod(), cost ? this.fmt(cost.scrap) : ''] : [])].join('|');
+    if (key === this.key) {
+      if (live) this.tick(now);
+      return;
+    }
     this.key = key;
     if (this.reading) return this.renderStory(this.reading.era);
     this.renderPlanet(now);
+  }
+
+  /** Updates the countdowns on the open window without rebuilding it. */
+  private tick(now: number): void {
+    const s = this.game.state;
+    const settle = document.getElementById('planet-settle-left');
+    if (settle) settle.textContent = formatDuration(planet.settleSeconds(s, now));
+    const shuttle = document.getElementById('planet-shuttle-left');
+    if (shuttle) shuttle.textContent = formatDuration(Math.max(0, (s.planet.shuttleAt - now) / 1000));
+    const pop = document.getElementById('planet-pop');
+    if (pop) pop.textContent = planet.population(s, now).toLocaleString();
   }
 
   private portrait(): string {
@@ -175,7 +192,7 @@ export class PlanetPanel {
           <p>${esc(planet.pathText(s, pr.desc))}</p>
           ${
             p.settleAt
-              ? `<div class="planet-settle">${ICONS.clock}<span>${settling > 0 ? `Taking hold. Done in <b>${formatDuration(settling)}</b>` : 'Almost there...'}</span></div>`
+              ? `<div class="planet-settle">${ICONS.clock}<span>${settling > 0 ? `Taking hold. Done in <b id="planet-settle-left">${formatDuration(settling)}</b>` : 'Almost there...'}</span></div>`
               : `<button type="button" class="buy planet-send" data-p="pod" ${can ? '' : 'disabled'}><span class="buy-count">Send a pod <small>${p.loads} of ${pr.loads} landed</small></span><span class="buy-cost">${price}</span></button>`
           }
         </div>`;
@@ -183,9 +200,9 @@ export class PlanetPanel {
       const pop = planet.population(s, now);
       const next = Math.max(0, (p.shuttleAt - now) / 1000);
       work = `<div class="planet-project thriving">
-          <b>${pop.toLocaleString()} people live here</b>
+          <b><span id="planet-pop">${pop.toLocaleString()}</span> people live here</b>
           <p>Trade shuttles rise from the spaceport every half hour or so with ${PLANET.shuttleMinutes} minutes of scrap. ${p.shuttles ? `${p.shuttles} so far.` : ''}</p>
-          <div class="planet-settle">${ICONS.clock}<span>Next shuttle in <b>${formatDuration(next)}</b></span></div>
+          <div class="planet-settle">${ICONS.clock}<span>Next shuttle in <b id="planet-shuttle-left">${formatDuration(next)}</b></span></div>
         </div>`;
     }
 

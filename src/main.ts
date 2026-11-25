@@ -1286,6 +1286,9 @@ async function boot(): Promise<void> {
   // Some apps that host the page take vertical swipes for themselves; claim them first.
   sceneEl.addEventListener('touchmove', (ev) => ev.cancelable && ev.preventDefault(), { passive: false });
 
+  /** When the scene was last tapped, so a burst of taps is never turned into opening a window. */
+  let lastSceneTap = -1e9;
+  const TAP_STREAK_MS = 900;
   sceneEl.addEventListener('pointerdown', (ev) => {
     const rect = sceneEl.getBoundingClientRect();
     const x = ev.clientX - rect.left;
@@ -1295,26 +1298,14 @@ async function boot(): Promise<void> {
       buzz(10);
       return;
     }
-    if (game.state.tutorial < 0 && game.state.planet.found && scene.planetAt(x, y)) {
-      planetPanel.open();
-      buzz(10);
-      return;
-    }
+    // While the captain is tapping away, the planet and the whale never pop a window open over the
+    // station: those taps stay claw taps (and still pet the whale). A calm single tap opens them.
+    const now = performance.now();
+    const tapping = now - lastSceneTap < TAP_STREAK_MS;
+    lastSceneTap = now;
+    const calm = !tapping && !game.state.boss;
     const onWhale = game.state.tutorial < 0 ? scene.whaleAt(x, y) : null;
-    if (onWhale === 'egg') {
-      whalePanel.open();
-      buzz(10);
-      return;
-    }
-    if (onWhale === 'whale') {
-      // A tap on the whale pets it; a second tap soon after opens its window.
-      if (game.petWhale()) {
-        scene.whalePet();
-        sfx.whaleSong(whaleStage(game.state).size, true);
-        buzz(8);
-      } else whalePanel.open();
-      return;
-    }
+    const onPlanet = game.state.tutorial < 0 && game.state.planet.found && scene.planetAt(x, y);
     cancelHold();
     if (!drag && !pinch) {
       drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, moving: false };
@@ -1370,6 +1361,26 @@ async function boot(): Promise<void> {
       const n = game.boardConvoy();
       scene.floatText(scene.lastHit.x, scene.lastHit.y, `+${n} crystals`, true);
       buzz(25);
+      return;
+    }
+    // Crates, meteors and the rest drifting in front of them are caught first (above).
+    if (onWhale === 'egg' && calm) {
+      whalePanel.open();
+      buzz(10);
+      return;
+    }
+    if (onWhale === 'whale') {
+      if (game.petWhale()) {
+        scene.whalePet();
+        sfx.whaleSong(whaleStage(game.state).size, true);
+        buzz(8);
+      } else if (calm) {
+        whalePanel.open();
+        return;
+      }
+    } else if (onPlanet && calm) {
+      planetPanel.open();
+      buzz(10);
       return;
     }
     if (scene.pokeCrew(x, y)) buzz(6);

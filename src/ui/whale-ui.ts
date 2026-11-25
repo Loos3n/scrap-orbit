@@ -126,12 +126,28 @@ export class WhalePanel {
     const label = w.phase === 'egg' ? 'Egg' : w.name;
     if ($('whale-btn-name').textContent !== label) $('whale-btn-name').textContent = label;
     if ($('whale').hidden) return;
-    const key = [w.phase, w.warmed, Math.floor(w.growth), Math.round(w.mood), w.hunger, w.name, w.songs, w.nursery, this.naming, this.reading?.song.id ?? '', ...(this.naming || this.reading ? [] : [Math.floor(now / 1000), s.scrap.gte(this.game.whaleMealCost())])].join('|');
-    if (key === this.key) return;
+    // The window is only rebuilt when something on it changes shape; the countdowns tick in place,
+    // so a finger on Feed or Warm never lands on a button that was swapped out under it.
+    const live = !this.naming && !this.reading;
+    const hatchLeft = w.phase === 'egg' ? Math.max(0, (whale.hatchAt(s) - now) / 1000) : 0;
+    const key = [w.phase, w.warmed, Math.floor(w.growth), Math.round(w.mood), w.hunger, w.name, w.songs, w.nursery, w.treatsToday, w.treatDay, this.naming, this.reading?.song.id ?? '', ...(live ? [hatchLeft > 0, s.scrap.gte(this.game.whaleMealCost()), this.fmt(this.game.whaleMealCost())] : [])].join('|');
+    if (key === this.key) {
+      if (live) this.tick(now);
+      return;
+    }
     this.key = key;
     if (this.reading) return this.renderSong(this.reading.song);
     if (w.phase === 'egg') return this.renderEgg(now);
     this.renderWhale(now);
+  }
+
+  /** Updates the countdowns on the open window without rebuilding it. */
+  private tick(now: number): void {
+    const s = this.game.state;
+    const hatch = document.getElementById('whale-hatch-left');
+    if (hatch) hatch.textContent = formatDuration(Math.max(0, (whale.hatchAt(s) - now) / 1000));
+    const wait = document.getElementById('whale-meal-wait');
+    if (wait) wait.textContent = formatDuration(whale.nextMealSeconds(s, now));
   }
 
   private renderEgg(now: number): void {
@@ -143,7 +159,7 @@ export class WhalePanel {
       <div class="whale-hero egg"><img src="${this.eggPic}" alt="" /></div>
       <h2>A warm egg</h2>
       <p class="whale-lede">It was in a salvage crate, wrapped in old packing foam. It hums when you hold it, and something inside it hums back.</p>
-      <div class="whale-stat"><span>Hatches in</span><b>${left > 0 ? formatDuration(left) : 'any moment now'}</b></div>
+      <div class="whale-stat"><span>Hatches in</span><b>${left > 0 ? `<span id="whale-hatch-left">${formatDuration(left)}</span>` : 'any moment now'}</b></div>
       <button type="button" class="primary whale-act" data-w="warm" ${warmsLeft <= 0 || left <= 0 ? 'disabled' : ''}>Warm it up <small>${warmsLeft > 0 ? `${WHALE.warmMinutes} min sooner, ${warmsLeft} left` : 'It is as cosy as it gets'}</small></button>`;
   }
 
@@ -166,7 +182,7 @@ export class WhalePanel {
     const nameRow = this.naming
       ? `<div class="whale-naming"><input id="whale-name-input" type="text" maxlength="14" value="${esc(w.name)}" aria-label="Whale's name" autocomplete="off" /><button type="button" class="primary" data-w="save-name">Save</button></div>`
       : `<h2 class="whale-name">${esc(w.name)} <button type="button" class="whale-rename" data-w="rename">Rename</button></h2>`;
-    const feedNote = w.hunger > 0 ? (canFeed ? `Wants ${w.hunger} more ${w.hunger === 1 ? 'meal' : 'meals'}` : 'Not enough scrap for a meal yet') : `Full. Hungry again in ${formatDuration(wait)}`;
+    const feedNote = w.hunger > 0 ? (canFeed ? `Wants ${w.hunger} more ${w.hunger === 1 ? 'meal' : 'meals'}` : 'Not enough scrap for a meal yet') : `Full. Hungry again in <span id="whale-meal-wait">${formatDuration(wait)}</span>`;
     $('whale-body').innerHTML = `
       <div class="whale-hero" style="--size:${0.45 + stage.size * 0.55}"><img src="${this.whalePic}" alt="" /></div>
       ${nameRow}

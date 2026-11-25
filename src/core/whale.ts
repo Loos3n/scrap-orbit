@@ -39,7 +39,7 @@ export const WHALE_STAGES: readonly WhaleStage[] = [
 
 export const WHALE = {
   /** The egg turns up in the first crate opened after this much play (and the tutorial). */
-  eggAfterPlaySec: 20 * 60,
+  eggAfterPlaySec: 12 * 60,
   /** The egg hatches this long after it is found... */
   hatchMinutes: 60,
   /** ...less this much for each time it is warmed, up to `warmMax` times. */

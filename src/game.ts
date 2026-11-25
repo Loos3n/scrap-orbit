@@ -6,7 +6,7 @@ import { FINALE_CRYSTALS, FINALE_ID, STORY_CRYSTALS, pendingStory } from './core
 import { markOf } from './core/evolve';
 import { FLEET, shipDef, addPlates, collectPatrol, finishJob, jobSecondsLeft, shiftPlates, startJob, welcomeFleet, type ShipId } from './core/fleet';
 import { rushCost } from './core/content';
-import { cropDef, harvest, plant, type CropDef } from './core/garden';
+import { cropDef, harvest, plant, plotCount, type CropDef } from './core/garden';
 import { DIVE, finishDive, refillCharges, startDive } from './core/dive';
 import { comboMult, cooled, heatAfterTap } from './core/combo';
 import { CONTRACT_CRYSTALS, checkContract, contractAutoBuyOff, makeOffers, pickContract, type ContractId } from './core/contracts';
@@ -148,6 +148,12 @@ export interface OfflineReport {
   ship?: string;
   /** The multiplier offline earnings got (owl, research, greenhouses, loot). */
   mult: number;
+  /** The whale's egg hatched, or the whale is hungry (meals it wants, and its name). */
+  whale?: { name: string; hatched: boolean; hunger: number };
+  /** A planet project that took hold while away, and whether it changed the era. */
+  planet?: { name: string; project: string; era?: string };
+  /** Garden plots that ripened while away. */
+  ripe: number;
 }
 
 function storageGet(): string | null {
@@ -821,7 +827,27 @@ export class Game {
       trader: s.tutorial < 0 && s.trader.nextAt > 0 && s.trader.nextAt <= now && !s.trader.until,
       ship: s.fleet.job && s.fleet.job.endsAt > since && s.fleet.job.endsAt <= now ? shipDef(s.fleet.job.ship)?.name : undefined,
       mult: eco.offlineMult(s),
+      ripe: 0,
     };
+    // The egg hatching, a planet project taking hold and crops ripening, read before the regular
+    // updates tidy them up (they still celebrate as usual once the game is running again).
+    const w = s.whale;
+    if (w.phase === 'egg' && whale.hatchAt(s) > since && whale.hatchAt(s) <= now) report.whale = { name: w.name, hatched: true, hunger: 1 };
+    else if (w.phase === 'born') {
+      const probe = { ...w };
+      const hungerAfter = Math.min(whale.WHALE.mealsMax, probe.hunger + Math.max(0, Math.floor((now - probe.hungerAt) / (whale.WHALE.mealEveryMin * 60_000))));
+      if (hungerAfter > 0) report.whale = { name: w.name, hatched: false, hunger: hungerAfter };
+    }
+    const pr = planet.currentProject(s);
+    if (pr && s.planet.settleAt > since && s.planet.settleAt <= now) {
+      const era = s.planet.project + 1 >= planet.planetEra(s).projects.length ? planet.PLANET_ERAS[s.planet.era + 1]?.name : undefined;
+      report.planet = { name: s.planet.name, project: planet.pathText(s, pr.name), era };
+    }
+    for (let i = 0; i < plotCount(s); i++) {
+      const p = s.garden.plots[i];
+      const crop = p && cropDef(p.crop);
+      if (p && crop && p.at + crop.minutes * 60_000 > since && p.at + crop.minutes * 60_000 <= now) report.ripe++;
+    }
     const { seconds, earned } = eco.applyOffline(s, now);
     this.lastFrame = now;
     // Time spent watching an optional ad is credited quietly, not greeted with "welcome back".
